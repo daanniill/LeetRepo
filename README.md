@@ -28,3 +28,17 @@ npm test
 ```
 
 The extraction code intentionally uses several fallback selectors because LeetCode changes its DOM regularly.
+
+## Repository structure
+
+```text
+assets/                 Extension icons
+src/
+  background/           Manifest V3 service worker
+  content/              LeetCode page integration
+  core/                 Submission and GitHub domain logic
+  pages/                Popup, options, onboarding, and dashboard UIs
+  shared/               UI helpers and shared styles
+tests/                  Node unit tests for core logic
+manifest.json           Chrome extension entry points and permissions
+```

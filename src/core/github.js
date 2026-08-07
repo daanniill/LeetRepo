@@ -1,4 +1,4 @@
-import { buildReadme, folderFor, formatCommit, normalizeSubmission } from "./lib.js";
+import { buildReadme, folderFor, formatCommit, normalizeSubmission } from "./submissions.js";
 
 const API = "https://api.github.com";
 
@@ -14,7 +14,11 @@ function headers(token) {
 async function request(token, path, init = {}) {
   const response = await fetch(`${API}${path}`, { ...init, headers: { ...headers(token), ...init.headers } });
   const data = response.status === 204 ? null : await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data?.message || `GitHub request failed (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(data?.message || `GitHub request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 
@@ -37,15 +41,44 @@ async function createBlob(token, owner, repo, content) {
   });
 }
 
+function base64Utf8(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+async function initializeEmptyRepo(token, owner, repo) {
+  return request(token, `/repos/${owner}/${repo}/contents/README.md`, {
+    method: "PUT",
+    body: JSON.stringify({
+      message: "chore: initialize repository for LeetRepo",
+      content: base64Utf8("# LeetCode Solutions\n\nAccepted solutions synced by LeetRepo.\n")
+    })
+  });
+}
+
+function isEmptyRepoError(error) {
+  return error?.status === 409 && /repository is empty/i.test(error.message);
+}
+
 export async function pushSubmission({ token, settings, submission }) {
   const item = normalizeSubmission(submission);
   if (!item.code) throw new Error("No solution code was found on this page.");
   const owner = encodeURIComponent(settings.owner);
   const repo = encodeURIComponent(settings.repo);
   const info = await repoInfo(token, settings.owner, settings.repo);
-  const branch = settings.branch || info.default_branch;
-  const ref = await request(token, `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`);
-  const parentSha = ref.object.sha;
+  let branch = settings.branch || info.default_branch || "main";
+  let parentSha;
+  try {
+    const ref = await request(token, `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`);
+    parentSha = ref.object.sha;
+  } catch (error) {
+    if (!isEmptyRepoError(error)) throw error;
+    const initialized = await initializeEmptyRepo(token, owner, repo);
+    branch = info.default_branch || "main";
+    parentSha = initialized.commit.sha;
+  }
   const parentCommit = await request(token, `/repos/${owner}/${repo}/git/commits/${parentSha}`);
   const folder = folderFor(item);
   const solution = await createBlob(token, owner, repo, `${item.code}\n`);

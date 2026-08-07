@@ -1,5 +1,5 @@
-import { DEFAULT_SETTINGS } from "./lib.js";
-import { logo, send, setBusy, showNotice } from "./client.js";
+import { DEFAULT_SETTINGS } from "../../core/submissions.js";
+import { logo, send, setBusy, showNotice } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
 const notice = document.querySelector("#notice");

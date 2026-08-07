@@ -1,5 +1,5 @@
-import { calculateStreak, relativeTime } from "./lib.js";
-import { currentSubmission, difficultyClass, escapeHtml, logo, send, setBusy, showNotice } from "./client.js";
+import { calculateStreak, relativeTime } from "../../core/submissions.js";
+import { currentSubmission, difficultyClass, escapeHtml, logo, send, setBusy, showNotice } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
 const pushButton = document.querySelector("#push-button");

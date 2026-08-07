@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS } from "./lib.js";
+import { DEFAULT_SETTINGS } from "../core/submissions.js";
 
 const DEMO_SUBMISSION = {
   id: "42-trapping-rain-water",

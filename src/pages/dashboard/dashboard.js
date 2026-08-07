@@ -1,5 +1,5 @@
-import { buildReview, calculateStreak, relativeTime } from "./lib.js";
-import { difficultyClass, escapeHtml, logo, send } from "./client.js";
+import { buildReview, calculateStreak, relativeTime } from "../../core/submissions.js";
+import { difficultyClass, escapeHtml, logo, send } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
 let state = { settings: {}, submissions: [] };

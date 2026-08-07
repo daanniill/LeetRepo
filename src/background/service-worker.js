@@ -1,5 +1,5 @@
-import { DEFAULT_SETTINGS, normalizeSubmission } from "./lib.js";
-import { listRepos, pushSubmission, verifyToken } from "./github.js";
+import { DEFAULT_SETTINGS, normalizeSubmission } from "../core/submissions.js";
+import { listRepos, pushSubmission, verifyToken } from "../core/github.js";
 
 const getLocal = (keys) => chrome.storage.local.get(keys);
 const setLocal = (value) => chrome.storage.local.set(value);
@@ -9,7 +9,7 @@ const setSync = (value) => chrome.storage.sync.set(value);
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   const { settings } = await getSync("settings");
   if (!settings) await setSync({ settings: DEFAULT_SETTINGS });
-  if (reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("src/onboarding.html") });
+  if (reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("src/pages/onboarding/onboarding.html") });
 });
 
 async function recordPush(submission, result) {
@@ -59,7 +59,7 @@ async function handle(message) {
       return { ok: true };
     }
     case "OPEN_DASHBOARD":
-      await chrome.tabs.create({ url: chrome.runtime.getURL("src/dashboard.html") });
+      await chrome.tabs.create({ url: chrome.runtime.getURL("src/pages/dashboard/dashboard.html") });
       return { ok: true };
     case "OPEN_OPTIONS":
       await chrome.runtime.openOptionsPage();

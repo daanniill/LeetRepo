@@ -8,7 +8,7 @@ import {
   normalizeSubmission,
   relativeTime,
   slugify
-} from "../src/lib.js";
+} from "../src/core/submissions.js";
 
 const submission = {
   number: 42,
