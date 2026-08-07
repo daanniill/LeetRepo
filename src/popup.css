@@ -1,0 +1,16 @@
+html, body { width: 376px; min-height: 590px; }
+.popup-header { height: 56px; padding: 0 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+.popup-header .logo-mark { width: 27px; height: 27px; border-radius: 9px; }
+.popup-header .logo-mark svg { width: 16px; }
+.popup-main { padding: 16px; display: flex; flex-direction: column; gap: 15px; }
+.problem-card { padding: 15px; display: flex; flex-direction: column; gap: 13px; }
+.problem-card h1 { margin: 0 0 6px; font-size: 17px; line-height: 1.2; }
+.problem-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; color: var(--muted); font-size: 12px; }
+.auto-row { min-height: 43px; }
+.auto-row strong { display: block; font-size: 13px; }
+.auto-row small { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+.recent-label { margin: 2px 0 6px; color: var(--muted); }
+.recent-item { padding: 8px 0; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.recent-item:last-child { border-bottom: 0; }
+.recent-item time { margin-left: auto; color: var(--muted); font-size: 11px; }
+.recent-empty { color: var(--muted); font-size: 12px; padding: 10px 0; }

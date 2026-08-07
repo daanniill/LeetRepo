@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeetRepo Settings</title>
+    <link rel="stylesheet" href="common.css">
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <header class="topbar"><a class="brand" href="#" id="brand"><span id="logo"></span>LeetRepo</a><span class="muted">/</span><strong>Settings</strong></header>
+    <main class="settings-page">
+      <div class="settings-head"><div><div class="eyebrow">Extension preferences</div><h1>Settings</h1><p>Choose where and how accepted submissions are committed.</p></div><button class="button secondary" id="open-dashboard">Open dashboard</button></div>
+      <div class="notice" id="notice" hidden></div>
+      <form class="panel settings-panel" id="settings-form">
+        <section>
+          <div class="section-title"><div><h2>Repository</h2><p>The destination for all solution commits.</p></div><span class="badge accepted" id="connection-badge">Connected</span></div>
+          <div class="field-grid">
+            <div class="field"><label for="owner">Owner</label><input class="input" id="owner" required></div>
+            <div class="field"><label for="repo">Repository</label><input class="input" id="repo" required></div>
+            <div class="field"><label for="branch">Branch</label><input class="input" id="branch" placeholder="main"></div>
+          </div>
+        </section>
+        <hr class="divider">
+        <section>
+          <div class="section-title"><div><h2>Commit content</h2><p>One atomic commit per accepted solution.</p></div></div>
+          <div class="field"><label for="commit-template">Commit message format</label><input class="input mono" id="commit-template"></div>
+          <div class="toggle-list">
+            <label class="setting-line"><div><strong>Auto-push on Accepted</strong><small>Sync immediately after LeetCode accepts</small></div><span class="switch"><input id="autoPush" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>Generate a README</strong><small>Problem details and interview review</small></div><span class="switch"><input id="includeReadme" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>Runtime and memory</strong><small>Include captured submission metrics</small></div><span class="switch"><input id="includeStats" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>LeetCode link</strong><small>Link back to the original problem</small></div><span class="switch"><input id="includeLink" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>Interview overview</strong><small>Add patterns and replay prompts</small></div><span class="switch"><input id="includeReview" type="checkbox"><span></span></span></label>
+          </div>
+        </section>
+        <div class="form-actions"><button class="button" id="save-button" type="submit">Save settings</button><button class="button danger" id="disconnect" type="button">Disconnect GitHub</button></div>
+      </form>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

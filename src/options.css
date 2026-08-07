@@ -1,0 +1,16 @@
+.settings-page { width: min(940px, calc(100% - 32px)); margin: 0 auto; padding: 62px 0 80px; }
+.settings-head { margin-bottom: 26px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.settings-head h1 { margin: 8px 0 7px; font-size: 42px; }
+.settings-head p, .section-title p { margin: 0; color: var(--muted); }
+.settings-panel { margin-top: 16px; padding: 32px; display: flex; flex-direction: column; gap: 28px; }
+.section-title { margin-bottom: 20px; display: flex; align-items: flex-start; justify-content: space-between; }
+.section-title h2 { margin-bottom: 5px; font-size: 21px; }
+.section-title p { font-size: 12px; }
+.field-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.toggle-list { margin-top: 18px; border-top: 1px solid var(--line); }
+.setting-line { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.setting-line strong, .setting-line small { display: block; }
+.setting-line small { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.form-actions { display: flex; align-items: center; gap: 10px; }
+.form-actions .danger { margin-left: auto; }
+@media (max-width: 680px) { .settings-page { padding-top: 34px; } .settings-head { align-items: flex-start; } .settings-head .button { display: none; } .field-grid { grid-template-columns: 1fr; } .settings-panel { padding: 22px 18px; } }

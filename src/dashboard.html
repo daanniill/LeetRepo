@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LeetRepo Dashboard</title>
+    <link rel="stylesheet" href="common.css">
+    <link rel="stylesheet" href="dashboard.css">
+  </head>
+  <body>
+    <div class="app-shell dashboard-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#"><span id="logo"></span>LeetRepo</a>
+        <nav>
+          <button class="nav-item active" data-view="problems"><span>▦</span>Problems</button>
+          <button class="nav-item" data-view="activity"><span>↻</span>Activity</button>
+          <button class="nav-item" id="settings-link"><span>☷</span>Settings</button>
+        </nav>
+        <div class="repo-chip"><span class="dot"></span><span class="truncate" id="repo-name">Not connected</span></div>
+      </aside>
+      <main class="dashboard-main">
+        <header class="dashboard-header">
+          <div><div class="eyebrow">Your solution library</div><h1>Synced problems</h1></div>
+          <div class="header-actions"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Search problems…"></label><button class="button secondary" id="refresh">Refresh</button></div>
+        </header>
+
+        <section class="stats-row" id="stats-row">
+          <div class="stat"><div class="stat-value" id="total-stat">0</div><div class="stat-label">problems synced</div></div>
+          <div class="stat"><div class="stat-value accent" id="streak-stat">0</div><div class="stat-label">day streak</div></div>
+          <div class="stat"><div class="stat-value difficulty-counts" id="difficulty-stat">0 / 0 / 0</div><div class="stat-label">easy / medium / hard</div></div>
+          <div class="stat"><div class="stat-value" id="reviewed-stat">0</div><div class="stat-label">interview overviews</div></div>
+        </section>
+
+        <section class="activity-card panel" id="activity-card">
+          <div class="row spread"><div><h2>Solve activity</h2><p>Accepted submissions synced in the last 20 weeks</p></div><div class="activity-legend"><span>Less</span><i></i><i></i><i></i><i></i><span>More</span></div></div>
+          <div class="heatmap" id="heatmap" aria-label="Solve activity heatmap"></div>
+        </section>
+
+        <section class="library-panel panel">
+          <div class="library-toolbar">
+            <div class="filters" role="group" aria-label="Filter by difficulty">
+              <button class="filter active" data-filter="All">All</button>
+              <button class="filter" data-filter="Easy">Easy</button>
+              <button class="filter" data-filter="Medium">Medium</button>
+              <button class="filter" data-filter="Hard">Hard</button>
+            </div>
+            <span class="muted" id="result-count">0 results</span>
+          </div>
+          <div class="library-grid">
+            <div class="table-wrap">
+              <div class="table-head"><span>Problem</span><span>Diff</span><span>Lang</span><span>Synced</span></div>
+              <div id="problem-list"></div>
+            </div>
+            <aside class="detail-panel" id="detail-panel">
+              <div class="empty"><strong>Select a problem</strong>Its interview overview will appear here.</div>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="dashboard.js"></script>
+  </body>
+</html>

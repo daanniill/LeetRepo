@@ -1,0 +1,40 @@
+#leetrepo-panel { all: initial; position: fixed; right: 22px; bottom: 22px; z-index: 2147483000; width: 286px; color: #1c211f; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+#leetrepo-panel * { box-sizing: border-box; }
+#leetrepo-panel .lr-shell { overflow: hidden; border: 1px solid rgba(28,33,31,.14); border-radius: 22px; background: #edeee4; box-shadow: 0 16px 46px rgba(24,32,29,.24); }
+#leetrepo-panel .lr-head { height: 48px; padding: 0 13px; border-bottom: 1px solid rgba(28,33,31,.12); display: flex; align-items: center; gap: 8px; }
+#leetrepo-panel .lr-logo { width: 25px; height: 25px; border-radius: 9px; display: grid; place-items: center; color: #edeee4; background: #2f8f8a; }
+#leetrepo-panel .lr-logo svg { width: 15px; height: 15px; }
+#leetrepo-panel .lr-brand { font-family: "Arial Rounded MT Bold", "Trebuchet MS", sans-serif; font-size: 13px; font-weight: 800; }
+#leetrepo-panel .lr-minimize { width: 28px; height: 28px; margin-left: auto; border: 0; border-radius: 10px; color: #667069; background: transparent; cursor: pointer; }
+#leetrepo-panel .lr-minimize:hover { color: #1c211f; background: #f6f7f1; }
+#leetrepo-panel .lr-body { padding: 14px; display: flex; flex-direction: column; gap: 11px; }
+#leetrepo-panel .lr-title { font-family: "Arial Rounded MT Bold", "Trebuchet MS", sans-serif; font-size: 14px; font-weight: 800; line-height: 1.25; }
+#leetrepo-panel .lr-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: #667069; font-size: 10.5px; }
+#leetrepo-panel .lr-badge { padding: 3px 8px; border-radius: 11px; background: #e4e7d8; color: #4d5443; font-size: 10px; font-weight: 800; }
+#leetrepo-panel .lr-badge.Easy { color: #3d642b; background: #dcecc9; }
+#leetrepo-panel .lr-badge.Hard { color: #984d32; background: #f0d8cd; }
+#leetrepo-panel .lr-status { display: flex; align-items: center; gap: 6px; color: #667069; font-size: 10.5px; }
+#leetrepo-panel .lr-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #a1a8a3; }
+#leetrepo-panel .lr-status.accepted { color: #3d642b; }
+#leetrepo-panel .lr-status.accepted::before { background: #6e9852; }
+#leetrepo-panel .lr-button { width: 100%; min-height: 38px; padding: 0 14px; border: 0; border-radius: 999px; display: flex; align-items: center; justify-content: center; gap: 7px; color: #edeee4; background: #2f8f8a; font-family: "Arial Rounded MT Bold", "Trebuchet MS", sans-serif; font-size: 12px; font-weight: 800; cursor: pointer; }
+#leetrepo-panel .lr-button:disabled { cursor: not-allowed; filter: grayscale(.7); opacity: .55; }
+#leetrepo-panel .lr-button.secondary { min-height: 34px; border: 1px solid rgba(47,143,138,.35); color: #1f6360; background: #cdece9; }
+#leetrepo-panel .lr-notice { padding: 8px 9px; border-radius: 12px; color: #1f6360; background: #cdece9; font-size: 10.5px; line-height: 1.4; }
+#leetrepo-panel .lr-notice.error { color: #984d32; background: #f0d8cd; }
+#leetrepo-panel.lr-collapsed { width: auto; }
+#leetrepo-panel.lr-collapsed .lr-shell { border-radius: 15px; }
+#leetrepo-panel.lr-collapsed .lr-head { border-bottom: 0; }
+#leetrepo-panel.lr-collapsed .lr-brand, #leetrepo-panel.lr-collapsed .lr-body { display: none; }
+#leetrepo-panel.lr-collapsed .lr-minimize { margin-left: 0; }
+@media (prefers-color-scheme: dark) {
+  #leetrepo-panel { color: #f2e9db; }
+  #leetrepo-panel .lr-shell { border-color: rgba(242,233,219,.13); background: #211c18; box-shadow: 0 16px 48px rgba(0,0,0,.45); }
+  #leetrepo-panel .lr-head { border-color: rgba(242,233,219,.13); }
+  #leetrepo-panel .lr-logo { color: #211c18; background: #e08a4e; }
+  #leetrepo-panel .lr-minimize, #leetrepo-panel .lr-meta, #leetrepo-panel .lr-status { color: #a89b8a; }
+  #leetrepo-panel .lr-minimize:hover { color: #f2e9db; background: #322b25; }
+  #leetrepo-panel .lr-button { color: #211c18; background: #e08a4e; }
+  #leetrepo-panel .lr-button.secondary { border-color: rgba(224,138,78,.3); color: #f2b184; background: #3a2a1e; }
+  #leetrepo-panel .lr-notice { color: #f2b184; background: #3a2a1e; }
+}

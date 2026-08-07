@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set up LeetRepo</title>
+    <link rel="stylesheet" href="common.css">
+    <link rel="stylesheet" href="onboarding.css">
+  </head>
+  <body>
+    <main class="onboarding-shell">
+      <section class="intro" aria-label="About LeetRepo">
+        <a class="brand" href="#"><span id="logo"></span>LeetRepo</a>
+        <div class="intro-copy">
+          <span class="eyebrow">Your solutions, organized</span>
+          <h1>Every solved problem, committed to GitHub.</h1>
+          <p>One folder per problem, documented and ready to review — automatically, the moment your submission is Accepted.</p>
+        </div>
+        <ol class="steps" aria-label="Setup progress">
+          <li class="active" data-step-marker="1"><span>1</span><div><strong>Connect GitHub</strong><small>Use a repository-scoped token</small></div></li>
+          <li data-step-marker="2"><span>2</span><div><strong>Choose your repo</strong><small>Configure how solutions land</small></div></li>
+          <li data-step-marker="3"><span>3</span><div><strong>Start solving</strong><small>Push manually or automatically</small></div></li>
+        </ol>
+        <div class="privacy-note">LeetRepo reads submissions from the page. Your GitHub token stays in local extension storage.</div>
+      </section>
+
+      <section class="setup-wrap">
+        <div class="setup-panel panel">
+          <div class="setup-head">
+            <div><div class="eyebrow" id="step-eyebrow">Step 1 of 3</div><h2 id="step-title">Connect GitHub</h2></div>
+            <span class="step-count" id="step-count">01 / 03</span>
+          </div>
+          <div class="notice" id="notice" hidden></div>
+
+          <form id="connect-step" class="step-pane stack gap-16">
+            <div class="field">
+              <label for="token">Fine-grained personal access token</label>
+              <input class="input mono" id="token" type="password" autocomplete="off" placeholder="github_pat_…" required>
+              <p class="field-help">Give the token access only to your target repository with <strong>Contents: read and write</strong>. LeetRepo never sends it anywhere except GitHub’s API.</p>
+            </div>
+            <a class="token-link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">Create a fine-grained token on GitHub ↗</a>
+            <button class="button full" type="submit" id="connect-button">Connect GitHub</button>
+          </form>
+
+          <form id="configure-step" class="step-pane stack gap-16" hidden>
+            <div class="connected-user row"><span class="avatar" id="avatar">GH</span><div><strong id="github-login">Connected</strong><small>GitHub account connected</small></div><span class="badge accepted">Verified</span></div>
+            <div class="field">
+              <label for="repo">Target repository</label>
+              <select class="select" id="repo" required></select>
+            </div>
+            <div class="field">
+              <label for="commit-template">Commit message format</label>
+              <input class="input mono" id="commit-template" value="solve: {number}. {title} ({difficulty})">
+            </div>
+            <div class="repo-preview card">
+              <div class="eyebrow">Folder preview</div>
+              <code>leetcode-solutions/<br>├─ 0001-two-sum/<br><span>│&nbsp; solution.py · README.md</span><br>└─ 0042-trapping-rain-water/<br><span>&nbsp;&nbsp; solution.cpp · README.md</span></code>
+            </div>
+            <div class="setting-line"><div><strong>Auto-push on Accepted</strong><small>Also push manually anytime from the popup</small></div><label class="switch"><input id="setup-auto-push" type="checkbox" checked><span></span></label></div>
+            <button class="button full" type="submit" id="configure-button">Save configuration</button>
+          </form>
+
+          <div id="finish-step" class="step-pane finish-step" hidden>
+            <div class="success-mark">✓</div>
+            <h2>You’re ready to solve.</h2>
+            <p>Open any LeetCode problem. After an Accepted submission, push it from the page panel or let auto-push handle it.</p>
+            <div class="row finish-actions">
+              <a class="button grow" href="https://leetcode.com/problemset/" target="_blank" rel="noreferrer">Open LeetCode ↗</a>
+              <button class="button secondary grow" id="finish-dashboard">View dashboard</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="onboarding.js"></script>
+  </body>
+</html>
