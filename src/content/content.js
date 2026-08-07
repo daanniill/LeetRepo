@@ -84,9 +84,42 @@
     return supported?.[0] || "Code";
   }
 
+  function extractExample() {
+    const selectors = [
+      '[data-track-load="description_content"] pre',
+      '[data-cy="question-content"] pre',
+      '[data-e2e-locator="description-content"] pre',
+      "main pre"
+    ];
+    for (const node of document.querySelectorAll(selectors.join(","))) {
+      const value = normalizeSpace(node.textContent);
+      const input = value.match(/\bInput:\s*(.+?)\s+Output:/i)?.[1];
+      const output = value.match(/\bOutput:\s*(.+?)(?:\s+Explanation:|$)/i)?.[1];
+      if (input && output) return { exampleInput: input.slice(0, 1_000), exampleOutput: output.slice(0, 1_000) };
+    }
+    return { exampleInput: "", exampleOutput: "" };
+  }
+
+  function extractProblemContext() {
+    const roots = document.querySelectorAll([
+      '[data-track-load="description_content"]',
+      '[data-cy="question-content"]',
+      '[data-e2e-locator="description-content"]'
+    ].join(","));
+    for (const root of roots) {
+      for (const paragraph of root.querySelectorAll("p")) {
+        const value = normalizeSpace(paragraph.textContent);
+        if (value.length >= 20 && !/^(example|input|output|constraints)\b/i.test(value)) return value.slice(0, 600);
+      }
+    }
+    return "";
+  }
+
   function extractSubmission() {
     return {
       ...getProblemIdentity(),
+      problemContext: extractProblemContext(),
+      ...extractExample(),
       difficulty: detectDifficulty(),
       language: detectLanguage(),
       code: editorCode(),

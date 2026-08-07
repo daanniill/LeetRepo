@@ -76,6 +76,9 @@ export function normalizeSubmission(input = {}) {
     memory: String(input.memory || "—"),
     status: input.status || "Accepted",
     url: input.url || "",
+    problemContext: String(input.problemContext || "").trim().slice(0, 600),
+    exampleInput: String(input.exampleInput || "").trim().slice(0, 1_000),
+    exampleOutput: String(input.exampleOutput || "").trim().slice(0, 1_000),
     syncedAt: input.syncedAt || null,
     commitUrl: input.commitUrl || "",
     commitSha: input.commitSha || "",
@@ -84,6 +87,115 @@ export function normalizeSubmission(input = {}) {
     reviewDueAt: input.reviewDueAt || null,
     lastReviewedAt: input.lastReviewedAt || null
   };
+}
+
+function compactText(value, maxLength) {
+  return String(value || "")
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+export function normalizeSolutionVisual(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const steps = Array.isArray(value.steps) ? value.steps.map((step) => {
+    const label = Array.isArray(step) ? step[0] : step?.label;
+    const state = Array.isArray(step) ? step[1] : step?.state;
+    return { label: compactText(label, 80), state: compactText(state, 140) };
+  }).filter((step) => step.label && step.state).slice(0, 4) : [];
+  const visual = {
+    context: compactText(value.context, 180),
+    input: compactText(value.input, 160),
+    invariant: compactText(value.invariant, 160),
+    steps,
+    result: compactText(value.result, 120)
+  };
+  return visual.input && visual.invariant && visual.steps.length >= 2 && visual.result ? visual : null;
+}
+
+const FALLBACK_VISUALS = {
+  "Arrays & Hashing": {
+    invariant: "The lookup state summarizes only items already processed.",
+    steps: [["Read an item", "Inspect the current value"], ["Consult state", "Check or update the lookup structure"], ["Resolve", "Use the stored information to produce the answer"]]
+  },
+  "Two Pointers": {
+    invariant: "Everything outside the pointers has already been resolved.",
+    steps: [["Position pointers", "Start at the relevant boundaries"], ["Compare state", "Choose which pointer must move"], ["Narrow the search", "Repeat until the answer is determined"]]
+  },
+  "Sliding Window": {
+    invariant: "The active window represents the current valid candidate.",
+    steps: [["Expand", "Add the next item to the window"], ["Restore validity", "Move the left edge when needed"], ["Record progress", "Update the best valid result"]]
+  },
+  "Binary Search": {
+    invariant: "Any valid answer remains inside the active search interval.",
+    steps: [["Choose midpoint", "Inspect the middle candidate"], ["Compare", "Determine which half can be discarded"], ["Narrow interval", "Repeat on the remaining candidates"]]
+  },
+  "Graph Traversal": {
+    invariant: "Visited nodes are processed once; the frontier holds discovered work.",
+    steps: [["Seed frontier", "Add the starting node or nodes"], ["Visit", "Process one frontier node"], ["Discover neighbors", "Add unseen reachable nodes"]]
+  },
+  "Dynamic Programming": {
+    invariant: "Each stored state summarizes an already solved subproblem.",
+    steps: [["Initialize", "Record the base cases"], ["Transition", "Build a state from smaller solved states"], ["Finish", "Read the state representing the full problem"]]
+  },
+  Heap: {
+    invariant: "The heap keeps the next best candidate at its root.",
+    steps: [["Add candidates", "Push relevant values into the heap"], ["Select next", "Remove or inspect the root candidate"], ["Update", "Continue until the requested result is fixed"]]
+  },
+  Stack: {
+    invariant: "The stack contains unresolved items in processing order.",
+    steps: [["Read an item", "Compare it with the stack top"], ["Resolve", "Pop items whose answer is now known"], ["Preserve", "Push the current unresolved item"]]
+  },
+  "Union-Find": {
+    invariant: "Each parent chain identifies one connected component.",
+    steps: [["Initialize sets", "Start each item in its own component"], ["Connect", "Union items related by the current edge"], ["Query roots", "Compare representatives for the result"]]
+  },
+  Trie: {
+    invariant: "The current trie path represents the processed prefix.",
+    steps: [["Start at root", "Begin with an empty prefix"], ["Follow a symbol", "Reuse or create the next trie node"], ["Finish path", "Mark or inspect the completed prefix"]]
+  }
+};
+
+function fallbackSolutionVisual(item, review = {}) {
+  const pattern = (review.patterns || [])[0];
+  const template = FALLBACK_VISUALS[pattern] || {
+    invariant: "Each step preserves the information needed to compute the final result.",
+    steps: [["Initialize", "Create the required working state"], ["Process", "Update state from the current input"], ["Return", "Produce the result from the completed state"]]
+  };
+  return {
+    context: item.problemContext || `Solve ${item.number}. ${item.title}.`,
+    input: item.exampleInput || "Problem input",
+    invariant: template.invariant,
+    steps: template.steps.map(([label, state]) => ({ label, state })),
+    result: item.exampleOutput ? `Expected output: ${item.exampleOutput}` : "Computed result"
+  };
+}
+
+function mermaidText(value) {
+  return compactText(value, 180)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "'")
+    .replace(/`/g, "'");
+}
+
+export function buildMermaidDiagram(submission, review = {}) {
+  const item = normalizeSubmission(submission);
+  const suppliedVisual = normalizeSolutionVisual(review.visual);
+  const visual = suppliedVisual || fallbackSolutionVisual(item, review);
+  const context = visual.context || item.problemContext || `Solve ${item.number}. ${item.title}.`;
+  const nodes = [
+    `  n0["Goal<br/>${mermaidText(context)}"]`,
+    `  n1["Sample input<br/>${mermaidText(visual.input)}"]`,
+    ...visual.steps.map((step, index) => `  n${index + 2}["Step ${index + 1}: ${mermaidText(step.label)}<br/>${mermaidText(step.state)}"]`),
+    `  n${visual.steps.length + 2}["Sample output<br/>${mermaidText(visual.result)}"]`,
+    `  inv["Invariant<br/>${mermaidText(visual.invariant)}"]`
+  ];
+  const path = Array.from({ length: visual.steps.length + 3 }, (_, index) => `n${index}`).join(" --> ");
+  const invariantLinks = visual.steps.map((_, index) => `  inv -.-> n${index + 2}`);
+  return ["flowchart TD", ...nodes, `  ${path}`, ...invariantLinks].join("\n");
 }
 
 export function folderFor(submission) {
@@ -136,6 +248,7 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
   if (settings.includeReview !== false) {
     lines.push("", "## Interview overview", "", `**Patterns:** ${review.patterns.join(", ")}`, "");
     if (review.summary) lines.push(review.summary, "");
+    lines.push("### Solution replay", "", "```mermaid", buildMermaidDiagram(item, review), "```", "");
     lines.push("### Approach", "");
     const steps = review.approach || review.steps || [];
     steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`));

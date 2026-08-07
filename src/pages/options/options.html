@@ -70,7 +70,7 @@
             <label class="setting-line"><div><strong>Runtime and memory</strong><small>Include captured submission metrics</small></div><span class="switch"><input id="includeStats" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>LeetCode link</strong><small>Link back to the original problem</small></div><span class="switch"><input id="includeLink" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>Personal notes</strong><small>Include notes written in the LeetCode panel</small></div><span class="switch"><input id="includeNotes" type="checkbox"><span></span></span></label>
-            <label class="setting-line"><div><strong>Interview overview</strong><small>Add patterns and replay prompts</small></div><span class="switch"><input id="includeReview" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>Interview overview</strong><small>Add patterns, approach, and a self-contained Mermaid solution replay</small></div><span class="switch"><input id="includeReview" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>Repository profile README</strong><small>Opt in to replacing the root README with generated stats on every push</small></div><span class="switch"><input id="includeProfile" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>Spaced repetition</strong><small>Resurface a solution 30 days after it is synced or reviewed</small></div><span class="switch"><input id="spacedRepetition" type="checkbox"><span></span></span></label>
           </div>
@@ -101,7 +101,7 @@
             <span id="ai-usage">0 of 20 requests used today · resets at 00:00 UTC</span>
             <span><a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">Create a Groq key ↗</a> · <button class="text-button" id="clear-groq-key" type="button">Remove saved key</button></span>
           </div>
-          <div class="notice ai-privacy">When enabled, LeetRepo sends the problem title, language, and solution code to Groq. AI output may be incorrect, so generated READMEs include a verification note. This per-install limit prevents accidental overuse; it is not a server-enforced billing control.</div>
+          <div class="notice ai-privacy">When enabled, LeetRepo sends the problem title, language, first detected description paragraph and example input/output, and solution code to Groq. AI output may be incorrect, so generated READMEs include a verification note. This per-install limit prevents accidental overuse; it is not a server-enforced billing control.</div>
         </section>
         <div class="form-actions"><button class="button" id="save-button" type="submit">Save settings</button><button class="button danger" id="disconnect" type="button">Disconnect GitHub</button></div>
       </form>

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildMermaidDiagram,
   buildReadme,
   buildProfileReadme,
   calculateStreak,
@@ -20,6 +21,7 @@ const submission = {
   difficulty: "Hard",
   language: "C++",
   code: "int trap(vector<int>& h) { return 0; }",
+  problemContext: "Given an elevation map, compute how much rain water it can trap.",
   runtime: "52 ms",
   memory: "41.2 MB",
   url: "https://leetcode.com/problems/trapping-rain-water/"
@@ -51,6 +53,11 @@ test("README includes metadata and interview prompts", () => {
   assert.match(readme, /# 42\. Trapping Rain Water/);
   assert.match(readme, /\*\*Runtime:\*\* 52 ms/);
   assert.match(readme, /## Interview overview/);
+  assert.match(readme, /### Solution replay/);
+  assert.match(readme, /```mermaid\nflowchart TD/);
+  assert.match(readme, /Goal<br\/>Given an elevation map/);
+  assert.match(readme, /Sample input/);
+  assert.match(readme, /Sample output/);
   assert.match(readme, /View problem on LeetCode/);
 });
 
@@ -58,6 +65,7 @@ test("README respects disabled optional sections", () => {
   const readme = buildReadme(submission, { includeLink: false, includeStats: false, includeReview: false });
   assert.doesNotMatch(readme, /Runtime/);
   assert.doesNotMatch(readme, /Interview overview/);
+  assert.doesNotMatch(readme, /Solution replay/);
   assert.doesNotMatch(readme, /View problem/);
 });
 
@@ -95,12 +103,49 @@ test("README renders a validated AI explanation with a verification note", () =>
     approach: ["Scan the input.", "Remove dominated candidates.", "Compute the answer."],
     complexity: { time: "O(n), with each item processed once.", space: "O(n) for the stack." },
     edgeCases: ["Empty input", "Monotonic input"],
+    visual: {
+      context: "Compute trapped water between elevation bars.",
+      input: "heights=[0,1,0,2]",
+      invariant: "The stack keeps unresolved decreasing heights.",
+      steps: [["Read height", "stack=[0,1]"], ["Find boundary", "pop the lower bar"]],
+      result: "trapped water increases"
+    },
     generatedBy: "Groq"
   });
   assert.match(readme, /### Approach/);
   assert.match(readme, /### Complexity/);
   assert.match(readme, /### Edge cases/);
+  assert.match(readme, /Goal<br\/>Compute trapped water between elevation bars/);
+  assert.match(readme, /heights=\[0,1,0,2\]/);
+  assert.match(readme, /Step 2: Find boundary<br\/>pop the lower bar/);
   assert.match(readme, /AI-generated with Groq/);
+});
+
+test("Mermaid replay falls back by pattern and escapes untrusted labels", () => {
+  const diagram = buildMermaidDiagram({
+    ...submission,
+    exampleInput: "[1, 2] ` ``` <script>",
+    exampleOutput: "2"
+  }, { patterns: ["Two Pointers"] });
+  assert.match(diagram, /^flowchart TD/);
+  assert.match(diagram, /Goal<br\/>Given an elevation map/);
+  assert.match(diagram, /Everything outside the pointers/);
+  assert.match(diagram, /Sample output<br\/>Expected output: 2/);
+  assert.doesNotMatch(diagram, /```/);
+  assert.doesNotMatch(diagram, /<script>/);
+});
+
+test("legacy AI visuals inherit the captured problem context", () => {
+  const diagram = buildMermaidDiagram(submission, {
+    visual: {
+      input: "height=[2,0,2]",
+      invariant: "resolved bars never need to be revisited",
+      steps: [["Read left bar", "leftMax=2"], ["Read middle bar", "water=2"]],
+      result: "2"
+    }
+  });
+  assert.match(diagram, /Goal<br\/>Given an elevation map/);
+  assert.match(diagram, /Sample input<br\/>height=\[2,0,2\]/);
 });
 
 test("calculateStreak counts consecutive UTC solve days", () => {
