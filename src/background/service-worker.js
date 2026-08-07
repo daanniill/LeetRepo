@@ -1,4 +1,4 @@
-import { buildReview, DEFAULT_SETTINGS, normalizeSubmission, normalizeTheme } from "../core/submissions.js";
+import { buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
 import { createRepo, listRepos, listSolutionFolders, pushSubmission, verifyToken } from "../core/github.js";
 import {
   addTokenUsage,
@@ -108,20 +108,21 @@ async function recordPush(submission, result, review, settings) {
   return mutateLocal(async () => {
     const { submissions = [] } = await getLocal("submissions");
     const normalized = normalizeSubmission(submission);
-    const existing = submissions.find((item) => item.id === normalized.id) || {};
-    const syncedAt = new Date().toISOString();
+    const existing = submissions.find((item) => sameProblem(item, normalized)) || {};
+    const syncedAt = normalized.syncedAt || new Date().toISOString();
     const reviewDueAt = new Date(syncedAt);
     reviewDueAt.setUTCDate(reviewDueAt.getUTCDate() + 30);
     const item = {
       ...existing,
       ...normalized,
+      solvedAt: existing.solvedAt || normalized.solvedAt || existing.syncedAt || syncedAt,
       review: review || normalized.review || existing.review || buildReview(normalized),
       syncedAt,
       reviewDueAt: settings.spacedRepetition === false ? null : reviewDueAt.toISOString(),
       commitUrl: result.url,
       commitSha: result.sha
     };
-    const next = [item, ...submissions.filter((stored) => stored.id !== item.id)].slice(0, 500);
+    const next = [item, ...submissions.filter((stored) => !sameProblem(stored, item))].slice(0, 500);
     await setLocal({ submissions: next, lastSubmission: item });
     return item;
   });
@@ -185,8 +186,7 @@ async function handle(message) {
       const imported = await listSolutionFolders(githubToken, settings.owner, settings.repo, settings.branch);
       return mutateLocal(async () => {
         const { submissions = [] } = await getLocal("submissions");
-        const existingIds = new Set(submissions.map((item) => item.id));
-        const additions = imported.map(normalizeSubmission).filter((item) => !existingIds.has(item.id));
+        const additions = imported.map(normalizeSubmission).filter((item) => !submissions.some((existing) => sameProblem(existing, item)));
         await setLocal({ submissions: [...submissions, ...additions].slice(0, 500) });
         return { imported: additions.length };
       });
@@ -194,9 +194,14 @@ async function handle(message) {
     case "PUSH_SUBMISSION": {
       const [{ githubToken, groqApiKey, submissions = [], submissionNotes = {} }, { settings }] = await Promise.all([getLocal(["githubToken", "groqApiKey", "submissions", "submissionNotes"]), getSync("settings")]);
       if (!githubToken || !settings?.connected) throw new Error("Finish GitHub setup first.");
-      if (message.submission?.status !== "Accepted") throw new Error("Only Accepted submissions can be pushed.");
+      if (!isSubmissionPushReady(message.submission)) {
+        throw new Error("Submit this code on LeetCode and wait for a fresh Accepted result before pushing.");
+      }
       const normalizedSettings = normalizeSettings(settings);
       const submission = normalizeSubmission(message.submission);
+      const existing = submissions.find((item) => sameProblem(item, submission));
+      submission.syncedAt = new Date().toISOString();
+      submission.solvedAt = existing?.solvedAt || existing?.syncedAt || submission.syncedAt;
       submission.notes = submission.notes || submissionNotes[submission.id] || "";
       const explanation = await explanationFor(normalizedSettings, submission, groqApiKey);
       const result = await pushSubmission({
@@ -217,9 +222,9 @@ async function handle(message) {
       const normalized = normalizeSubmission(message.submission);
       await mutateLocal(async () => {
         const { submissions = [], lastSubmission } = await getLocal(["submissions", "lastSubmission"]);
-        if (!submissions.some((item) => item.id === normalized.id)) return;
-        const next = submissions.map((item) => item.id === normalized.id ? { ...item, review } : item);
-        const nextLast = lastSubmission?.id === normalized.id ? { ...lastSubmission, review } : lastSubmission;
+        if (!submissions.some((item) => sameProblem(item, normalized))) return;
+        const next = submissions.map((item) => sameProblem(item, normalized) ? { ...item, review } : item);
+        const nextLast = lastSubmission && sameProblem(lastSubmission, normalized) ? { ...lastSubmission, review } : lastSubmission;
         await setLocal({ submissions: next, lastSubmission: nextLast });
       });
       return { review, ai: explanation.ai };
@@ -233,8 +238,8 @@ async function handle(message) {
       const normalized = normalizeSubmission({ ...message.submission, notes: message.notes });
       return mutateLocal(async () => {
         const { submissions = [], lastSubmission, submissionNotes = {} } = await getLocal(["submissions", "lastSubmission", "submissionNotes"]);
-        const next = submissions.map((item) => item.id === normalized.id ? { ...item, notes: normalized.notes } : item);
-        const nextLast = lastSubmission?.id === normalized.id ? { ...lastSubmission, notes: normalized.notes } : lastSubmission;
+        const next = submissions.map((item) => sameProblem(item, normalized) ? { ...item, notes: normalized.notes } : item);
+        const nextLast = lastSubmission && sameProblem(lastSubmission, normalized) ? { ...lastSubmission, notes: normalized.notes } : lastSubmission;
         await setLocal({ submissions: next, lastSubmission: nextLast, submissionNotes: {
           ...submissionNotes,
           [normalized.id]: normalized.notes,

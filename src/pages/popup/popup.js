@@ -7,6 +7,12 @@ const notice = document.querySelector("#notice");
 let submission = null;
 let state = null;
 
+function syncedSolutionFor(item) {
+  const repoUrl = `https://github.com/${state.settings.owner || ""}/${state.settings.repo || ""}/`.toLowerCase();
+  return state.submissions.find((stored) => String(stored.number) === String(item?.number)
+    && (!stored.commitUrl || stored.commitUrl.toLowerCase().startsWith(repoUrl)));
+}
+
 async function init() {
   [state, submission] = await Promise.all([send("GET_STATE"), currentSubmission()]);
   renderState();
@@ -31,12 +37,16 @@ function renderSubmission() {
   notesWrap.hidden = !submission;
   if (!submission) return;
   submission.notes = submission.notes || state.notes?.[`${submission.number}-${submission.slug}`] || "";
+  const existingSolution = syncedSolutionFor(submission);
+  const freshAcceptance = submission.pushReady === true;
+  const currentSolutionSynced = !freshAcceptance && Boolean(existingSolution?.code && String(existingSolution.code).trimEnd() === String(submission.code || "").trimEnd());
   const diff = difficultyClass(submission.difficulty);
-  document.querySelector("#status-badge").className = `badge ${submission.status === "Accepted" ? "accepted" : "unknown"}`;
-  document.querySelector("#status-badge").textContent = submission.status || "Detected";
+  document.querySelector("#status-badge").className = `badge ${freshAcceptance || currentSolutionSynced ? "accepted" : "unknown"}`;
+  document.querySelector("#status-badge").textContent = freshAcceptance ? "Accepted" : currentSolutionSynced ? "Synced" : "Submit on LeetCode";
   document.querySelector("#problem-title").textContent = `${submission.number}. ${submission.title}`;
   document.querySelector("#problem-meta").innerHTML = `<span class="badge ${diff}">${escapeHtml(submission.difficulty)}</span><span>${escapeHtml(submission.language)} · ${escapeHtml(submission.runtime)} · ${escapeHtml(submission.memory)}</span>`;
-  pushButton.disabled = !submission.code || submission.status !== "Accepted" || !state.settings.connected;
+  pushButton.disabled = currentSolutionSynced || !freshAcceptance || !submission.code || !state.settings.connected;
+  pushButton.textContent = currentSolutionSynced ? "Solution already synced" : existingSolution ? "Update on GitHub" : "Push to GitHub";
   document.querySelector("#personal-notes").value = submission.notes;
   if (!state.settings.connected) showNotice(notice, "Connect GitHub in Settings before your first push.");
 }
@@ -46,18 +56,22 @@ pushButton.addEventListener("click", async () => {
   showNotice(notice, "");
   try {
     const response = await send("PUSH_SUBMISSION", { submission });
+    submission = { ...response.submission, pushReady: false };
+    const pushed = response.result?.updated ? "Solution updated successfully." : "Pushed successfully.";
     const message = response.ai?.warning
-      ? `Pushed successfully. ${response.ai.warning}`
+      ? `${pushed} ${response.ai.warning}`
       : response.ai?.generated
-        ? "Pushed successfully with a Groq-generated explanation."
-        : "Pushed successfully — your GitHub commit is ready.";
+        ? `${pushed} A Groq-generated explanation was added.`
+        : `${pushed} Your GitHub commit is ready.`;
     showNotice(notice, message);
     state = await send("GET_STATE");
     renderState();
+    renderSubmission();
   } catch (error) {
     showNotice(notice, error.message, true);
   } finally {
     setBusy(pushButton, false);
+    renderSubmission();
   }
 });
 

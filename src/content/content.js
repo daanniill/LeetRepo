@@ -6,11 +6,72 @@
   let pushing = false;
   let reviewing = false;
   let notes = {};
+  let syncedSubmissions = [];
+  let pendingSubmission = null;
+  let acceptedSubmissionKey = "";
   const themes = new Set(["light", "dark", "teal"]);
+  const submissionStatuses = ["Accepted", "Wrong Answer", "Time Limit Exceeded", "Memory Limit Exceeded", "Runtime Error", "Compile Error", "Output Limit Exceeded"];
+  const resultSelector = '[data-e2e-locator*="submission-result"], [data-cy*="submission-result"]';
 
   const text = (selector) => document.querySelector(selector)?.textContent?.trim() || "";
   const normalizeSpace = (value) => String(value || "").replace(/\s+/g, " ").trim();
   const escapeHtml = (value) => String(value || "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]);
+
+  function syncedSolutionFor(submission) {
+    const repoUrl = `https://github.com/${settings?.owner || ""}/${settings?.repo || ""}/`.toLowerCase();
+    return syncedSubmissions.find((item) => String(item.number) === String(submission?.number)
+      && (!item.commitUrl || item.commitUrl.toLowerCase().startsWith(repoUrl)));
+  }
+
+  function isCurrentSolutionSynced() {
+    const stored = syncedSolutionFor(latest);
+    return Boolean(stored?.code && String(stored.code).trimEnd() === String(latest?.code || "").trimEnd());
+  }
+
+  function submissionKey(submission) {
+    return `${submission?.number || "0"}:${String(submission?.code || "").trimEnd()}`;
+  }
+
+  function hasFreshAcceptance(submission = latest) {
+    return Boolean(acceptedSubmissionKey && acceptedSubmissionKey === submissionKey(submission));
+  }
+
+  function submissionForPush(submission = latest) {
+    const accepted = hasFreshAcceptance(submission);
+    return {
+      ...submission,
+      status: accepted ? "Accepted" : submission?.status === "Accepted" ? "Ready" : submission?.status,
+      pushReady: accepted
+    };
+  }
+
+  function isLeetCodeSubmitButton(target) {
+    const button = target?.closest?.("button");
+    if (!button || button.closest(`#${PANEL_ID}`)) return false;
+    return button.matches('[data-e2e-locator*="submit"], [data-cy*="submit"]')
+      || /^submit$/i.test(normalizeSpace(button.textContent || button.getAttribute("aria-label")));
+  }
+
+  function resultStatusFromMutations(mutations) {
+    const roots = new Set();
+    for (const mutation of mutations) {
+      const target = mutation.target.nodeType === Node.ELEMENT_NODE ? mutation.target : mutation.target.parentElement;
+      const closest = target?.closest?.(resultSelector);
+      if (closest) roots.add(closest);
+      for (const added of mutation.addedNodes || []) {
+        const element = added.nodeType === Node.ELEMENT_NODE ? added : added.parentElement;
+        if (!element) continue;
+        if (element.matches?.(resultSelector)) roots.add(element);
+        element.querySelectorAll?.(resultSelector).forEach((root) => roots.add(root));
+      }
+    }
+    for (const root of roots) {
+      const value = normalizeSpace(root.textContent);
+      const status = submissionStatuses.find((candidate) => new RegExp(`\\b${candidate.replaceAll(" ", "\\s+")}\\b`, "i").test(value));
+      if (status) return status;
+    }
+    return null;
+  }
 
   function applyTheme() {
     const panel = document.getElementById(PANEL_ID);
@@ -50,12 +111,11 @@
       '[class*="success"]'
     ];
     const resultText = selectors.map(text).join(" ");
-    const statuses = ["Accepted", "Wrong Answer", "Time Limit Exceeded", "Memory Limit Exceeded", "Runtime Error", "Compile Error", "Output Limit Exceeded"];
-    for (const status of statuses) if (new RegExp(`\\b${status.replaceAll(" ", "\\s+")}\\b`, "i").test(resultText)) return status;
+    for (const status of submissionStatuses) if (new RegExp(`\\b${status.replaceAll(" ", "\\s+")}\\b`, "i").test(resultText)) return status;
     const pageSignals = Array.from(document.querySelectorAll("span, div")).slice(-800)
       .filter((node) => node.children.length === 0)
       .map((node) => normalizeSpace(node.textContent));
-    return statuses.find((status) => pageSignals.includes(status)) || "Ready";
+    return submissionStatuses.find((status) => pageSignals.includes(status)) || "Ready";
   }
 
   function editorCode() {
@@ -183,12 +243,25 @@
     const difficulty = ["Easy", "Medium", "Hard"].includes(latest.difficulty) ? latest.difficulty : "Unknown";
     panel.querySelector(".lr-meta").innerHTML = `<span class="lr-badge ${difficulty}">${escapeHtml(difficulty)}</span><span>${escapeHtml(latest.language)} · ${escapeHtml(latest.runtime)} · ${escapeHtml(latest.memory)}</span>`;
     const status = panel.querySelector(".lr-status");
-    status.textContent = latest.status === "Accepted" ? "Accepted — ready to sync" : latest.status === "Ready" ? "Waiting for an Accepted submission" : latest.status;
-    status.classList.toggle("accepted", latest.status === "Accepted");
-    status.classList.toggle("rejected", !["Accepted", "Ready"].includes(latest.status));
+    const freshAcceptance = hasFreshAcceptance();
+    const currentSolutionSynced = isCurrentSolutionSynced() && !freshAcceptance;
+    const existingSolution = syncedSolutionFor(latest);
+    status.textContent = currentSolutionSynced
+      ? "Accepted — solution already synced"
+      : freshAcceptance
+        ? existingSolution ? "Accepted — updated solution ready to sync" : "Accepted — ready to sync"
+        : pendingSubmission?.key === submissionKey(latest)
+          ? "Waiting for LeetCode to finish…"
+          : latest.status === "Ready" || latest.status === "Accepted" ? "Submit on LeetCode to sync" : latest.status;
+    status.classList.toggle("accepted", freshAcceptance || currentSolutionSynced);
+    status.classList.toggle("rejected", !freshAcceptance && !currentSolutionSynced && !["Accepted", "Ready"].includes(latest.status));
     const button = panel.querySelector(".lr-button:not(.secondary)");
-    button.disabled = pushing || latest.status !== "Accepted" || !latest.code || !settings?.connected;
-    button.textContent = pushing ? "Pushing…" : settings?.connected ? (latest.code ? "Push to GitHub" : "Open the code editor") : "Connect GitHub in Settings";
+    button.disabled = pushing || currentSolutionSynced || !freshAcceptance || !latest.code || !settings?.connected;
+    button.textContent = pushing
+      ? "Pushing…"
+      : currentSolutionSynced
+        ? "Solution already synced"
+        : settings?.connected ? (latest.code ? existingSolution ? "Update on GitHub" : "Push to GitHub" : "Open the code editor") : "Connect GitHub in Settings";
     const reviewButton = panel.querySelector(".lr-review");
     reviewButton.disabled = reviewing || !latest.code;
     reviewButton.textContent = reviewing ? "Reviewing solution…" : "Get AI feedback";
@@ -229,15 +302,18 @@
   }
 
   async function push(automatic) {
-    if (pushing || latest?.status !== "Accepted" || !latest?.code) return;
+    if (pushing || !hasFreshAcceptance() || !latest?.code) return;
     pushing = true;
     render();
     showNotice("");
     try {
-      const response = await chrome.runtime.sendMessage({ type: "PUSH_SUBMISSION", submission: latest });
+      const response = await chrome.runtime.sendMessage({ type: "PUSH_SUBMISSION", submission: submissionForPush() });
       if (!response?.ok) throw new Error(response?.error || "Push failed.");
-      await chrome.storage.local.set({ lastAutoPushKey: `${latest.number}:${hash(latest.code)}` });
-      const success = automatic ? "Accepted and pushed automatically." : "Pushed successfully to GitHub.";
+      syncedSubmissions = [response.submission, ...syncedSubmissions.filter((item) => String(item.number) !== String(response.submission.number))];
+      acceptedSubmissionKey = "";
+      const success = response.result?.updated
+        ? automatic ? "Accepted solution updated automatically." : "Solution updated successfully on GitHub."
+        : automatic ? "Accepted and pushed automatically." : "Pushed successfully to GitHub.";
       showNotice(response.ai?.warning ? `${success} ${response.ai.warning}` : response.ai?.generated ? `${success} AI explanation added.` : success);
     } catch (error) {
       showNotice(error.message, true);
@@ -247,22 +323,12 @@
     }
   }
 
-  function hash(value) {
-    let result = 0;
-    for (let index = 0; index < value.length; index += 1) result = ((result << 5) - result + value.charCodeAt(index)) | 0;
-    return result;
-  }
-
   async function refresh() {
     latest = extractSubmission();
     latest.notes = notes[`${latest.number}-${latest.slug}`] || "";
     render();
     if (!["Ready"].includes(latest.status) && latest.code) chrome.runtime.sendMessage({ type: "RECORD_ATTEMPT", submission: latest });
-    if (settings?.autoPush && settings.connected && latest.status === "Accepted" && latest.code) {
-      const key = `${latest.number}:${hash(latest.code)}`;
-      const { lastAutoPushKey } = await chrome.storage.local.get("lastAutoPushKey");
-      if (key !== lastAutoPushKey) push(true);
-    }
+    if (settings?.autoPush && settings.connected && hasFreshAcceptance() && latest.code) push(true);
   }
 
   function scheduleRefresh() {
@@ -273,7 +339,7 @@
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === "GET_SUBMISSION") {
       latest = extractSubmission();
-      sendResponse({ submission: latest });
+      sendResponse({ submission: submissionForPush(latest) });
     }
   });
 
@@ -283,16 +349,40 @@
       applyTheme();
       render();
     }
+    if (area === "local" && changes.submissions) {
+      syncedSubmissions = changes.submissions.newValue || [];
+      if (hasFreshAcceptance() && isCurrentSolutionSynced()) acceptedSubmissionKey = "";
+      render();
+    }
   });
 
   mount();
   chrome.runtime.sendMessage({ type: "GET_STATE" }).then((response) => {
     settings = response?.settings || {};
     notes = response?.notes || {};
+    syncedSubmissions = response?.submissions || [];
     applyTheme();
     refresh();
   });
+  document.addEventListener("click", (event) => {
+    if (!isLeetCodeSubmitButton(event.target)) return;
+    const submission = extractSubmission();
+    if (!submission.code) return;
+    acceptedSubmissionKey = "";
+    pendingSubmission = { key: submissionKey(submission), startedAt: Date.now() };
+    latest = submission;
+    showNotice("");
+    render();
+  }, true);
   new MutationObserver((mutations) => {
+    const resultStatus = pendingSubmission && Date.now() - pendingSubmission.startedAt >= 250
+      ? resultStatusFromMutations(mutations)
+      : null;
+    if (resultStatus) {
+      if (resultStatus === "Accepted") acceptedSubmissionKey = pendingSubmission.key;
+      else acceptedSubmissionKey = "";
+      pendingSubmission = null;
+    }
     const pageChanged = mutations.some((mutation) => {
       const target = mutation.target.nodeType === Node.ELEMENT_NODE ? mutation.target : mutation.target.parentElement;
       return target && !target.closest?.(`#${PANEL_ID}`);

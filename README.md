@@ -29,8 +29,10 @@ The built-in request cap is a per-install guardrail, not an access-control or bi
 - The content script detects the current LeetCode problem and accepted submission details.
 - The first detected description paragraph and official example ground a self-contained solution replay with the goal, sample input, state changes, invariant, and sample output.
 - Manual pushes come from either the in-page panel or toolbar popup.
-- Auto-push reacts to an accepted result appearing on the page.
-- The service worker creates solution and README blobs, builds one Git tree, and advances the repository branch in a single commit.
+- Auto-push is armed only by clicking LeetCode's Submit button and receiving a fresh Accepted result for that exact editor code.
+- The service worker checks for an existing problem folder, updates the generated solution and README blobs, and advances the repository branch in a single commit.
+- Before the branch moves, LeetRepo reads the proposed tree back from GitHub and aborts unless every existing repository file is still present and unchanged.
+- Each problem README records the first synced solve time; later solution pushes refresh the code, metrics, notes, and generated analysis without resetting that timestamp.
 - A local index powers the dashboard even when offline.
 
 ## Study and profile features

@@ -9,9 +9,11 @@ import {
   folderFor,
   formatCommit,
   historyInsights,
+  isSubmissionPushReady,
   normalizeSubmission,
   normalizeTheme,
   relativeTime,
+  sameProblem,
   slugify
 } from "../src/core/submissions.js";
 
@@ -41,6 +43,18 @@ test("normalizeSubmission maps languages to extensions", () => {
   assert.equal(normalizeSubmission(submission).extension, "cpp");
   assert.equal(normalizeSubmission({ language: "Python3" }).extension, "py");
   assert.equal(normalizeSubmission({ title: "Safe", slug: "../../unsafe/path" }).slug, "unsafe-path");
+  assert.equal(normalizeSubmission({ syncedAt: "2026-08-07T12:34:56.000Z" }).solvedAt, "2026-08-07T12:34:56.000Z");
+});
+
+test("problem identity is stable when a title or slug changes", () => {
+  assert.equal(sameProblem(submission, { ...submission, title: "Trapping Rainwater", slug: "trapping-rainwater" }), true);
+  assert.equal(sameProblem(submission, { ...submission, number: 43 }), false);
+});
+
+test("push readiness requires code from a freshly accepted LeetCode submission", () => {
+  assert.equal(isSubmissionPushReady({ code: "return 1", status: "Accepted", pushReady: true }), true);
+  assert.equal(isSubmissionPushReady({ code: "return 1", status: "Accepted" }), false);
+  assert.equal(isSubmissionPushReady({ code: "return 1", status: "Ready", pushReady: true }), false);
 });
 
 test("folder and commit formatting follow the configured convention", () => {
@@ -73,6 +87,12 @@ test("README includes personal notes only when enabled", () => {
   const withNotes = { ...submission, notes: "Re-check the decreasing-height case." };
   assert.match(buildReadme(withNotes), /## Personal notes/);
   assert.doesNotMatch(buildReadme(withNotes, { includeNotes: false }), /Personal notes/);
+});
+
+test("README shows the original solved timestamp", () => {
+  const readme = buildReadme({ ...submission, solvedAt: "2026-08-07T12:34:56.000Z", syncedAt: "2026-08-09T08:00:00.000Z" });
+  assert.match(readme, /\*\*Solved:\*\* 2026-08-07 12:34 UTC/);
+  assert.doesNotMatch(readme, /2026-08-09/);
 });
 
 test("profile README summarizes real history without inventing totals", () => {

@@ -79,6 +79,7 @@ export function normalizeSubmission(input = {}) {
     problemContext: String(input.problemContext || "").trim().slice(0, 600),
     exampleInput: String(input.exampleInput || "").trim().slice(0, 1_000),
     exampleOutput: String(input.exampleOutput || "").trim().slice(0, 1_000),
+    solvedAt: input.solvedAt || input.syncedAt || null,
     syncedAt: input.syncedAt || null,
     commitUrl: input.commitUrl || "",
     commitSha: input.commitSha || "",
@@ -203,6 +204,25 @@ export function folderFor(submission) {
   return `${item.number.padStart(4, "0")}-${item.slug}`;
 }
 
+export function sameProblem(left, right) {
+  const first = normalizeSubmission(left);
+  const second = normalizeSubmission(right);
+  if (first.number !== "0" && second.number !== "0") return first.number === second.number;
+  return first.id === second.id;
+}
+
+export function isSubmissionPushReady(submission = {}) {
+  return submission.pushReady === true
+    && submission.status === "Accepted"
+    && Boolean(String(submission.code || "").trimEnd());
+}
+
+export function formatSolvedAt(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
 export function formatCommit(template, submission) {
   const item = normalizeSubmission(submission);
   return String(template || DEFAULT_SETTINGS.commitTemplate)
@@ -244,6 +264,8 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
   const lines = [`# ${item.number}. ${item.title}`, ""];
   if (settings.includeLink !== false && item.url) lines.push(`[View problem on LeetCode](${item.url})`, "");
   lines.push(`- **Difficulty:** ${item.difficulty}`, `- **Language:** ${item.language}`);
+  const solvedAt = formatSolvedAt(item.solvedAt);
+  if (solvedAt) lines.push(`- **Solved:** ${solvedAt}`);
   if (settings.includeStats !== false) lines.push(`- **Runtime:** ${item.runtime}`, `- **Memory:** ${item.memory}`);
   if (settings.includeReview !== false) {
     lines.push("", "## Interview overview", "", `**Patterns:** ${review.patterns.join(", ")}`, "");

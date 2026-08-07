@@ -1,4 +1,4 @@
-import { buildProfileReadme, buildReadme, folderFor, formatCommit, normalizeSubmission } from "./submissions.js";
+import { buildProfileReadme, buildReadme, folderFor, formatCommit, normalizeSubmission, sameProblem } from "./submissions.js";
 
 const API = "https://api.github.com";
 
@@ -99,8 +99,38 @@ function isEmptyRepoError(error) {
   return error?.status === 409 && /repository is empty/i.test(error.message);
 }
 
+async function repositoryTree(token, owner, repo, treeSha) {
+  const tree = await request(token, `/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`);
+  if (tree.truncated) throw new Error("This repository is too large to verify a safe solution update.");
+  return tree.tree || [];
+}
+
+function problemFiles(entries, item) {
+  const prefix = `${item.number.padStart(4, "0")}-`;
+  return entries.filter((entry) => entry.type === "blob"
+    && entry.path.startsWith(prefix)
+    && /^\d{4,}-[^/]+\/(?:solution\.[A-Za-z0-9]+|README\.md)$/.test(entry.path));
+}
+
+function assertTreePreserved(previousEntries, nextEntries, additions) {
+  const nextByPath = new Map(nextEntries.filter((entry) => entry.type !== "tree").map((entry) => [entry.path, entry]));
+  const additionsByPath = new Map(additions.map((entry) => [entry.path, entry]));
+  for (const previous of previousEntries.filter((entry) => entry.type !== "tree")) {
+    const expectedSha = additionsByPath.get(previous.path)?.sha || previous.sha;
+    if (nextByPath.get(previous.path)?.sha !== expectedSha) {
+      throw new Error("Safety check failed because the proposed commit did not preserve every existing repository file. The branch was not updated.");
+    }
+  }
+  for (const addition of additions) {
+    if (nextByPath.get(addition.path)?.sha !== addition.sha) {
+      throw new Error("Safety check failed because the proposed commit was missing a generated solution file. The branch was not updated.");
+    }
+  }
+}
+
 export async function pushSubmission({ token, settings, submission, review, profileItems = [] }) {
-  const item = normalizeSubmission(submission);
+  const pushedAt = submission.syncedAt || new Date().toISOString();
+  const item = normalizeSubmission({ ...submission, solvedAt: submission.solvedAt || pushedAt, syncedAt: pushedAt });
   if (!item.code) throw new Error("No solution code was found on this page.");
   const owner = encodeURIComponent(settings.owner);
   const repo = encodeURIComponent(settings.repo);
@@ -118,16 +148,20 @@ export async function pushSubmission({ token, settings, submission, review, prof
   }
   const parentCommit = await request(token, `/repos/${owner}/${repo}/git/commits/${parentSha}`);
   const folder = folderFor(item);
+  const previousTree = await repositoryTree(token, owner, repo, parentCommit.tree.sha);
+  const existingFiles = problemFiles(previousTree, item);
+  const solutionPath = `${folder}/solution.${item.extension}`;
+  const readmePath = `${folder}/README.md`;
   const solution = await createBlob(token, owner, repo, `${item.code}\n`);
-  const entries = [{ path: `${folder}/solution.${item.extension}`, mode: "100644", type: "blob", sha: solution.sha }];
+  const entries = [{ path: solutionPath, mode: "100644", type: "blob", sha: solution.sha }];
   if (settings.includeReadme !== false) {
     const readme = await createBlob(token, owner, repo, buildReadme(item, settings, review));
-    entries.push({ path: `${folder}/README.md`, mode: "100644", type: "blob", sha: readme.sha });
+    entries.push({ path: readmePath, mode: "100644", type: "blob", sha: readme.sha });
   }
   if (settings.includeProfile === true) {
     const history = [
-      { ...item, syncedAt: new Date().toISOString(), review: review || item.review },
-      ...profileItems.filter((existing) => normalizeSubmission(existing).id !== item.id)
+      { ...item, syncedAt: item.syncedAt || new Date().toISOString(), review: review || item.review },
+      ...profileItems.filter((existing) => !sameProblem(existing, item))
     ];
     const profile = await createBlob(token, owner, repo, buildProfileReadme(history, settings));
     entries.push({ path: "README.md", mode: "100644", type: "blob", sha: profile.sha });
@@ -136,6 +170,8 @@ export async function pushSubmission({ token, settings, submission, review, prof
     method: "POST",
     body: JSON.stringify({ base_tree: parentCommit.tree.sha, tree: entries })
   });
+  const proposedTree = await repositoryTree(token, owner, repo, tree.sha);
+  assertTreePreserved(previousTree, proposedTree, entries);
   const commit = await request(token, `/repos/${owner}/${repo}/git/commits`, {
     method: "POST",
     body: JSON.stringify({
@@ -148,5 +184,10 @@ export async function pushSubmission({ token, settings, submission, review, prof
     method: "PATCH",
     body: JSON.stringify({ sha: commit.sha, force: false })
   });
-  return { sha: commit.sha, url: `https://github.com/${settings.owner}/${settings.repo}/commit/${commit.sha}`, branch };
+  return {
+    sha: commit.sha,
+    url: `https://github.com/${settings.owner}/${settings.repo}/commit/${commit.sha}`,
+    branch,
+    updated: existingFiles.some((entry) => entry.path.includes("/solution."))
+  };
 }
