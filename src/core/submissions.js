@@ -29,6 +29,7 @@ export const LANGUAGE_EXTENSIONS = {
   c: "c",
   "c++": "cpp",
   cpp: "cpp",
+  "c#": "cs",
   csharp: "cs",
   dart: "dart",
   elixir: "ex",
@@ -204,6 +205,34 @@ export function folderFor(submission) {
   return `${item.number.padStart(4, "0")}-${item.slug}`;
 }
 
+const LANGUAGE_FOLDERS = {
+  sh: "bash",
+  c: "c",
+  cpp: "cpp",
+  cs: "csharp",
+  dart: "dart",
+  ex: "elixir",
+  erl: "erlang",
+  go: "go",
+  java: "java",
+  js: "javascript",
+  kt: "kotlin",
+  sql: "sql",
+  php: "php",
+  py: "python",
+  rkt: "racket",
+  rb: "ruby",
+  rs: "rust",
+  scala: "scala",
+  swift: "swift",
+  ts: "typescript"
+};
+
+export function languageFolderFor(submission) {
+  const item = normalizeSubmission(submission);
+  return LANGUAGE_FOLDERS[item.extension] || slugify(item.language);
+}
+
 export function sameProblem(left, right) {
   const first = normalizeSubmission(left);
   const second = normalizeSubmission(right);
@@ -319,7 +348,7 @@ export function buildProfileReadme(items = [], settings = {}) {
   const lines = [
     `# ${owner} / ${repo}`,
     "",
-    "Accepted LeetCode submissions, organized one folder per problem and kept up to date by LeetRepo.",
+    "Accepted LeetCode submissions, organized by problem and language and kept up to date by LeetRepo.",
     "",
     `**${normalized.length} solved** · ${counts.Easy} easy · ${counts.Medium} medium · ${counts.Hard} hard · ${insights.languages.length} languages`,
     "",

@@ -10,6 +10,7 @@ import {
   formatCommit,
   historyInsights,
   isSubmissionPushReady,
+  languageFolderFor,
   normalizeSubmission,
   normalizeTheme,
   relativeTime,
@@ -42,6 +43,7 @@ test("theme preference accepts known themes and falls back safely", () => {
 test("normalizeSubmission maps languages to extensions", () => {
   assert.equal(normalizeSubmission(submission).extension, "cpp");
   assert.equal(normalizeSubmission({ language: "Python3" }).extension, "py");
+  assert.equal(normalizeSubmission({ language: "C#" }).extension, "cs");
   assert.equal(normalizeSubmission({ title: "Safe", slug: "../../unsafe/path" }).slug, "unsafe-path");
   assert.equal(normalizeSubmission({ syncedAt: "2026-08-07T12:34:56.000Z" }).solvedAt, "2026-08-07T12:34:56.000Z");
 });
@@ -59,6 +61,9 @@ test("push readiness requires code from a freshly accepted LeetCode submission",
 
 test("folder and commit formatting follow the configured convention", () => {
   assert.equal(folderFor(submission), "0042-trapping-rain-water");
+  assert.equal(languageFolderFor(submission), "cpp");
+  assert.equal(languageFolderFor({ language: "Python3" }), "python");
+  assert.equal(languageFolderFor({ language: "C#" }), "csharp");
   assert.equal(formatCommit("solve: {number}. {title} [{language}]", submission), "solve: 42. Trapping Rain Water [C++]");
 });
 

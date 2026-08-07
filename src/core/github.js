@@ -1,4 +1,4 @@
-import { buildProfileReadme, buildReadme, folderFor, formatCommit, normalizeSubmission, sameProblem } from "./submissions.js";
+import { buildProfileReadme, buildReadme, folderFor, formatCommit, languageFolderFor, normalizeSubmission, sameProblem } from "./submissions.js";
 
 const API = "https://api.github.com";
 
@@ -55,9 +55,9 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
   if (tree.truncated) throw new Error("This repository is too large to backfill safely in one request.");
   const languages = { py: "Python3", cpp: "C++", java: "Java", js: "JavaScript", ts: "TypeScript", go: "Go", rs: "Rust", cs: "C#", kt: "Kotlin", swift: "Swift", rb: "Ruby", php: "PHP" };
   return (tree.tree || []).flatMap((entry) => {
-    const match = entry.type === "blob" && entry.path.match(/^(\d{4,})-([^/]+)\/solution\.([A-Za-z0-9]+)$/);
+    const match = entry.type === "blob" && entry.path.match(/^(\d{4,})-([^/]+)\/(?:(?:([^/]+)\/)?solution\.([A-Za-z0-9]+))$/);
     if (!match) return [];
-    const [, number, slug, extension] = match;
+    const [, number, slug, languageFolder, extension] = match;
     return [{
       number: String(Number(number)),
       title: slug.split("-").map((part) => part ? part[0].toUpperCase() + part.slice(1) : "").join(" "),
@@ -66,7 +66,7 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
       language: languages[extension.toLowerCase()] || extension.toUpperCase(),
       extension,
       status: "Accepted",
-      commitUrl: `https://github.com/${owner}/${repo}/tree/${encodeURIComponent(selectedBranch)}/${number}-${slug}`
+      commitUrl: `https://github.com/${owner}/${repo}/tree/${encodeURIComponent(selectedBranch)}/${number}-${slug}${languageFolder ? `/${encodeURIComponent(languageFolder)}` : ""}`
     }];
   });
 }
@@ -105,13 +105,6 @@ async function repositoryTree(token, owner, repo, treeSha) {
   return tree.tree || [];
 }
 
-function problemFiles(entries, item) {
-  const prefix = `${item.number.padStart(4, "0")}-`;
-  return entries.filter((entry) => entry.type === "blob"
-    && entry.path.startsWith(prefix)
-    && /^\d{4,}-[^/]+\/(?:solution\.[A-Za-z0-9]+|README\.md)$/.test(entry.path));
-}
-
 function assertTreePreserved(previousEntries, nextEntries, additions) {
   const nextByPath = new Map(nextEntries.filter((entry) => entry.type !== "tree").map((entry) => [entry.path, entry]));
   const additionsByPath = new Map(additions.map((entry) => [entry.path, entry]));
@@ -148,10 +141,11 @@ export async function pushSubmission({ token, settings, submission, review, prof
   }
   const parentCommit = await request(token, `/repos/${owner}/${repo}/git/commits/${parentSha}`);
   const folder = folderFor(item);
+  const languageFolder = languageFolderFor(item);
   const previousTree = await repositoryTree(token, owner, repo, parentCommit.tree.sha);
-  const existingFiles = problemFiles(previousTree, item);
-  const solutionPath = `${folder}/solution.${item.extension}`;
+  const solutionPath = `${folder}/${languageFolder}/solution.${item.extension}`;
   const readmePath = `${folder}/README.md`;
+  const updatesExistingSolution = previousTree.some((entry) => entry.type === "blob" && entry.path === solutionPath);
   const solution = await createBlob(token, owner, repo, `${item.code}\n`);
   const entries = [{ path: solutionPath, mode: "100644", type: "blob", sha: solution.sha }];
   if (settings.includeReadme !== false) {
@@ -188,6 +182,6 @@ export async function pushSubmission({ token, settings, submission, review, prof
     sha: commit.sha,
     url: `https://github.com/${settings.owner}/${settings.repo}/commit/${commit.sha}`,
     branch,
-    updated: existingFiles.some((entry) => entry.path.includes("/solution."))
+    updated: updatesExistingSolution
   };
 }

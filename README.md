@@ -30,9 +30,9 @@ The built-in request cap is a per-install guardrail, not an access-control or bi
 - The first detected description paragraph and official example ground a self-contained solution replay with the goal, sample input, state changes, invariant, and sample output.
 - Manual pushes come from either the in-page panel or toolbar popup.
 - Auto-push is armed only by clicking LeetCode's Submit button and receiving a fresh Accepted result for that exact editor code.
-- The service worker checks for an existing problem folder, updates the generated solution and README blobs, and advances the repository branch in a single commit.
+- The service worker stores each solution in its language subfolder (for example, `0001-two-sum/python/solution.py`), keeps one generated README at the problem root, and advances the repository branch in a single commit.
 - Before the branch moves, LeetRepo reads the proposed tree back from GitHub and aborts unless every existing repository file is still present and unchanged.
-- Each problem README records the first synced solve time; later solution pushes refresh the code, metrics, notes, and generated analysis without resetting that timestamp.
+- Each problem README records the first synced solve time; later solution pushes refresh the metrics, notes, and generated analysis without resetting that timestamp.
 - A local index powers the dashboard even when offline.
 
 ## Study and profile features

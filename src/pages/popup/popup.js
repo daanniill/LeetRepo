@@ -10,6 +10,7 @@ let state = null;
 function syncedSolutionFor(item) {
   const repoUrl = `https://github.com/${state.settings.owner || ""}/${state.settings.repo || ""}/`.toLowerCase();
   return state.submissions.find((stored) => String(stored.number) === String(item?.number)
+    && String(stored.language || "").toLowerCase() === String(item?.language || "").toLowerCase()
     && (!stored.commitUrl || stored.commitUrl.toLowerCase().startsWith(repoUrl)));
 }
 
