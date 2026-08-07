@@ -138,12 +138,6 @@
     return "—";
   }
 
-  function detectLanguage() {
-    const value = text('button[id*="lang"]') || text('[data-cy="lang-select"]') || text('[class*="lang-select"]');
-    const supported = value.match(/Python3?|C\+\+|JavaScript|TypeScript|Java|C#|Go|Rust|Swift|Kotlin|Ruby|PHP/i);
-    return supported?.[0] || "Code";
-  }
-
   function extractExample() {
     const selectors = [
       '[data-track-load="description_content"] pre',
@@ -181,7 +175,7 @@
       problemContext: extractProblemContext(),
       ...extractExample(),
       difficulty: detectDifficulty(),
-      language: detectLanguage(),
+      language: globalThis.LeetRepoLanguage.detectLanguage(document),
       code: editorCode(),
       runtime: findMetric("Runtime"),
       memory: findMetric("Memory"),
