@@ -81,19 +81,6 @@
     else delete panel.dataset.theme;
   }
 
-  function getProblemIdentity() {
-    const match = document.title.match(/^(\d+)\.\s*(.+?)(?:\s*-\s*LeetCode)?$/i);
-    const heading = text('[data-cy="question-title"]') || text('[data-e2e-locator="problem-title"]') || text("h1");
-    const headingMatch = heading.match(/^(\d+)\.\s*(.+)$/);
-    const urlParts = location.pathname.split("/").filter(Boolean);
-    const slug = urlParts[urlParts.indexOf("problems") + 1] || "problem";
-    return {
-      number: headingMatch?.[1] || match?.[1] || "0",
-      title: headingMatch?.[2] || match?.[2] || slug.split("-").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" "),
-      slug
-    };
-  }
-
   function detectDifficulty() {
     const candidates = document.querySelectorAll('[diff], [data-degree], [class*="difficulty"], [class*="text-difficulty"]');
     for (const node of candidates) {
@@ -172,7 +159,7 @@
 
   function extractSubmission() {
     return {
-      ...getProblemIdentity(),
+      ...globalThis.LeetRepoProblem.getProblemIdentity(document, location),
       problemContext: extractProblemContext(),
       ...extractExample(),
       difficulty: detectDifficulty(),
