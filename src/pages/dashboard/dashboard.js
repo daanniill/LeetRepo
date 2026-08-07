@@ -22,6 +22,12 @@ function safeUrl(value) {
   return /^https:\/\//.test(value || "") ? value : "";
 }
 
+function leetcodeProblemUrl(item) {
+  const url = safeUrl(item?.url);
+  if (/^https:\/\/(www\.)?leetcode\.com\/problems\/[a-z0-9-]+(?:\/|$)/i.test(url)) return url;
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item?.slug || "") ? `https://leetcode.com/problems/${item.slug}/` : "";
+}
+
 function render() {
   const items = state.submissions;
   const counts = ["Easy", "Medium", "Hard"].map((difficulty) => items.filter((item) => item.difficulty === difficulty).length);
@@ -96,6 +102,7 @@ function renderDetail(item) {
   const review = item.review || buildReview(item);
   const steps = review.approach || review.steps || [];
   const commitUrl = safeUrl(item.commitUrl);
+  const problemUrl = leetcodeProblemUrl(item);
   panel.innerHTML = `
     <div class="eyebrow">${review.generatedBy ? "AI overview" : "Interview overview"}</div>
     <h2>${escapeHtml(item.number)}. ${escapeHtml(item.title)}</h2>
@@ -108,6 +115,7 @@ function renderDetail(item) {
     ${item.notes ? `<div class="personal-note"><strong>Personal note</strong><br>${escapeHtml(item.notes)}</div>` : ""}
     <div class="detail-actions">
       ${item.code ? `<button class="button full" id="regenerate-feedback">${item.review ? "Regenerate feedback" : "Get AI feedback"}</button>` : ""}
+      ${problemUrl ? `<a class="button secondary full" href="${escapeHtml(problemUrl)}" target="_blank" rel="noreferrer">View on LeetCode ↗</a>` : ""}
       ${commitUrl ? `<a class="button secondary full" href="${escapeHtml(commitUrl)}" target="_blank" rel="noreferrer">View on GitHub ↗</a>` : ""}
     </div>`;
   document.querySelector("#regenerate-feedback")?.addEventListener("click", (event) => regenerateFeedback(item, event.currentTarget));
