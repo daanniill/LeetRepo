@@ -1,4 +1,4 @@
-import { buildReview, DEFAULT_SETTINGS, normalizeSubmission } from "../core/submissions.js";
+import { buildReview, DEFAULT_SETTINGS, normalizeSubmission, normalizeTheme } from "../core/submissions.js";
 import { createRepo, listRepos, listSolutionFolders, pushSubmission, verifyToken } from "../core/github.js";
 import {
   addTokenUsage,
@@ -23,7 +23,8 @@ function normalizeSettings(value = {}) {
     ...stored,
     aiEnabled: stored.aiEnabled === true,
     aiModel: normalizeGroqModel(stored.aiModel),
-    aiDailyLimit: normalizeDailyLimit(stored.aiDailyLimit)
+    aiDailyLimit: normalizeDailyLimit(stored.aiDailyLimit),
+    theme: normalizeTheme(stored.theme)
   };
 }
 

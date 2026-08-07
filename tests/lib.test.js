@@ -9,6 +9,7 @@ import {
   formatCommit,
   historyInsights,
   normalizeSubmission,
+  normalizeTheme,
   relativeTime,
   slugify
 } from "../src/core/submissions.js";
@@ -26,6 +27,12 @@ const submission = {
 
 test("slugify normalizes punctuation and accents", () => {
   assert.equal(slugify("  Déjà Vu: Arrays & Hashing! "), "deja-vu-arrays-hashing");
+});
+
+test("theme preference accepts known themes and falls back safely", () => {
+  assert.equal(normalizeTheme("teal"), "teal");
+  assert.equal(normalizeTheme("dark"), "dark");
+  assert.equal(normalizeTheme("unexpected"), "system");
 });
 
 test("normalizeSubmission maps languages to extensions", () => {

@@ -6,10 +6,18 @@
   let pushing = false;
   let reviewing = false;
   let notes = {};
+  const themes = new Set(["light", "dark", "teal"]);
 
   const text = (selector) => document.querySelector(selector)?.textContent?.trim() || "";
   const normalizeSpace = (value) => String(value || "").replace(/\s+/g, " ").trim();
   const escapeHtml = (value) => String(value || "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]);
+
+  function applyTheme() {
+    const panel = document.getElementById(PANEL_ID);
+    if (!panel) return;
+    if (themes.has(settings?.theme)) panel.dataset.theme = settings.theme;
+    else delete panel.dataset.theme;
+  }
 
   function getProblemIdentity() {
     const match = document.title.match(/^(\d+)\.\s*(.+?)(?:\s*-\s*LeetCode)?$/i);
@@ -239,6 +247,7 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes.settings) {
       settings = changes.settings.newValue;
+      applyTheme();
       render();
     }
   });
@@ -247,6 +256,7 @@
   chrome.runtime.sendMessage({ type: "GET_STATE" }).then((response) => {
     settings = response?.settings || {};
     notes = response?.notes || {};
+    applyTheme();
     refresh();
   });
   new MutationObserver((mutations) => {

@@ -73,7 +73,6 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
       branch = selected.selectedOptions[0]?.dataset.branch || "main";
     }
     await send("SAVE_SETTINGS", { settings: {
-      ...DEFAULT_SETTINGS,
       connected: true,
       owner,
       repo,

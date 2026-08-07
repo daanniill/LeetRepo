@@ -10,9 +10,47 @@
   <body>
     <header class="topbar"><a class="brand" href="#" id="brand"><span id="logo"></span>LeetRepo</a><span class="muted">/</span><strong>Settings</strong></header>
     <main class="settings-page">
-      <div class="settings-head"><div><div class="eyebrow">Extension preferences</div><h1>Settings</h1><p>Choose where and how accepted submissions are committed.</p></div><button class="button secondary" id="open-dashboard">Open dashboard</button></div>
-      <div class="notice" id="notice" hidden></div>
+      <div class="settings-head"><div><div class="eyebrow">Extension preferences</div><h1>Settings</h1><p>Choose how LeetRepo looks and where accepted submissions are committed.</p></div><button class="button secondary" id="open-dashboard">Open dashboard</button></div>
+      <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
       <form class="panel settings-panel" id="settings-form">
+        <section>
+          <div class="section-title"><div><h2>Appearance</h2><p>Choose a look for every LeetRepo surface.</p></div></div>
+          <div class="theme-grid" role="radiogroup" aria-label="Color theme">
+            <label class="theme-option">
+              <input type="radio" name="theme" value="system">
+              <span class="theme-card">
+                <span class="theme-preview theme-preview-system" aria-hidden="true"><i></i><b></b><em></em></span>
+                <span class="theme-copy"><strong>System</strong><small>Match your device</small></span>
+                <span class="theme-check" aria-hidden="true">✓</span>
+              </span>
+            </label>
+            <label class="theme-option">
+              <input type="radio" name="theme" value="light">
+              <span class="theme-card">
+                <span class="theme-preview theme-preview-light" aria-hidden="true"><i></i><b></b><em></em></span>
+                <span class="theme-copy"><strong>Light</strong><small>Soft and focused</small></span>
+                <span class="theme-check" aria-hidden="true">✓</span>
+              </span>
+            </label>
+            <label class="theme-option">
+              <input type="radio" name="theme" value="dark">
+              <span class="theme-card">
+                <span class="theme-preview theme-preview-dark" aria-hidden="true"><i></i><b></b><em></em></span>
+                <span class="theme-copy"><strong>Dark</strong><small>Warm and low-glare</small></span>
+                <span class="theme-check" aria-hidden="true">✓</span>
+              </span>
+            </label>
+            <label class="theme-option">
+              <input type="radio" name="theme" value="teal">
+              <span class="theme-card">
+                <span class="theme-preview theme-preview-teal" aria-hidden="true"><i></i><b></b><em></em></span>
+                <span class="theme-copy"><strong>Teal</strong><small>Deep ocean contrast</small></span>
+                <span class="theme-check" aria-hidden="true">✓</span>
+              </span>
+            </label>
+          </div>
+        </section>
+        <hr class="divider">
         <section>
           <div class="section-title"><div><h2>Repository</h2><p>The destination for all solution commits.</p></div><span class="badge accepted" id="connection-badge">Connected</span></div>
           <div class="field-grid">

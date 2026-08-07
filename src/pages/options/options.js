@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS } from "../../core/submissions.js";
 import { GROQ_MODELS } from "../../core/llm.js";
-import { logo, send, setBusy, showNotice } from "../../shared/client.js";
+import { applyTheme, logo, send, setBusy, showNotice } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
 const notice = document.querySelector("#notice");
@@ -17,6 +17,10 @@ async function init() {
   document.querySelector("#repo").value = settings.repo || "";
   document.querySelector("#branch").value = settings.branch || "";
   document.querySelector("#commit-template").value = settings.commitTemplate || DEFAULT_SETTINGS.commitTemplate;
+  const themeInputs = [...document.querySelectorAll('input[name="theme"]')];
+  const theme = themeInputs.find((input) => input.value === settings.theme) || themeInputs[0];
+  theme.checked = true;
+  applyTheme(theme.value);
   document.querySelector("#ai-model").value = settings.aiModel;
   document.querySelector("#ai-daily-limit").value = settings.aiDailyLimit;
   toggleKeys.forEach((key) => document.querySelector(`#${key}`).checked = settings[key] !== false);
@@ -41,6 +45,7 @@ document.querySelector("#settings-form").addEventListener("submit", async (event
       repo: document.querySelector("#repo").value.trim(),
       branch: document.querySelector("#branch").value.trim(),
       commitTemplate: document.querySelector("#commit-template").value.trim(),
+      theme: document.querySelector('input[name="theme"]:checked')?.value || DEFAULT_SETTINGS.theme,
       aiModel: document.querySelector("#ai-model").value,
       aiDailyLimit: document.querySelector("#ai-daily-limit").value
     };
@@ -55,6 +60,16 @@ document.querySelector("#settings-form").addEventListener("submit", async (event
     setBusy(button, false);
   }
 });
+
+document.querySelectorAll('input[name="theme"]').forEach((input) => input.addEventListener("change", async (event) => {
+  const theme = applyTheme(event.target.value);
+  try {
+    await send("SAVE_SETTINGS", { settings: { theme } });
+    showNotice(notice, "Theme updated across LeetRepo.");
+  } catch (error) {
+    showNotice(notice, error.message, true);
+  }
+}));
 
 document.querySelector("#disconnect").addEventListener("click", async () => {
   await send("DISCONNECT");

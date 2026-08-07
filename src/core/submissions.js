@@ -18,6 +18,12 @@ export const DEFAULT_SETTINGS = {
   theme: "system"
 };
 
+export const THEME_IDS = ["system", "light", "dark", "teal"];
+
+export function normalizeTheme(value) {
+  return THEME_IDS.includes(value) ? value : DEFAULT_SETTINGS.theme;
+}
+
 export const LANGUAGE_EXTENSIONS = {
   bash: "sh",
   c: "c",

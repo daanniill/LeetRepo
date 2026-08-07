@@ -1,4 +1,4 @@
-import { buildReview, DEFAULT_SETTINGS } from "../core/submissions.js";
+import { buildReview, DEFAULT_SETTINGS, normalizeTheme } from "../core/submissions.js";
 
 const DEMO_SUBMISSION = {
   id: "42-trapping-rain-water",
@@ -27,6 +27,33 @@ const DEMO_ATTEMPTS = [
 ];
 
 export const isExtension = Boolean(globalThis.chrome?.runtime?.id);
+
+export function applyTheme(value, root = globalThis.document?.documentElement) {
+  const theme = normalizeTheme(value);
+  if (!root) return theme;
+  if (theme === "system") {
+    delete root.dataset.theme;
+    root.style.colorScheme = "light dark";
+  } else {
+    root.dataset.theme = theme;
+    root.style.colorScheme = theme === "light" ? "light" : "dark";
+  }
+  return theme;
+}
+
+export async function initializeTheme() {
+  if (!isExtension) return applyTheme(DEFAULT_SETTINGS.theme);
+  const { settings } = await chrome.storage.sync.get("settings");
+  return applyTheme(settings?.theme);
+}
+
+if (isExtension && chrome.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "sync" && changes.settings) applyTheme(changes.settings.newValue?.theme);
+  });
+}
+
+initializeTheme().catch(() => applyTheme(DEFAULT_SETTINGS.theme));
 
 export async function send(type, payload = {}) {
   if (!isExtension) return demoResponse(type, payload);

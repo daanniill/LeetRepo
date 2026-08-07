@@ -191,11 +191,12 @@ function showView(view) {
 function drawShareCard() {
   const canvas = document.querySelector("#share-canvas");
   const context = canvas.getContext("2d");
+  const theme = getComputedStyle(document.documentElement);
   const insights = historyInsights(state.submissions);
   const streak = calculateStreak(state.submissions);
-  context.fillStyle = "#4e5a37";
+  context.fillStyle = theme.getPropertyValue("--share-bg").trim() || "#4e5a37";
   context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#f5ead8";
+  context.fillStyle = theme.getPropertyValue("--share-ink").trim() || "#f5ead8";
   context.font = "700 34px system-ui";
   context.fillText("LeetRepo", 70, 82);
   context.font = "700 150px system-ui";
