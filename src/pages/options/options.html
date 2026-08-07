@@ -33,6 +33,34 @@
             <label class="setting-line"><div><strong>Interview overview</strong><small>Add patterns and replay prompts</small></div><span class="switch"><input id="includeReview" type="checkbox"><span></span></span></label>
           </div>
         </section>
+        <hr class="divider">
+        <section>
+          <div class="section-title">
+            <div><h2>AI explanations</h2><p>Generate a tailored solution walkthrough before each GitHub push.</p></div>
+            <span class="badge unknown" id="ai-status-badge">Key required</span>
+          </div>
+          <label class="setting-line ai-toggle"><div><strong>Use Groq for interview overviews</strong><small>Falls back to the local template if Groq is unavailable or the daily limit is reached</small></div><span class="switch"><input id="aiEnabled" type="checkbox"><span></span></span></label>
+          <div class="ai-fields">
+            <div class="field ai-key-field">
+              <label for="groq-api-key">Groq API key</label>
+              <input class="input mono" id="groq-api-key" type="password" autocomplete="new-password" spellcheck="false" placeholder="gsk_…">
+              <small>Stored only in local extension storage, never synced, and sent only to Groq. LeetRepo does not encrypt it separately.</small>
+            </div>
+            <div class="field">
+              <label for="ai-model">Model</label>
+              <select class="select" id="ai-model"></select>
+            </div>
+            <div class="field">
+              <label for="ai-daily-limit">Daily request limit</label>
+              <input class="input" id="ai-daily-limit" type="number" inputmode="numeric" min="1" max="100" step="1">
+            </div>
+          </div>
+          <div class="ai-meta">
+            <span id="ai-usage">0 of 20 requests used today · resets at 00:00 UTC</span>
+            <span><a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">Create a Groq key ↗</a> · <button class="text-button" id="clear-groq-key" type="button">Remove saved key</button></span>
+          </div>
+          <div class="notice ai-privacy">When enabled, LeetRepo sends the problem title, language, and solution code to Groq. AI output may be incorrect, so generated READMEs include a verification note. This per-install limit prevents accidental overuse; it is not a server-enforced billing control.</div>
+        </section>
         <div class="form-actions"><button class="button" id="save-button" type="submit">Save settings</button><button class="button danger" id="disconnect" type="button">Disconnect GitHub</button></div>
       </form>
     </main>

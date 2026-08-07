@@ -62,7 +62,7 @@ function isEmptyRepoError(error) {
   return error?.status === 409 && /repository is empty/i.test(error.message);
 }
 
-export async function pushSubmission({ token, settings, submission }) {
+export async function pushSubmission({ token, settings, submission, review }) {
   const item = normalizeSubmission(submission);
   if (!item.code) throw new Error("No solution code was found on this page.");
   const owner = encodeURIComponent(settings.owner);
@@ -84,7 +84,7 @@ export async function pushSubmission({ token, settings, submission }) {
   const solution = await createBlob(token, owner, repo, `${item.code}\n`);
   const entries = [{ path: `${folder}/solution.${item.extension}`, mode: "100644", type: "blob", sha: solution.sha }];
   if (settings.includeReadme !== false) {
-    const readme = await createBlob(token, owner, repo, buildReadme(item, settings));
+    const readme = await createBlob(token, owner, repo, buildReadme(item, settings, review));
     entries.push({ path: `${folder}/README.md`, mode: "100644", type: "blob", sha: readme.sha });
   }
   const tree = await request(token, `/repos/${owner}/${repo}/git/trees`, {

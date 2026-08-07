@@ -33,7 +33,12 @@ export async function send(type, payload = {}) {
 function demoResponse(type, payload) {
   if (type === "GET_STATE") {
     const onboardingPreview = globalThis.location?.pathname?.endsWith("/onboarding.html");
-    return Promise.resolve({ settings: { ...DEFAULT_SETTINGS, connected: !onboardingPreview, owner: onboardingPreview ? "" : "alex-c", repo: onboardingPreview ? "" : "leetcode-solutions" }, submissions: DEMO_HISTORY, lastSubmission: DEMO_HISTORY[0] });
+    return Promise.resolve({
+      settings: { ...DEFAULT_SETTINGS, connected: !onboardingPreview, owner: onboardingPreview ? "" : "alex-c", repo: onboardingPreview ? "" : "leetcode-solutions" },
+      submissions: DEMO_HISTORY,
+      lastSubmission: DEMO_HISTORY[0],
+      ai: { hasApiKey: false, usage: { requests: 0, inputTokens: 0, outputTokens: 0 } }
+    });
   }
   if (type === "SAVE_SETTINGS") return Promise.resolve({ settings: { ...DEFAULT_SETTINGS, ...payload.settings } });
   if (type === "PUSH_SUBMISSION") return new Promise((resolve) => setTimeout(() => resolve({ submission: { ...payload.submission, syncedAt: new Date().toISOString() }, result: { url: "https://github.com/" } }), 500));

@@ -41,8 +41,13 @@ pushButton.addEventListener("click", async () => {
   setBusy(pushButton, true, "Pushing…");
   showNotice(notice, "");
   try {
-    await send("PUSH_SUBMISSION", { submission });
-    showNotice(notice, "Pushed successfully — your GitHub commit is ready.");
+    const response = await send("PUSH_SUBMISSION", { submission });
+    const message = response.ai?.warning
+      ? `Pushed successfully. ${response.ai.warning}`
+      : response.ai?.generated
+        ? "Pushed successfully with a Groq-generated explanation."
+        : "Pushed successfully — your GitHub commit is ready.";
+    showNotice(notice, message);
     state = await send("GET_STATE");
     renderState();
   } catch (error) {

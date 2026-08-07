@@ -11,6 +11,19 @@ LeetRepo is a dependency-free Chrome/Chromium Manifest V3 extension that capture
 
 LeetRepo uses a fine-grained GitHub personal access token rather than bundling an OAuth client secret. Grant the token access only to the repository you want to sync and give it **Contents: read and write** permission. The token is kept in `chrome.storage.local` and is sent only to `api.github.com`.
 
+## AI explanations with Groq
+
+AI explanations are optional and disabled by default. To enable them, open **Settings → AI explanations**, add your own [Groq API key](https://console.groq.com/keys), choose a production model, and set a daily request limit.
+
+- The Groq key is stored in `chrome.storage.local`, is not included in synced settings, and is never returned to extension pages after it is saved.
+- Each request contains the problem title, difficulty, language, and up to 24,000 characters of solution code.
+- Requests use Groq's OpenAI-compatible Chat Completions API with JSON output, a bounded completion size, and a 25-second timeout.
+- The default cap is 20 attempted requests per UTC day, configurable from 1 to 100. Failed attempts count toward the limit to prevent repeated error loops.
+- If Groq is unavailable, rejects the key, returns invalid output, or the limit is reached, the GitHub push continues with the local rule-based interview template.
+- AI-generated READMEs include a reminder to verify the analysis.
+
+The built-in request cap is a per-install guardrail, not an access-control or billing boundary. Anyone who controls their browser can modify extension storage or code. If LeetRepo later pays for requests with a shared service key, put that key behind an authenticated server-side proxy with a durable per-user rate limiter, payload limits, abuse monitoring, and provider-level spend caps. Never bundle a shared Groq key in the extension.
+
 ## How syncing works
 
 - The content script detects the current LeetCode problem and accepted submission details.
@@ -18,6 +31,8 @@ LeetRepo uses a fine-grained GitHub personal access token rather than bundling a
 - Auto-push reacts to an accepted result appearing on the page.
 - The service worker creates solution and README blobs, builds one Git tree, and advances the repository branch in a single commit.
 - A local index powers the dashboard even when offline.
+
+See [PRIVACY.md](PRIVACY.md) for the data-handling disclosure.
 
 ## Development
 

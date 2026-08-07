@@ -8,6 +8,9 @@ export const DEFAULT_SETTINGS = {
   includeStats: true,
   includeLink: true,
   includeReview: true,
+  aiEnabled: false,
+  aiModel: "llama-3.3-70b-versatile",
+  aiDailyLimit: 20,
   commitTemplate: "solve: {number}. {title} ({difficulty})",
   theme: "system"
 };
@@ -102,16 +105,27 @@ export function buildReview(submission) {
   };
 }
 
-export function buildReadme(submission, settings = DEFAULT_SETTINGS) {
+export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedReview) {
   const item = normalizeSubmission(submission);
-  const review = buildReview(item);
+  const review = suppliedReview || buildReview(item);
   const lines = [`# ${item.number}. ${item.title}`, ""];
   if (settings.includeLink !== false && item.url) lines.push(`[View problem on LeetCode](${item.url})`, "");
   lines.push(`- **Difficulty:** ${item.difficulty}`, `- **Language:** ${item.language}`);
   if (settings.includeStats !== false) lines.push(`- **Runtime:** ${item.runtime}`, `- **Memory:** ${item.memory}`);
   if (settings.includeReview !== false) {
     lines.push("", "## Interview overview", "", `**Patterns:** ${review.patterns.join(", ")}`, "");
-    review.steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`));
+    if (review.summary) lines.push(review.summary, "");
+    lines.push("### Approach", "");
+    const steps = review.approach || review.steps || [];
+    steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`));
+    if (review.complexity?.time && review.complexity?.space) {
+      lines.push("", "### Complexity", "", `- **Time:** ${review.complexity.time}`, `- **Space:** ${review.complexity.space}`);
+    }
+    if (review.edgeCases?.length) {
+      lines.push("", "### Edge cases", "");
+      review.edgeCases.forEach((edgeCase) => lines.push(`- ${edgeCase}`));
+    }
+    if (review.generatedBy) lines.push("", `_AI-generated with ${review.generatedBy}; verify the analysis before relying on it._`);
   }
   lines.push("", "---", "_Synced by [LeetRepo](https://github.com/)_");
   return lines.join("\n");

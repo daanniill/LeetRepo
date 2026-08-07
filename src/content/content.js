@@ -145,7 +145,8 @@
       const response = await chrome.runtime.sendMessage({ type: "PUSH_SUBMISSION", submission: latest });
       if (!response?.ok) throw new Error(response?.error || "Push failed.");
       await chrome.storage.local.set({ lastAutoPushKey: `${latest.number}:${hash(latest.code)}` });
-      showNotice(automatic ? "Accepted and pushed automatically." : "Pushed successfully to GitHub.");
+      const success = automatic ? "Accepted and pushed automatically." : "Pushed successfully to GitHub.";
+      showNotice(response.ai?.warning ? `${success} ${response.ai.warning}` : response.ai?.generated ? `${success} AI explanation added.` : success);
     } catch (error) {
       showNotice(error.message, true);
     } finally {

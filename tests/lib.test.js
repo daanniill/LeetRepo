@@ -51,6 +51,21 @@ test("README respects disabled optional sections", () => {
   assert.doesNotMatch(readme, /View problem/);
 });
 
+test("README renders a validated AI explanation with a verification note", () => {
+  const readme = buildReadme(submission, undefined, {
+    summary: "A monotonic structure tracks useful candidates.",
+    patterns: ["Monotonic Stack"],
+    approach: ["Scan the input.", "Remove dominated candidates.", "Compute the answer."],
+    complexity: { time: "O(n), with each item processed once.", space: "O(n) for the stack." },
+    edgeCases: ["Empty input", "Monotonic input"],
+    generatedBy: "Groq"
+  });
+  assert.match(readme, /### Approach/);
+  assert.match(readme, /### Complexity/);
+  assert.match(readme, /### Edge cases/);
+  assert.match(readme, /AI-generated with Groq/);
+});
+
 test("calculateStreak counts consecutive UTC solve days", () => {
   const history = ["2026-08-07", "2026-08-06", "2026-08-05"].map((date) => ({ syncedAt: `${date}T12:00:00.000Z` }));
   assert.equal(calculateStreak(history, new Date("2026-08-07T20:00:00.000Z")), 3);
