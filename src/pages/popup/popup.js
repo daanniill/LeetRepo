@@ -27,13 +27,17 @@ function renderState() {
 }
 
 function renderSubmission() {
+  const notesWrap = document.querySelector("#popup-notes-wrap");
+  notesWrap.hidden = !submission;
   if (!submission) return;
+  submission.notes = submission.notes || state.notes?.[`${submission.number}-${submission.slug}`] || "";
   const diff = difficultyClass(submission.difficulty);
   document.querySelector("#status-badge").className = `badge ${submission.status === "Accepted" ? "accepted" : "unknown"}`;
   document.querySelector("#status-badge").textContent = submission.status || "Detected";
   document.querySelector("#problem-title").textContent = `${submission.number}. ${submission.title}`;
   document.querySelector("#problem-meta").innerHTML = `<span class="badge ${diff}">${escapeHtml(submission.difficulty)}</span><span>${escapeHtml(submission.language)} · ${escapeHtml(submission.runtime)} · ${escapeHtml(submission.memory)}</span>`;
   pushButton.disabled = !submission.code || submission.status !== "Accepted" || !state.settings.connected;
+  document.querySelector("#personal-notes").value = submission.notes;
   if (!state.settings.connected) showNotice(notice, "Connect GitHub in Settings before your first push.");
 }
 
@@ -59,6 +63,12 @@ pushButton.addEventListener("click", async () => {
 
 document.querySelector("#auto-push").addEventListener("change", async (event) => {
   await send("SAVE_SETTINGS", { settings: { autoPush: event.target.checked } });
+});
+
+document.querySelector("#personal-notes").addEventListener("change", async (event) => {
+  if (!submission) return;
+  submission.notes = event.target.value;
+  await send("SAVE_NOTES", { submission, notes: event.target.value });
 });
 
 for (const id of ["dashboard-link", "open-dashboard", "dashboard-button"]) document.querySelector(`#${id}`).addEventListener("click", (event) => { event.preventDefault(); send("OPEN_DASHBOARD"); });

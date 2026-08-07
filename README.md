@@ -1,6 +1,6 @@
 # LeetRepo
 
-LeetRepo is a dependency-free Chrome/Chromium Manifest V3 extension that captures accepted LeetCode submissions and commits them to GitHub. It implements the supplied product wireframes as a real extension: onboarding, popup, in-page panel, settings, dashboard, activity history, search, difficulty filters, and atomic multi-file GitHub commits.
+LeetRepo is a dependency-free Chrome/Chromium Manifest V3 extension that captures LeetCode attempts and commits accepted solutions to GitHub. It implements the supplied product wireframes as a real extension: onboarding, popup, in-page feedback, settings, solution library, attempt history, pattern analytics, spaced repetition, shareable stats, and atomic multi-file GitHub commits.
 
 ## Install locally
 
@@ -31,6 +31,15 @@ The built-in request cap is a per-install guardrail, not an access-control or bi
 - Auto-push reacts to an accepted result appearing on the page.
 - The service worker creates solution and README blobs, builds one Git tree, and advances the repository branch in a single commit.
 - A local index powers the dashboard even when offline.
+
+## Study and profile features
+
+- The LeetCode panel records accepted and failed attempts, keeps personal notes, and can generate a 30-second interview refresher before a push.
+- The dashboard separates the solution library, activity analytics, and study queue. Pattern and language coverage are derived from actual synced solutions.
+- Spaced repetition resurfaces a solution 30 days after it is synced or reviewed, with a three-day snooze option.
+- Shareable stats are rendered locally to an image and copied only after an explicit click.
+- Existing LeetRepo-style folders can be backfilled from the selected GitHub repository into the local dashboard.
+- Repository-profile generation is opt-in because it replaces the root `README.md`; when enabled, the refreshed profile is included in the same atomic commit as the solution.
 
 See [PRIVACY.md](PRIVACY.md) for the data-handling disclosure.
 

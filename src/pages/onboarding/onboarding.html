@@ -45,8 +45,19 @@
           <form id="configure-step" class="step-pane stack gap-16" hidden>
             <div class="connected-user row"><span class="avatar" id="avatar">GH</span><div><strong id="github-login">Connected</strong><small>GitHub account connected</small></div><span class="badge accepted">Verified</span></div>
             <div class="field">
-              <label for="repo">Target repository</label>
-              <select class="select" id="repo" required></select>
+              <label>Target repository</label>
+              <div class="repo-mode" role="radiogroup" aria-label="Repository choice">
+                <label><input type="radio" name="repo-mode" value="existing" checked><span>Use existing</span></label>
+                <label><input type="radio" name="repo-mode" value="new"><span>Create new</span></label>
+              </div>
+            </div>
+            <div class="field" id="existing-repo-field">
+              <label for="repo">Repository</label>
+              <select class="select" id="repo"></select>
+            </div>
+            <div class="new-repo-grid" id="new-repo-fields" hidden>
+              <div class="field"><label for="new-repo-name">Repository name</label><input class="input" id="new-repo-name" value="leetcode-solutions"></div>
+              <div class="field"><label for="new-repo-visibility">Visibility</label><select class="select" id="new-repo-visibility"><option value="private">Private</option><option value="public">Public</option></select></div>
             </div>
             <div class="field">
               <label for="commit-template">Commit message format</label>
@@ -56,7 +67,20 @@
               <div class="eyebrow">Folder preview</div>
               <code>leetcode-solutions/<br>├─ 0001-two-sum/<br><span>│&nbsp; solution.py · README.md</span><br>└─ 0042-trapping-rain-water/<br><span>&nbsp;&nbsp; solution.cpp · README.md</span></code>
             </div>
+            <div class="field">
+              <span class="field-label">Include in each commit</span>
+              <div class="include-grid">
+                <label><input id="setup-readme" type="checkbox" checked><span>README</span></label>
+                <label><input id="setup-stats" type="checkbox" checked><span>Runtime &amp; memory</span></label>
+                <label><input id="setup-link" type="checkbox" checked><span>LeetCode link</span></label>
+                <label><input id="setup-notes" type="checkbox" checked><span>Personal notes</span></label>
+                <label><input id="setup-review" type="checkbox" checked><span>Interview overview</span></label>
+              </div>
+            </div>
             <div class="setting-line"><div><strong>Auto-push on Accepted</strong><small>Also push manually anytime from the popup</small></div><label class="switch"><input id="setup-auto-push" type="checkbox" checked><span></span></label></div>
+            <div class="setting-line"><div><strong>Backfill existing solutions</strong><small>Import LeetRepo-style folders already in this repository</small></div><label class="switch"><input id="setup-backfill" type="checkbox"><span></span></label></div>
+            <div class="setting-line"><div><strong>Generate repository profile</strong><small>Opt in to updating the root README with live stats</small></div><label class="switch"><input id="setup-profile" type="checkbox"><span></span></label></div>
+            <div class="setting-line"><div><strong>Spaced repetition</strong><small>Resurface solutions 30 days after each sync</small></div><label class="switch"><input id="setup-repetition" type="checkbox" checked><span></span></label></div>
             <button class="button full" type="submit" id="configure-button">Save configuration</button>
           </form>
 

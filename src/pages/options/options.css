@@ -8,6 +8,7 @@
 .section-title p { font-size: 12px; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .toggle-list { margin-top: 18px; border-top: 1px solid var(--line); }
+.repository-actions { margin-top: 16px; display: flex; align-items: center; gap: 12px; font-size: 11px; }
 .setting-line { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .setting-line strong, .setting-line small { display: block; }
 .setting-line small { margin-top: 4px; color: var(--muted); font-size: 11px; }
@@ -21,4 +22,4 @@
 .text-button { padding: 0; border: 0; background: transparent; color: var(--hard-ink); cursor: pointer; text-decoration: underline; }
 .text-button:disabled { color: var(--muted); cursor: not-allowed; opacity: .6; }
 .ai-privacy { margin-top: 18px; }
-@media (max-width: 680px) { .settings-page { padding-top: 34px; } .settings-head { align-items: flex-start; } .settings-head .button { display: none; } .field-grid, .ai-fields { grid-template-columns: 1fr; } .ai-meta { flex-direction: column; } .settings-panel { padding: 22px 18px; } }
+@media (max-width: 680px) { .settings-page { padding-top: 34px; } .settings-head { align-items: flex-start; } .settings-head > .button { display: none; } .field-grid, .ai-fields { grid-template-columns: 1fr; } .repository-actions, .ai-meta { align-items: flex-start; flex-direction: column; } .settings-panel { padding: 22px 18px; } }

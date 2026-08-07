@@ -2,9 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildReadme,
+  buildProfileReadme,
   calculateStreak,
+  dueForReview,
   folderFor,
   formatCommit,
+  historyInsights,
   normalizeSubmission,
   relativeTime,
   slugify
@@ -49,6 +52,33 @@ test("README respects disabled optional sections", () => {
   assert.doesNotMatch(readme, /Runtime/);
   assert.doesNotMatch(readme, /Interview overview/);
   assert.doesNotMatch(readme, /View problem/);
+});
+
+test("README includes personal notes only when enabled", () => {
+  const withNotes = { ...submission, notes: "Re-check the decreasing-height case." };
+  assert.match(buildReadme(withNotes), /## Personal notes/);
+  assert.doesNotMatch(buildReadme(withNotes, { includeNotes: false }), /Personal notes/);
+});
+
+test("profile README summarizes real history without inventing totals", () => {
+  const history = [
+    { ...submission, syncedAt: "2026-08-07T12:00:00.000Z" },
+    { ...submission, number: 1, title: "Two Sum", difficulty: "Easy", language: "Python3", code: "seen = {}", syncedAt: "2026-08-06T12:00:00.000Z" }
+  ];
+  const profile = buildProfileReadme(history, { owner: "alex-c", repo: "solutions" });
+  assert.match(profile, /# alex-c \/ solutions/);
+  assert.match(profile, /\*\*2 solved\*\*/);
+  assert.match(profile, /\| 1 \| \[Two Sum\]/);
+  assert.equal(historyInsights(history).languages.length, 2);
+});
+
+test("review queue respects generated and snoozed due dates", () => {
+  const items = [
+    { ...submission, syncedAt: "2026-06-01T12:00:00.000Z" },
+    { ...submission, number: 1, title: "Two Sum", syncedAt: "2026-08-01T12:00:00.000Z" },
+    { ...submission, number: 2, title: "Add Two Numbers", syncedAt: "2026-01-01T12:00:00.000Z", reviewDueAt: "2026-08-10T12:00:00.000Z" }
+  ];
+  assert.deepEqual(dueForReview(items, new Date("2026-08-07T12:00:00.000Z")).map((item) => item.number), [42]);
 });
 
 test("README renders a validated AI explanation with a verification note", () => {

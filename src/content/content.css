@@ -17,9 +17,28 @@
 #leetrepo-panel .lr-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #a1a8a3; }
 #leetrepo-panel .lr-status.accepted { color: #3d642b; }
 #leetrepo-panel .lr-status.accepted::before { background: #6e9852; }
+#leetrepo-panel .lr-status.rejected { color: #984d32; }
+#leetrepo-panel .lr-status.rejected::before { background: #984d32; }
 #leetrepo-panel .lr-button { width: 100%; min-height: 38px; padding: 0 14px; border: 0; border-radius: 999px; display: flex; align-items: center; justify-content: center; gap: 7px; color: #edeee4; background: #2f8f8a; font-family: "Arial Rounded MT Bold", "Trebuchet MS", sans-serif; font-size: 12px; font-weight: 800; cursor: pointer; }
 #leetrepo-panel .lr-button:disabled { cursor: not-allowed; filter: grayscale(.7); opacity: .55; }
 #leetrepo-panel .lr-button.secondary { min-height: 34px; border: 1px solid rgba(47,143,138,.35); color: #1f6360; background: #cdece9; }
+#leetrepo-panel .lr-feedback { padding: 10px; border-radius: 14px; color: #1c211f; background: #f6f7f1; font: 10.5px/1.45 Inter, ui-sans-serif, sans-serif; }
+#leetrepo-panel .lr-feedback strong { display: block; margin-bottom: 5px; font-family: "Arial Rounded MT Bold", "Trebuchet MS", sans-serif; font-size: 11px; }
+#leetrepo-panel .lr-feedback p { margin: 0; color: #667069; }
+#leetrepo-panel .lr-patterns { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 4px; }
+#leetrepo-panel .lr-patterns span { padding: 2px 6px; border-radius: 8px; color: #1f6360; background: #cdece9; font-size: 9px; font-weight: 700; }
+#leetrepo-panel .lr-complexity { margin-top: 7px; display: flex; flex-direction: column; gap: 3px; color: #667069; font-family: ui-monospace, monospace; font-size: 9px; }
+#leetrepo-panel .lr-notes-label { color: #667069; font: 800 9px/1 Inter, ui-sans-serif, sans-serif; letter-spacing: .1em; text-transform: uppercase; }
+#leetrepo-panel .lr-notes { width: 100%; min-height: 48px; padding: 8px 10px; resize: vertical; border: 1px solid rgba(28,33,31,.14); border-radius: 13px; outline: 0; color: #1c211f; background: #f6f7f1; font: 10.5px/1.4 Inter, ui-sans-serif, sans-serif; }
+#leetrepo-panel .lr-notes:focus { border-color: #2f8f8a; box-shadow: 0 0 0 2px rgba(47,143,138,.18); }
+#leetrepo-panel .lr-auto { display: flex; align-items: center; justify-content: space-between; color: #667069; font: 10.5px Inter, ui-sans-serif, sans-serif; }
+#leetrepo-panel .lr-switch { position: relative; width: 34px; height: 20px; }
+#leetrepo-panel .lr-switch input { position: absolute; opacity: 0; pointer-events: none; }
+#leetrepo-panel .lr-switch > span { position: absolute; inset: 0; border-radius: 99px; background: rgba(28,33,31,.18); cursor: pointer; }
+#leetrepo-panel .lr-switch > span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #edeee4; transition: .18s; }
+#leetrepo-panel .lr-switch input:checked + span { background: #2f8f8a; }
+#leetrepo-panel .lr-switch input:checked + span::after { transform: translateX(14px); }
+#leetrepo-panel .lr-link { padding: 0; border: 0; color: #1f6360; background: transparent; font: 700 10.5px Inter, ui-sans-serif, sans-serif; cursor: pointer; text-align: left; }
 #leetrepo-panel .lr-notice { padding: 8px 9px; border-radius: 12px; color: #1f6360; background: #cdece9; font-size: 10.5px; line-height: 1.4; }
 #leetrepo-panel .lr-notice.error { color: #984d32; background: #f0d8cd; }
 #leetrepo-panel.lr-collapsed { width: auto; }
@@ -36,5 +55,9 @@
   #leetrepo-panel .lr-minimize:hover { color: #f2e9db; background: #322b25; }
   #leetrepo-panel .lr-button { color: #211c18; background: #e08a4e; }
   #leetrepo-panel .lr-button.secondary { border-color: rgba(224,138,78,.3); color: #f2b184; background: #3a2a1e; }
+  #leetrepo-panel .lr-feedback, #leetrepo-panel .lr-notes { border-color: rgba(242,233,219,.13); color: #f2e9db; background: #322b25; }
+  #leetrepo-panel .lr-feedback p, #leetrepo-panel .lr-complexity, #leetrepo-panel .lr-notes-label, #leetrepo-panel .lr-auto { color: #a89b8a; }
+  #leetrepo-panel .lr-patterns span { color: #f2b184; background: #3a2a1e; }
+  #leetrepo-panel .lr-link { color: #f2b184; }
   #leetrepo-panel .lr-notice { color: #f2b184; background: #3a2a1e; }
 }

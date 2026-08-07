@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS } from "../core/submissions.js";
+import { buildReview, DEFAULT_SETTINGS } from "../core/submissions.js";
 
 const DEMO_SUBMISSION = {
   id: "42-trapping-rain-water",
@@ -19,6 +19,11 @@ const DEMO_HISTORY = [
   { ...DEMO_SUBMISSION, syncedAt: new Date(Date.now() - 120000).toISOString() },
   { ...DEMO_SUBMISSION, id: "11-container-with-most-water", number: "11", title: "Container With Most Water", slug: "container-with-most-water", difficulty: "Medium", language: "Python3", extension: "py", syncedAt: new Date(Date.now() - 3600000).toISOString() },
   { ...DEMO_SUBMISSION, id: "1-two-sum", number: "1", title: "Two Sum", slug: "two-sum", difficulty: "Easy", language: "Python3", extension: "py", syncedAt: new Date(Date.now() - 86400000).toISOString() }
+].map((item) => ({ ...item, review: buildReview(item) }));
+
+const DEMO_ATTEMPTS = [
+  { ...DEMO_HISTORY[1], status: "Wrong Answer", recordedAt: new Date(Date.now() - 180000).toISOString() },
+  { ...DEMO_HISTORY[1], status: "Accepted", recordedAt: new Date(Date.now() - 120000).toISOString() }
 ];
 
 export const isExtension = Boolean(globalThis.chrome?.runtime?.id);
@@ -36,6 +41,8 @@ function demoResponse(type, payload) {
     return Promise.resolve({
       settings: { ...DEFAULT_SETTINGS, connected: !onboardingPreview, owner: onboardingPreview ? "" : "alex-c", repo: onboardingPreview ? "" : "leetcode-solutions" },
       submissions: DEMO_HISTORY,
+      attempts: DEMO_ATTEMPTS,
+      notes: {},
       lastSubmission: DEMO_HISTORY[0],
       ai: { hasApiKey: false, usage: { requests: 0, inputTokens: 0, outputTokens: 0 } }
     });
@@ -43,6 +50,9 @@ function demoResponse(type, payload) {
   if (type === "SAVE_SETTINGS") return Promise.resolve({ settings: { ...DEFAULT_SETTINGS, ...payload.settings } });
   if (type === "PUSH_SUBMISSION") return new Promise((resolve) => setTimeout(() => resolve({ submission: { ...payload.submission, syncedAt: new Date().toISOString() }, result: { url: "https://github.com/" } }), 500));
   if (type === "CONNECT_GITHUB") return Promise.resolve({ user: { login: "alex-c" }, repos: [{ full_name: "alex-c/leetcode-solutions", name: "leetcode-solutions", owner: { login: "alex-c" }, default_branch: "main" }] });
+  if (type === "CREATE_REPO") return Promise.resolve({ repo: { name: payload.repo?.name || "leetcode-solutions", owner: { login: "alex-c" }, default_branch: "main" } });
+  if (type === "IMPORT_REPOSITORY") return Promise.resolve({ imported: 3 });
+  if (type === "GENERATE_FEEDBACK") return Promise.resolve({ review: buildReview(payload.submission), ai: { generated: false } });
   return Promise.resolve({ ok: true });
 }
 

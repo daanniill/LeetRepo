@@ -20,6 +20,7 @@
             <div class="field"><label for="repo">Repository</label><input class="input" id="repo" required></div>
             <div class="field"><label for="branch">Branch</label><input class="input" id="branch" placeholder="main"></div>
           </div>
+          <div class="repository-actions"><button class="button secondary" id="backfill-repository" type="button">Backfill existing solution folders</button><span class="muted">Imports LeetRepo-style folders into the local dashboard without changing GitHub.</span></div>
         </section>
         <hr class="divider">
         <section>
@@ -30,7 +31,10 @@
             <label class="setting-line"><div><strong>Generate a README</strong><small>Problem details and interview review</small></div><span class="switch"><input id="includeReadme" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>Runtime and memory</strong><small>Include captured submission metrics</small></div><span class="switch"><input id="includeStats" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>LeetCode link</strong><small>Link back to the original problem</small></div><span class="switch"><input id="includeLink" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>Personal notes</strong><small>Include notes written in the LeetCode panel</small></div><span class="switch"><input id="includeNotes" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>Interview overview</strong><small>Add patterns and replay prompts</small></div><span class="switch"><input id="includeReview" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>Repository profile README</strong><small>Opt in to replacing the root README with generated stats on every push</small></div><span class="switch"><input id="includeProfile" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>Spaced repetition</strong><small>Resurface a solution 30 days after it is synced or reviewed</small></div><span class="switch"><input id="spacedRepetition" type="checkbox"><span></span></span></label>
           </div>
         </section>
         <hr class="divider">

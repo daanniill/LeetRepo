@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "LeetRepo",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Commit accepted LeetCode solutions to GitHub with clean READMEs and study metadata.",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "clipboardWrite"],
   "host_permissions": ["https://api.github.com/*", "https://api.groq.com/*"],
   "background": {
     "service_worker": "src/background/service-worker.js",

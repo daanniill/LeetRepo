@@ -87,6 +87,11 @@ export function normalizeGeneratedReview(value) {
       time: cleanText(value.complexity?.time, 300),
       space: cleanText(value.complexity?.space, 300)
     },
+    complexityCheck: {
+      verdict: ["optimal", "suboptimal", "unclear"].includes(value.complexityCheck?.verdict) ? value.complexityCheck.verdict : "unclear",
+      intended: cleanText(value.complexityCheck?.intended, 300),
+      note: cleanText(value.complexityCheck?.note, 500)
+    },
     edgeCases: cleanList(value.edgeCases, { maxItems: 5, maxLength: 300 }),
     generatedBy: "Groq"
   };
@@ -111,6 +116,11 @@ Return exactly one JSON object with this shape:
   "complexity": {
     "time": "Big-O followed by a short justification",
     "space": "Big-O followed by a short justification"
+  },
+  "complexityCheck": {
+    "verdict": "optimal, suboptimal, or unclear",
+    "intended": "the intended best time and space complexity, without inventing constraints",
+    "note": "one concise comparison or improvement suggestion"
   },
   "edgeCases": ["2-4 concrete edge cases handled by this code"]
 }

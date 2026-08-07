@@ -8,56 +8,96 @@
     <link rel="stylesheet" href="dashboard.css">
   </head>
   <body>
-    <div class="app-shell dashboard-shell">
-      <aside class="sidebar">
-        <a class="brand" href="#"><span id="logo"></span>LeetRepo</a>
-        <nav>
-          <button class="nav-item active" data-view="problems"><span>▦</span>Problems</button>
-          <button class="nav-item" data-view="activity"><span>↻</span>Activity</button>
-          <button class="nav-item" id="settings-link"><span>☷</span>Settings</button>
+    <div class="app-shell">
+      <header class="dashboard-nav">
+        <a class="brand" href="#" data-view="problems"><span id="logo"></span>LeetRepo</a>
+        <nav aria-label="Dashboard views">
+          <button class="nav-item active" data-view="problems">Problems</button>
+          <button class="nav-item" data-view="activity">Activity</button>
+          <button class="nav-item" data-view="study">Study</button>
+          <button class="nav-item" id="settings-link">Settings</button>
         </nav>
-        <div class="repo-chip"><span class="dot"></span><span class="truncate" id="repo-name">Not connected</span></div>
-      </aside>
+        <a class="repo-link truncate" id="repo-name" target="_blank" rel="noreferrer">Not connected</a>
+      </header>
+
       <main class="dashboard-main">
-        <header class="dashboard-header">
-          <div><div class="eyebrow">Your solution library</div><h1>Synced problems</h1></div>
-          <div class="header-actions"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Search problems…"></label><button class="button secondary" id="refresh">Refresh</button></div>
-        </header>
+        <section data-view-panel="problems">
+          <header class="dashboard-header">
+            <div><div class="eyebrow">Your solution library</div><h1>Synced problems</h1></div>
+            <div class="header-actions"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Search problems…"></label><button class="button secondary" id="refresh">Refresh</button></div>
+          </header>
 
-        <section class="stats-row" id="stats-row">
-          <div class="stat"><div class="stat-value" id="total-stat">0</div><div class="stat-label">problems synced</div></div>
-          <div class="stat"><div class="stat-value accent" id="streak-stat">0</div><div class="stat-label">day streak</div></div>
-          <div class="stat"><div class="stat-value difficulty-counts" id="difficulty-stat">0 / 0 / 0</div><div class="stat-label">easy / medium / hard</div></div>
-          <div class="stat"><div class="stat-value" id="reviewed-stat">0</div><div class="stat-label">interview overviews</div></div>
+          <section class="stats-row">
+            <div class="stat"><div class="stat-value" id="total-stat">0</div><div class="stat-label">problems synced</div></div>
+            <div class="stat"><div class="stat-value accent" id="streak-stat">0</div><div class="stat-label">day streak</div></div>
+            <div class="stat"><div class="stat-value difficulty-counts" id="difficulty-stat">0 / 0 / 0</div><div class="stat-label">easy / medium / hard</div></div>
+            <div class="stat"><div class="stat-value" id="reviewed-stat">0</div><div class="stat-label">interview overviews</div></div>
+          </section>
+
+          <section class="library-panel panel">
+            <div class="library-toolbar">
+              <div class="filters" role="group" aria-label="Filter by difficulty">
+                <button class="filter active" data-filter="All">All</button>
+                <button class="filter" data-filter="Easy">Easy</button>
+                <button class="filter" data-filter="Medium">Medium</button>
+                <button class="filter" data-filter="Hard">Hard</button>
+              </div>
+              <span class="muted" id="result-count">0 results</span>
+            </div>
+            <div class="library-grid">
+              <div class="table-wrap">
+                <div class="table-head"><span>Problem</span><span>Diff</span><span>Lang</span><span>Synced</span></div>
+                <div id="problem-list"></div>
+              </div>
+              <aside class="detail-panel" id="detail-panel"><div class="empty"><strong>Select a problem</strong>Its interview overview will appear here.</div></aside>
+            </div>
+          </section>
         </section>
 
-        <section class="activity-card panel" id="activity-card">
-          <div class="row spread"><div><h2>Solve activity</h2><p>Accepted submissions synced in the last 20 weeks</p></div><div class="activity-legend"><span>Less</span><i></i><i></i><i></i><i></i><span>More</span></div></div>
-          <div class="heatmap" id="heatmap" aria-label="Solve activity heatmap"></div>
+        <section data-view-panel="activity" hidden>
+          <header class="dashboard-header">
+            <div><div class="eyebrow">Progress, not just totals</div><h1>Solve activity</h1><p>See how your repository has grown and how you reached each accepted solution.</p></div>
+          </header>
+          <section class="profile-hero panel">
+            <div><div class="eyebrow">Repository profile</div><h2 id="profile-title">leetcode-solutions</h2><p>Accepted submissions, organized, documented, and ready to review.</p></div>
+            <div class="profile-badges" id="profile-badges"></div>
+            <a class="button secondary" id="view-repository" target="_blank" rel="noreferrer">View repository ↗</a>
+          </section>
+          <section class="activity-card panel">
+            <div class="row spread"><div><h2>Solve activity</h2><p>Accepted submissions synced in the last 20 weeks</p></div><div class="activity-legend"><span>Less</span><i></i><i></i><i></i><i></i><span>More</span></div></div>
+            <div class="heatmap" id="heatmap" aria-label="Solve activity heatmap"></div>
+          </section>
+          <div class="analytics-grid">
+            <section class="panel analytics-card"><div class="eyebrow">Pattern coverage</div><h2>What you practice</h2><div class="bar-list" id="pattern-breakdown"></div></section>
+            <section class="panel analytics-card"><div class="eyebrow">Language breakdown</div><h2>How you solve</h2><div class="bar-list" id="language-breakdown"></div></section>
+          </div>
+          <section class="panel attempts-card">
+            <div class="section-heading"><div><div class="eyebrow">The full path</div><h2>Attempt history</h2></div><span class="muted" id="attempt-count">0 captured</span></div>
+            <div id="attempt-list"></div>
+          </section>
         </section>
 
-        <section class="library-panel panel">
-          <div class="library-toolbar">
-            <div class="filters" role="group" aria-label="Filter by difficulty">
-              <button class="filter active" data-filter="All">All</button>
-              <button class="filter" data-filter="Easy">Easy</button>
-              <button class="filter" data-filter="Medium">Medium</button>
-              <button class="filter" data-filter="Hard">Hard</button>
-            </div>
-            <span class="muted" id="result-count">0 results</span>
+        <section data-view-panel="study" hidden>
+          <header class="dashboard-header">
+            <div><div class="eyebrow">Explain it like you’ll forget</div><h1>Study guide</h1><p>Thirty-second refreshers, pattern gaps, and spaced repetition from your own solutions.</p></div>
+          </header>
+          <div class="study-grid">
+            <section class="panel review-card" id="review-card"></section>
+            <section class="panel share-panel">
+              <div class="share-card" id="share-card"><div class="share-brand">LeetRepo</div><div class="share-total" id="share-total">0</div><div>problems solved &amp; committed</div><div class="share-meta" id="share-meta"></div></div>
+              <div class="row"><button class="button grow" id="copy-stats">Copy image</button><button class="button secondary grow" id="share-stats">Share</button></div>
+            </section>
           </div>
-          <div class="library-grid">
-            <div class="table-wrap">
-              <div class="table-head"><span>Problem</span><span>Diff</span><span>Lang</span><span>Synced</span></div>
-              <div id="problem-list"></div>
-            </div>
-            <aside class="detail-panel" id="detail-panel">
-              <div class="empty"><strong>Select a problem</strong>Its interview overview will appear here.</div>
-            </aside>
-          </div>
+          <section class="panel coverage-card">
+            <div class="section-heading"><div><div class="eyebrow">Study-gap map</div><h2>Where you’re strong — and where you’re not</h2></div></div>
+            <div class="pattern-cloud" id="pattern-cloud"></div>
+            <div class="gap-callout" id="gap-callout"></div>
+          </section>
         </section>
       </main>
     </div>
+    <canvas id="share-canvas" width="1200" height="630" hidden></canvas>
+    <div class="toast" id="toast" hidden></div>
     <script type="module" src="dashboard.js"></script>
   </body>
 </html>

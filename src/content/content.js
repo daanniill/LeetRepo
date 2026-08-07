@@ -4,6 +4,8 @@
   let latest = null;
   let checkTimer = null;
   let pushing = false;
+  let reviewing = false;
+  let notes = {};
 
   const text = (selector) => document.querySelector(selector)?.textContent?.trim() || "";
   const normalizeSpace = (value) => String(value || "").replace(/\s+/g, " ").trim();
@@ -40,9 +42,12 @@
       '[class*="success"]'
     ];
     const resultText = selectors.map(text).join(" ");
-    if (/\bAccepted\b/i.test(resultText)) return "Accepted";
-    const pageSignals = Array.from(document.querySelectorAll("span, div")).slice(-800).some((node) => node.children.length === 0 && normalizeSpace(node.textContent) === "Accepted");
-    return pageSignals ? "Accepted" : "Ready";
+    const statuses = ["Accepted", "Wrong Answer", "Time Limit Exceeded", "Memory Limit Exceeded", "Runtime Error", "Compile Error", "Output Limit Exceeded"];
+    for (const status of statuses) if (new RegExp(`\\b${status.replaceAll(" ", "\\s+")}\\b`, "i").test(resultText)) return status;
+    const pageSignals = Array.from(document.querySelectorAll("span, div")).slice(-800)
+      .filter((node) => node.children.length === 0)
+      .map((node) => normalizeSpace(node.textContent));
+    return statuses.find((status) => pageSignals.includes(status)) || "Ready";
   }
 
   function editorCode() {
@@ -101,7 +106,12 @@
           <div class="lr-meta"></div>
           <div class="lr-status">Waiting for an Accepted submission</div>
           <button class="lr-button" disabled>Push to GitHub</button>
-          <button class="lr-button secondary lr-review">View interview overview</button>
+          <button class="lr-button secondary lr-review">Get AI feedback</button>
+          <div class="lr-feedback" hidden></div>
+          <label class="lr-notes-label" for="lr-personal-notes">Personal notes</label>
+          <textarea class="lr-notes" id="lr-personal-notes" rows="2" maxlength="4000" placeholder="What should future-you remember?"></textarea>
+          <div class="lr-auto"><span>Auto-push on Accepted</span><label class="lr-switch"><input type="checkbox"><span></span></label></div>
+          <button class="lr-link lr-dashboard">Open dashboard →</button>
           <div class="lr-notice" hidden></div>
         </div>
       </div>`;
@@ -111,7 +121,18 @@
       panel.querySelector(".lr-minimize").textContent = panel.classList.contains("lr-collapsed") ? "+" : "−";
     });
     panel.querySelector(".lr-button:not(.secondary)").addEventListener("click", () => push(false));
-    panel.querySelector(".lr-review").addEventListener("click", () => chrome.runtime.sendMessage({ type: "OPEN_DASHBOARD" }));
+    panel.querySelector(".lr-review").addEventListener("click", review);
+    panel.querySelector(".lr-dashboard").addEventListener("click", () => chrome.runtime.sendMessage({ type: "OPEN_DASHBOARD" }));
+    panel.querySelector(".lr-notes").addEventListener("input", (event) => { if (latest) latest.notes = event.target.value; });
+    panel.querySelector(".lr-notes").addEventListener("change", async (event) => {
+      if (!latest) return;
+      notes[`${latest.number}-${latest.slug}`] = event.target.value;
+      await chrome.runtime.sendMessage({ type: "SAVE_NOTES", submission: latest, notes: event.target.value });
+    });
+    panel.querySelector(".lr-switch input").addEventListener("change", async (event) => {
+      settings = { ...settings, autoPush: event.target.checked };
+      await chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", settings: { autoPush: event.target.checked } });
+    });
   }
 
   function render() {
@@ -121,11 +142,41 @@
     const difficulty = ["Easy", "Medium", "Hard"].includes(latest.difficulty) ? latest.difficulty : "Unknown";
     panel.querySelector(".lr-meta").innerHTML = `<span class="lr-badge ${difficulty}">${escapeHtml(difficulty)}</span><span>${escapeHtml(latest.language)} · ${escapeHtml(latest.runtime)} · ${escapeHtml(latest.memory)}</span>`;
     const status = panel.querySelector(".lr-status");
-    status.textContent = latest.status === "Accepted" ? "Accepted — ready to sync" : "Waiting for an Accepted submission";
+    status.textContent = latest.status === "Accepted" ? "Accepted — ready to sync" : latest.status === "Ready" ? "Waiting for an Accepted submission" : latest.status;
     status.classList.toggle("accepted", latest.status === "Accepted");
+    status.classList.toggle("rejected", !["Accepted", "Ready"].includes(latest.status));
     const button = panel.querySelector(".lr-button:not(.secondary)");
     button.disabled = pushing || latest.status !== "Accepted" || !latest.code || !settings?.connected;
     button.textContent = pushing ? "Pushing…" : settings?.connected ? (latest.code ? "Push to GitHub" : "Open the code editor") : "Connect GitHub in Settings";
+    const reviewButton = panel.querySelector(".lr-review");
+    reviewButton.disabled = reviewing || !latest.code;
+    reviewButton.textContent = reviewing ? "Reviewing solution…" : "Get AI feedback";
+    panel.querySelector(".lr-switch input").checked = settings?.autoPush !== false;
+    const notesInput = panel.querySelector(".lr-notes");
+    if (document.activeElement !== notesInput && notesInput.value !== (latest.notes || "")) notesInput.value = latest.notes || "";
+  }
+
+  async function review() {
+    if (reviewing || !latest?.code) return;
+    reviewing = true;
+    render();
+    showNotice("");
+    try {
+      const response = await chrome.runtime.sendMessage({ type: "GENERATE_FEEDBACK", submission: latest });
+      if (!response?.ok) throw new Error(response?.error || "Feedback failed.");
+      const feedback = document.querySelector(`#${PANEL_ID} .lr-feedback`);
+      const complexity = response.review.complexity?.time && response.review.complexity?.space
+        ? `<div class="lr-complexity"><span>Time · ${escapeHtml(response.review.complexity.time)}</span><span>Space · ${escapeHtml(response.review.complexity.space)}</span></div>`
+        : "";
+      feedback.innerHTML = `<strong>30-second refresher</strong><p>${escapeHtml(response.review.summary || response.review.steps?.[0] || "Review the approach and its key invariant.")}</p><div class="lr-patterns">${(response.review.patterns || []).map((pattern) => `<span>${escapeHtml(pattern)}</span>`).join("")}</div>${complexity}`;
+      feedback.hidden = false;
+      if (response.ai?.warning) showNotice(response.ai.warning, true);
+    } catch (error) {
+      showNotice(error.message, true);
+    } finally {
+      reviewing = false;
+      render();
+    }
   }
 
   function showNotice(message, error = false) {
@@ -163,7 +214,9 @@
 
   async function refresh() {
     latest = extractSubmission();
+    latest.notes = notes[`${latest.number}-${latest.slug}`] || "";
     render();
+    if (!["Ready"].includes(latest.status) && latest.code) chrome.runtime.sendMessage({ type: "RECORD_ATTEMPT", submission: latest });
     if (settings?.autoPush && settings.connected && latest.status === "Accepted" && latest.code) {
       const key = `${latest.number}:${hash(latest.code)}`;
       const { lastAutoPushKey } = await chrome.storage.local.get("lastAutoPushKey");
@@ -193,6 +246,7 @@
   mount();
   chrome.runtime.sendMessage({ type: "GET_STATE" }).then((response) => {
     settings = response?.settings || {};
+    notes = response?.notes || {};
     refresh();
   });
   new MutationObserver((mutations) => {

@@ -1,4 +1,4 @@
-import { buildReadme, folderFor, formatCommit, normalizeSubmission } from "./submissions.js";
+import { buildProfileReadme, buildReadme, folderFor, formatCommit, normalizeSubmission } from "./submissions.js";
 
 const API = "https://api.github.com";
 
@@ -30,8 +30,45 @@ export async function listRepos(token) {
   return request(token, "/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member");
 }
 
+export async function createRepo(token, { name, description = "LeetCode solutions synced by LeetRepo", visibility = "private" }) {
+  const repoName = String(name || "").trim();
+  if (!/^[A-Za-z0-9._-]+$/.test(repoName)) throw new Error("Repository names may contain letters, numbers, periods, underscores, and hyphens.");
+  return request(token, "/user/repos", {
+    method: "POST",
+    body: JSON.stringify({
+      name: repoName,
+      description: String(description || "").trim().slice(0, 350),
+      private: visibility !== "public",
+      auto_init: false
+    })
+  });
+}
+
 export async function repoInfo(token, owner, repo) {
   return request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
+}
+
+export async function listSolutionFolders(token, owner, repo, branch = "") {
+  const info = await repoInfo(token, owner, repo);
+  const selectedBranch = branch || info.default_branch || "main";
+  const tree = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(selectedBranch)}?recursive=1`);
+  if (tree.truncated) throw new Error("This repository is too large to backfill safely in one request.");
+  const languages = { py: "Python3", cpp: "C++", java: "Java", js: "JavaScript", ts: "TypeScript", go: "Go", rs: "Rust", cs: "C#", kt: "Kotlin", swift: "Swift", rb: "Ruby", php: "PHP" };
+  return (tree.tree || []).flatMap((entry) => {
+    const match = entry.type === "blob" && entry.path.match(/^(\d{4,})-([^/]+)\/solution\.([A-Za-z0-9]+)$/);
+    if (!match) return [];
+    const [, number, slug, extension] = match;
+    return [{
+      number: String(Number(number)),
+      title: slug.split("-").map((part) => part ? part[0].toUpperCase() + part.slice(1) : "").join(" "),
+      slug,
+      difficulty: "Unknown",
+      language: languages[extension.toLowerCase()] || extension.toUpperCase(),
+      extension,
+      status: "Accepted",
+      commitUrl: `https://github.com/${owner}/${repo}/tree/${encodeURIComponent(selectedBranch)}/${number}-${slug}`
+    }];
+  });
 }
 
 async function createBlob(token, owner, repo, content) {
@@ -62,7 +99,7 @@ function isEmptyRepoError(error) {
   return error?.status === 409 && /repository is empty/i.test(error.message);
 }
 
-export async function pushSubmission({ token, settings, submission, review }) {
+export async function pushSubmission({ token, settings, submission, review, profileItems = [] }) {
   const item = normalizeSubmission(submission);
   if (!item.code) throw new Error("No solution code was found on this page.");
   const owner = encodeURIComponent(settings.owner);
@@ -86,6 +123,14 @@ export async function pushSubmission({ token, settings, submission, review }) {
   if (settings.includeReadme !== false) {
     const readme = await createBlob(token, owner, repo, buildReadme(item, settings, review));
     entries.push({ path: `${folder}/README.md`, mode: "100644", type: "blob", sha: readme.sha });
+  }
+  if (settings.includeProfile === true) {
+    const history = [
+      { ...item, syncedAt: new Date().toISOString(), review: review || item.review },
+      ...profileItems.filter((existing) => normalizeSubmission(existing).id !== item.id)
+    ];
+    const profile = await createBlob(token, owner, repo, buildProfileReadme(history, settings));
+    entries.push({ path: "README.md", mode: "100644", type: "blob", sha: profile.sha });
   }
   const tree = await request(token, `/repos/${owner}/${repo}/git/trees`, {
     method: "POST",

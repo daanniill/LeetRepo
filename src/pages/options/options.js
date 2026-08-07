@@ -4,7 +4,7 @@ import { logo, send, setBusy, showNotice } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
 const notice = document.querySelector("#notice");
-const toggleKeys = ["autoPush", "includeReadme", "includeStats", "includeLink", "includeReview", "aiEnabled"];
+const toggleKeys = ["autoPush", "includeReadme", "includeStats", "includeLink", "includeNotes", "includeReview", "includeProfile", "spacedRepetition", "aiEnabled"];
 
 document.querySelector("#ai-model").innerHTML = GROQ_MODELS
   .map(({ id, label }) => `<option value="${id}">${label}</option>`)
@@ -60,6 +60,18 @@ document.querySelector("#disconnect").addEventListener("click", async () => {
   await send("DISCONNECT");
   showNotice(notice, "GitHub disconnected. Your local history is unchanged.");
   init();
+});
+document.querySelector("#backfill-repository").addEventListener("click", async () => {
+  const button = document.querySelector("#backfill-repository");
+  setBusy(button, true, "Importing…");
+  try {
+    const result = await send("IMPORT_REPOSITORY");
+    showNotice(notice, result.imported ? `Imported ${result.imported} existing solution folders.` : "No new LeetRepo-style solution folders were found.");
+  } catch (error) {
+    showNotice(notice, error.message, true);
+  } finally {
+    setBusy(button, false);
+  }
 });
 document.querySelector("#clear-groq-key").addEventListener("click", async () => {
   await send("CLEAR_GROQ_KEY");
