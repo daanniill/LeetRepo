@@ -13,15 +13,12 @@ LeetRepo is a dependency-free Chrome/Chromium Manifest V3 extension. It captures
 
 ## Why LeetRepo
 
-An Accepted submission is useful for a few seconds. The reasoning behind it can stay useful for years.
+LeetRepo turns accepted solutions into a GitHub-backed library you can learn from and revisit.
 
-LeetRepo removes the copy-paste ritual between LeetCode and GitHub, then turns the archive into something you can actually study:
-
-- **Capture automatically.** Push manually, or arm auto-push by clicking LeetCode's Submit button and receiving a fresh Accepted result for that exact editor code.
-- **Organize by default.** Store each problem in a predictable folder with language-specific solutions and one generated README.
-- **Remember the path.** Keep accepted and failed attempts, personal notes, runtimes, memory results, and interview overviews together.
-- **Review deliberately.** See pattern coverage, language usage, study gaps, and solutions due for spaced repetition.
-- **Keep control.** Choose the GitHub repository, opt in to AI explanations, and keep a local dashboard index that works offline.
+- **Save automatically.** Skip the copy-paste after every solve.
+- **Stay organized.** Keep solutions and problem notes together.
+- **Learn from attempts.** Preserve the path to the final answer.
+- **Review smarter.** Track patterns, study gaps, and spaced repetition.
 
 ![LeetRepo extension popup and solution dashboard](assets/marketing/final/store-promo-1400x560.png)
 
