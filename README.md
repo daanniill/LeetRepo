@@ -109,7 +109,11 @@ The request cap is a per-install guardrail, not an access-control or billing bou
 - Before moving a GitHub branch, LeetRepo reads the proposed tree back and aborts unless every existing repository file is still present and unchanged.
 - Existing LeetRepo-style folders can be imported from the selected repository to rebuild the local dashboard index.
 
-Read the full disclosure in [`PRIVACY.md`](PRIVACY.md).
+## Privacy, terms, and license
+
+- **Privacy:** Read the [LeetRepo Privacy Notice](PRIVACY.md) before installing. It explains what data stays on your device, what is sent to GitHub or Groq, how credentials are stored, and how to remove saved data.
+- **Terms:** Use of LeetRepo is subject to the [Terms and Conditions](TERMS.md), including user responsibilities, third-party service terms, and warranty limitations.
+- **License:** LeetRepo's source code is available under the [MIT License](LICENSE).
 
 ## Development
 
@@ -136,7 +140,3 @@ src/
 tests/                   Node unit tests
 manifest.json            Extension entry point and permissions
 ```
-
-## Marketing kit
-
-The campaign source files, exact image sizes, reusable copy, alt text, and visual guidelines are documented in [`assets/marketing/README.md`](assets/marketing/README.md).
