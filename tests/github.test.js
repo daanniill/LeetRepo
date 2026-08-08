@@ -174,7 +174,7 @@ test("pushSubmission initializes an empty repository before committing the solut
 
   assert.equal(calls[2].url, "https://api.github.com/repos/alex-c/empty-solutions/contents/README.md");
   assert.equal(calls[2].init.method, "PUT");
-  assert.equal(calls[2].body.message, "chore: initialize repository for LeetRepo");
+  assert.equal(calls[2].body.message, "chore: initialize repository for LeetRepo Lite");
   assert.equal(calls[3].url, "https://api.github.com/repos/alex-c/empty-solutions/git/commits/initial-commit");
   assert.deepEqual(calls[7].body.tree.map((entry) => entry.path), ["0001-two-sum/python/solution.py", "0001-two-sum/README.md"]);
   assert.deepEqual(calls[9].body.parents, ["initial-commit"]);

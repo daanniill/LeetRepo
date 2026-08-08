@@ -1,14 +1,9 @@
 import { DEFAULT_SETTINGS } from "../../core/submissions.js";
-import { GROQ_MODELS } from "../../core/llm.js";
 import { applyTheme, logo, send, setBusy, showNotice } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
 const notice = document.querySelector("#notice");
 const toggleKeys = ["autoPush", "includeReadme", "includeStats", "includeLink", "includeNotes", "includeReview", "includeProfile", "spacedRepetition", "aiEnabled"];
-
-document.querySelector("#ai-model").innerHTML = GROQ_MODELS
-  .map(({ id, label }) => `<option value="${id}">${label}</option>`)
-  .join("");
 
 async function init() {
   const state = await send("GET_STATE");
@@ -21,9 +16,8 @@ async function init() {
   const theme = themeInputs.find((input) => input.value === settings.theme) || themeInputs[0];
   theme.checked = true;
   applyTheme(theme.value);
-  document.querySelector("#ai-model").value = settings.aiModel;
-  document.querySelector("#ai-daily-limit").value = settings.aiDailyLimit;
   toggleKeys.forEach((key) => document.querySelector(`#${key}`).checked = settings[key] !== false);
+  document.querySelector("#ai-consent").checked = settings.aiConsent === true;
   const badge = document.querySelector("#connection-badge");
   badge.textContent = settings.connected ? "Connected" : "Not connected";
   badge.className = `badge ${settings.connected ? "accepted" : "unknown"}`;
@@ -32,11 +26,10 @@ async function init() {
   connectionButton.textContent = settings.connected ? "Disconnect GitHub" : "Connect GitHub";
   connectionButton.classList.toggle("danger", settings.connected);
   const aiBadge = document.querySelector("#ai-status-badge");
-  aiBadge.textContent = state.ai.hasApiKey ? "Key saved" : "Key required";
-  aiBadge.className = `badge ${state.ai.hasApiKey ? "accepted" : "unknown"}`;
-  document.querySelector("#groq-api-key").placeholder = state.ai.hasApiKey ? "Saved — leave blank to keep current key" : "gsk_…";
-  document.querySelector("#ai-usage").textContent = `${state.ai.usage.requests} of ${settings.aiDailyLimit} requests used today · resets at 00:00 UTC`;
-  document.querySelector("#clear-groq-key").disabled = !state.ai.hasApiKey;
+  aiBadge.textContent = state.ai.available ? "Hosted free tier" : "Sign-in required";
+  aiBadge.className = `badge ${state.ai.available ? "accepted" : "unknown"}`;
+  const usage = state.ai.usage;
+  document.querySelector("#ai-usage").textContent = `${usage.daily.requests} of ${usage.daily.limit} today · ${usage.monthly.requests} of ${usage.monthly.limit} this month`;
 }
 
 document.querySelector("#settings-form").addEventListener("submit", async (event) => {
@@ -50,12 +43,10 @@ document.querySelector("#settings-form").addEventListener("submit", async (event
       branch: document.querySelector("#branch").value.trim(),
       commitTemplate: document.querySelector("#commit-template").value.trim(),
       theme: document.querySelector('input[name="theme"]:checked')?.value || DEFAULT_SETTINGS.theme,
-      aiModel: document.querySelector("#ai-model").value,
-      aiDailyLimit: document.querySelector("#ai-daily-limit").value
+      aiConsent: document.querySelector("#ai-consent").checked
     };
     toggleKeys.forEach((key) => settings[key] = document.querySelector(`#${key}`).checked);
-    await send("SAVE_SETTINGS", { settings, groqApiKey: document.querySelector("#groq-api-key").value });
-    document.querySelector("#groq-api-key").value = "";
+    await send("SAVE_SETTINGS", { settings });
     showNotice(notice, "Settings saved.");
     await init();
   } catch (error) {
@@ -69,7 +60,7 @@ document.querySelectorAll('input[name="theme"]').forEach((input) => input.addEve
   const theme = applyTheme(event.target.value);
   try {
     await send("SAVE_SETTINGS", { settings: { theme } });
-    showNotice(notice, "Theme updated across LeetRepo Lite.");
+    showNotice(notice, "Theme updated across LeetRepo.");
   } catch (error) {
     showNotice(notice, error.message, true);
   }
@@ -81,7 +72,7 @@ document.querySelector("#disconnect").addEventListener("click", async () => {
     return;
   }
   await send("DISCONNECT");
-  showNotice(notice, "GitHub disconnected. Your local history is unchanged.");
+  showNotice(notice, "GitHub disconnected and hosted account data deleted. Your local history is unchanged.");
   init();
 });
 document.querySelector("#backfill-repository").addEventListener("click", async () => {
@@ -95,12 +86,6 @@ document.querySelector("#backfill-repository").addEventListener("click", async (
   } finally {
     setBusy(button, false);
   }
-});
-document.querySelector("#clear-groq-key").addEventListener("click", async () => {
-  await send("CLEAR_GROQ_KEY");
-  document.querySelector("#groq-api-key").value = "";
-  showNotice(notice, "Groq key removed and AI explanations disabled.");
-  await init();
 });
 document.querySelector("#open-dashboard").addEventListener("click", () => send("OPEN_DASHBOARD"));
 document.querySelector("#brand").addEventListener("click", (event) => { event.preventDefault(); send("OPEN_DASHBOARD"); });

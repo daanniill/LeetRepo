@@ -176,13 +176,13 @@
     if (document.getElementById(PANEL_ID)) return;
     const panel = document.createElement("aside");
     panel.id = PANEL_ID;
-    panel.setAttribute("aria-label", "LeetRepo Lite sync panel");
+    panel.setAttribute("aria-label", "LeetRepo sync panel");
     panel.innerHTML = `
       <div class="lr-shell">
         <div class="lr-head">
           <span class="lr-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>
-          <span class="lr-brand">LeetRepo Lite</span>
-          <button class="lr-minimize" title="Minimize LeetRepo Lite" aria-label="Minimize LeetRepo Lite">−</button>
+          <span class="lr-brand">LeetRepo</span>
+          <button class="lr-minimize" title="Minimize LeetRepo" aria-label="Minimize LeetRepo">−</button>
         </div>
         <div class="lr-body">
           <div class="lr-title">Reading this problem…</div>

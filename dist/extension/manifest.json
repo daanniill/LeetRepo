@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "LeetRepo Lite",
-  "version": "1.2.0",
-  "description": "Lite, local-run edition of LeetRepo: commit accepted LeetCode solutions to GitHub with clean READMEs and study metadata. No account, no backend, no stored user info.",
-  "permissions": ["storage", "tabs", "clipboardWrite"],
-  "host_permissions": ["https://api.github.com/*", "https://github.com/login/*", "https://api.groq.com/*"],
+  "name": "LeetRepo",
+  "version": "2.0.0",
+  "description": "Commit accepted LeetCode solutions to GitHub with clean READMEs and study metadata.",
+  "permissions": ["storage", "activeTab", "clipboardWrite", "identity"],
+  "host_permissions": ["https://api.github.com/*", "https://api.leetrepo.app/*"],
   "background": {
     "service_worker": "src/background/service-worker.js",
     "type": "module"
@@ -16,7 +16,7 @@
     "128": "assets/icon-128.png"
   },
   "action": {
-    "default_title": "LeetRepo Lite",
+    "default_title": "LeetRepo",
     "default_popup": "src/pages/popup/popup.html",
     "default_icon": {
       "16": "assets/icon-16.png",

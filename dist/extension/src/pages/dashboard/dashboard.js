@@ -206,7 +206,7 @@ function drawShareCard() {
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = theme.getPropertyValue("--share-ink").trim() || "#f5ead8";
   context.font = "700 34px system-ui";
-  context.fillText("LeetRepo Lite", 70, 82);
+  context.fillText("LeetRepo", 70, 82);
   context.font = "700 150px system-ui";
   context.fillText(String(state.submissions.length), 70, 310);
   context.font = "32px system-ui";
@@ -217,7 +217,7 @@ function drawShareCard() {
   context.fillText(`${insights.languages.length} languages`, 690, 455);
   context.font = "24px ui-monospace, monospace";
   context.globalAlpha = .72;
-  context.fillText(state.settings.connected ? `github.com/${state.settings.owner}/${state.settings.repo}` : "Synced by LeetRepo Lite", 76, 560);
+  context.fillText(state.settings.connected ? `github.com/${state.settings.owner}/${state.settings.repo}` : "Synced by LeetRepo", 76, 560);
   context.globalAlpha = 1;
   return canvas;
 }
@@ -237,7 +237,7 @@ async function shareStats() {
   const blob = await canvasBlob(drawShareCard());
   const file = new File([blob], "leetrepo-stats.png", { type: "image/png" });
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    await navigator.share({ title: "My LeetRepo Lite progress", text: `${state.submissions.length} LeetCode problems solved and committed.`, files: [file] });
+    await navigator.share({ title: "My LeetRepo progress", text: `${state.submissions.length} LeetCode problems solved and committed.`, files: [file] });
   } else {
     await copyStatsImage();
   }
