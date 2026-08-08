@@ -79,7 +79,7 @@ Create a GitHub App under an organization you control with these settings:
 
 - Make the app public and enable **Request user authorization (OAuth) during installation**.
 - Keep expiring user authorization tokens enabled.
-- Set the callback URL to `https://api.leetrepo.app/v1/auth/github/callback`, replacing the origin if needed.
+- Set the callback URL to `https://leetrepo.onrender.com/v1/auth/github/callback`, replacing the origin if needed.
 - Grant only **Repository permissions → Contents: Read and write**. Metadata read access is included by GitHub.
 - Disable the webhook; LeetRepo does not subscribe to events.
 - Do not grant Administration permission. Users create the destination repository on GitHub before installing LeetRepo.

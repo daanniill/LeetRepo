@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "description": "Commit accepted LeetCode solutions to GitHub with clean READMEs and study metadata.",
   "permissions": ["storage", "activeTab", "clipboardWrite", "identity"],
-  "host_permissions": ["https://api.github.com/*", "https://api.leetrepo.app/*"],
+  "host_permissions": ["https://api.github.com/*", "https://leetrepo.onrender.com/*"],
   "background": {
     "service_worker": "src/background/service-worker.js",
     "type": "module"
