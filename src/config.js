@@ -1,2 +1,3 @@
-// Public identifier for LeetRepo's GitHub OAuth app. Do not add a client secret here.
-export const GITHUB_OAUTH_CLIENT_ID = "Ov23li6NVOxZRVqvHcGT";
+// Public API origin for hosted authentication, token refresh, and AI explanations.
+// Keep secrets in the server environment, never in the extension package.
+export const LEETREPO_API_BASE_URL = "https://api.leetrepo.app";

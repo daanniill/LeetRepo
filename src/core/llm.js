@@ -7,61 +7,12 @@ export const GROQ_MODELS = [
   { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B (fastest / lowest cost)" },
   { id: "openai/gpt-oss-20b", label: "GPT-OSS 20B (balanced)" }
 ];
-export const DEFAULT_LLM_DAILY_LIMIT = 20;
-export const MAX_LLM_DAILY_LIMIT = 100;
 export const MAX_CODE_CHARACTERS = 24_000;
 
 const MODEL_IDS = new Set(GROQ_MODELS.map(({ id }) => id));
 
-export function normalizeDailyLimit(value) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return DEFAULT_LLM_DAILY_LIMIT;
-  return Math.min(MAX_LLM_DAILY_LIMIT, Math.max(1, parsed));
-}
-
 export function normalizeGroqModel(value) {
   return MODEL_IDS.has(value) ? value : DEFAULT_GROQ_MODEL;
-}
-
-export function utcDay(value = new Date()) {
-  return new Date(value).toISOString().slice(0, 10);
-}
-
-export function usageForToday(usage, now = new Date()) {
-  const date = utcDay(now);
-  if (!usage || usage.date !== date) {
-    return { date, requests: 0, inputTokens: 0, outputTokens: 0 };
-  }
-  return {
-    date,
-    requests: Math.max(0, Number(usage.requests) || 0),
-    inputTokens: Math.max(0, Number(usage.inputTokens) || 0),
-    outputTokens: Math.max(0, Number(usage.outputTokens) || 0),
-    lastUsedAt: usage.lastUsedAt || null,
-    model: usage.model || null
-  };
-}
-
-export function reserveUsage(usage, limit, now = new Date()) {
-  const current = usageForToday(usage, now);
-  const normalizedLimit = normalizeDailyLimit(limit);
-  if (current.requests >= normalizedLimit) {
-    const error = new Error(`Daily AI limit reached (${normalizedLimit}). The README will use the local review template.`);
-    error.code = "LLM_DAILY_LIMIT";
-    throw error;
-  }
-  return { ...current, requests: current.requests + 1, lastUsedAt: new Date(now).toISOString() };
-}
-
-export function addTokenUsage(usage, apiUsage = {}, model, now = new Date()) {
-  const current = usageForToday(usage, now);
-  return {
-    ...current,
-    inputTokens: current.inputTokens + Math.max(0, Number(apiUsage.prompt_tokens || apiUsage.input_tokens) || 0),
-    outputTokens: current.outputTokens + Math.max(0, Number(apiUsage.completion_tokens || apiUsage.output_tokens) || 0),
-    lastUsedAt: new Date(now).toISOString(),
-    model: normalizeGroqModel(model)
-  };
 }
 
 function cleanText(value, maxLength) {
@@ -149,7 +100,7 @@ ${code}${truncationNote}
 }
 
 function groqError(status, data) {
-  if (status === 401) return "Groq rejected the API key. Update it in Settings.";
+  if (status === 401) return "The AI provider rejected the configured service credential.";
   if (status === 429) return "Groq rate-limited this request. The README will use the local review template.";
   const message = cleanText(data?.error?.message, 180);
   return message ? `Groq request failed (${status}): ${message}` : `Groq request failed (${status}).`;
@@ -163,7 +114,7 @@ export async function generateExplanation({
   timeoutMs = 25_000
 }) {
   const token = String(apiKey || "").trim();
-  if (!token) throw new Error("Add a Groq API key in Settings to enable AI explanations.");
+  if (!token) throw new Error("The AI provider is not configured.");
   if (typeof fetchImpl !== "function") throw new Error("Network requests are unavailable.");
 
   const selectedModel = normalizeGroqModel(model);

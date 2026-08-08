@@ -2,11 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_GROQ_MODEL,
-  addTokenUsage,
-  generateExplanation,
-  normalizeDailyLimit,
-  reserveUsage,
-  usageForToday
+  generateExplanation
 } from "../src/core/llm.js";
 
 const submission = {
@@ -86,30 +82,4 @@ test("generateExplanation rejects incomplete model output", async () => {
     generateExplanation({ apiKey: "gsk_test", submission, fetchImpl }),
     /incomplete explanation/
   );
-});
-
-test("daily usage is reserved before a request and rejects requests beyond the cap", () => {
-  const now = new Date("2026-08-07T12:00:00.000Z");
-  const first = reserveUsage(null, 2, now);
-  const second = reserveUsage(first, 2, now);
-  assert.equal(second.requests, 2);
-  assert.throws(() => reserveUsage(second, 2, now), (error) => error.code === "LLM_DAILY_LIMIT");
-});
-
-test("usage resets on a new UTC day and accumulates API token counts", () => {
-  const old = { date: "2026-08-06", requests: 8, inputTokens: 200, outputTokens: 100 };
-  const now = new Date("2026-08-07T00:00:01.000Z");
-  assert.deepEqual(usageForToday(old, now), { date: "2026-08-07", requests: 0, inputTokens: 0, outputTokens: 0 });
-
-  const reserved = reserveUsage(old, 20, now);
-  const updated = addTokenUsage(reserved, { prompt_tokens: 35, completion_tokens: 15 }, DEFAULT_GROQ_MODEL, now);
-  assert.equal(updated.requests, 1);
-  assert.equal(updated.inputTokens, 35);
-  assert.equal(updated.outputTokens, 15);
-});
-
-test("daily limit is clamped to a safe per-install range", () => {
-  assert.equal(normalizeDailyLimit(0), 1);
-  assert.equal(normalizeDailyLimit(500), 100);
-  assert.equal(normalizeDailyLimit("not-a-number"), 20);
 });

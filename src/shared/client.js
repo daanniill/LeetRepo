@@ -71,14 +71,19 @@ function demoResponse(type, payload) {
       attempts: DEMO_ATTEMPTS,
       notes: {},
       lastSubmission: DEMO_HISTORY[0],
-      ai: { hasApiKey: false, usage: { requests: 0, inputTokens: 0, outputTokens: 0 } }
+      ai: {
+        available: !onboardingPreview,
+        usage: {
+          plan: "free",
+          daily: { requests: 0, inputTokens: 0, outputTokens: 0, limit: 3 },
+          monthly: { requests: 0, inputTokens: 0, outputTokens: 0, limit: 30 }
+        }
+      }
     });
   }
   if (type === "SAVE_SETTINGS") return Promise.resolve({ settings: { ...DEFAULT_SETTINGS, ...payload.settings } });
   if (type === "PUSH_SUBMISSION") return new Promise((resolve) => setTimeout(() => resolve({ submission: { ...payload.submission, syncedAt: new Date().toISOString() }, result: { url: "https://github.com/" } }), 500));
-  if (type === "START_GITHUB_SIGN_IN") return Promise.resolve({ userCode: "ABCD-EFGH", verificationUri: "https://github.com/login/device", expiresAt: Date.now() + 900000, interval: 1 });
-  if (type === "POLL_GITHUB_SIGN_IN") return Promise.resolve({ status: "connected", user: { login: "alex-c" }, repos: [{ full_name: "alex-c/leetcode-solutions", name: "leetcode-solutions", owner: { login: "alex-c" }, default_branch: "main" }] });
-  if (type === "CREATE_REPO") return Promise.resolve({ repo: { name: payload.repo?.name || "leetcode-solutions", owner: { login: "alex-c" }, default_branch: "main" } });
+  if (type === "START_GITHUB_SIGN_IN") return Promise.resolve({ status: "connected", user: { login: "alex-c" }, repos: [{ full_name: "alex-c/leetcode-solutions", name: "leetcode-solutions", owner: { login: "alex-c" }, default_branch: "main" }] });
   if (type === "IMPORT_REPOSITORY") return Promise.resolve({ imported: 3 });
   if (type === "GENERATE_FEEDBACK") return Promise.resolve({ review: buildReview(payload.submission), ai: { generated: false } });
   return Promise.resolve({ ok: true });

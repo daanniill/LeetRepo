@@ -38,12 +38,7 @@
 .form-actions { display: flex; align-items: center; gap: 10px; }
 .form-actions .danger { margin-left: auto; }
 .ai-toggle { border-top: 1px solid var(--line); }
-.ai-fields { margin-top: 20px; display: grid; grid-template-columns: 1.5fr 1fr .65fr; gap: 12px; }
-.ai-key-field small { color: var(--muted); font-size: 10px; line-height: 1.4; }
 .ai-meta { margin-top: 14px; display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 11px; }
-.ai-meta a { color: var(--accent-ink); font-weight: 700; }
-.text-button { padding: 0; border: 0; background: transparent; color: var(--hard-ink); cursor: pointer; text-decoration: underline; }
-.text-button:disabled { color: var(--muted); cursor: not-allowed; opacity: .6; }
 .ai-privacy { margin-top: 18px; }
 @media (max-width: 760px) { .theme-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 680px) { .settings-page { padding-top: 34px; } .settings-head { align-items: flex-start; } .settings-head > .button { display: none; } .field-grid, .ai-fields { grid-template-columns: 1fr; } .repository-actions, .ai-meta { align-items: flex-start; flex-direction: column; } .settings-panel { padding: 22px 18px; } }
+@media (max-width: 680px) { .settings-page { padding-top: 34px; } .settings-head { align-items: flex-start; } .settings-head > .button { display: none; } .field-grid { grid-template-columns: 1fr; } .repository-actions, .ai-meta { align-items: flex-start; flex-direction: column; } .settings-panel { padding: 22px 18px; } }

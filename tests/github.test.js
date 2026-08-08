@@ -1,58 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRepo, listSolutionFolders, pollDeviceAuthorization, pushSubmission, startDeviceAuthorization } from "../src/core/github.js";
+import { listRepos, listSolutionFolders, pushSubmission } from "../src/core/github.js";
 
-test("startDeviceAuthorization requests a GitHub device code with repo access", async (t) => {
-  let call;
-  t.mock.method(globalThis, "fetch", async (url, init) => {
-    call = { url, init, body: new URLSearchParams(init.body) };
-    return new Response(JSON.stringify({
-      device_code: "device-secret",
-      user_code: "ABCD-EFGH",
-      verification_uri: "https://github.com/login/device",
-      expires_in: 900,
-      interval: 5
-    }), { status: 200, headers: { "content-type": "application/json" } });
-  });
-
-  const result = await startDeviceAuthorization("client-id");
-
-  assert.equal(call.url, "https://github.com/login/device/code");
-  assert.equal(call.init.method, "POST");
-  assert.equal(call.body.get("client_id"), "client-id");
-  assert.equal(call.body.get("scope"), "repo");
-  assert.equal(result.userCode, "ABCD-EFGH");
-  assert.equal(result.interval, 5);
-});
-
-test("pollDeviceAuthorization distinguishes pending and authorized responses", async (t) => {
+test("listRepos returns only repositories selected for GitHub App installations", async (t) => {
   const replies = [
-    { error: "authorization_pending" },
-    { access_token: "oauth-token", token_type: "bearer", scope: "repo" }
+    { installations: [{ id: 22 }, { id: 33 }] },
+    { repositories: [{ id: 2, full_name: "alex-c/private-solutions" }] },
+    { repositories: [
+      { id: 1, full_name: "alex-c/leetcode-solutions" },
+      { id: 2, full_name: "alex-c/private-solutions" }
+    ] }
   ];
-  let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(replies[calls++]), { status: 200, headers: { "content-type": "application/json" } }));
-
-  assert.deepEqual(await pollDeviceAuthorization("client-id", "device-secret"), { status: "pending" });
-  assert.deepEqual(await pollDeviceAuthorization("client-id", "device-secret"), {
-    status: "authorized",
-    accessToken: "oauth-token",
-    scope: "repo",
-    tokenType: "bearer"
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(url);
+    return new Response(JSON.stringify(replies[calls.length - 1]), { status: 200, headers: { "content-type": "application/json" } });
   });
-});
-
-test("createRepo sends the selected visibility without auto-initializing", async (t) => {
-  let call;
-  t.mock.method(globalThis, "fetch", async (url, init) => {
-    call = { url, init, body: JSON.parse(init.body) };
-    return new Response(JSON.stringify({ name: "leetcode-solutions", default_branch: "main" }), { status: 201, headers: { "content-type": "application/json" } });
-  });
-  await createRepo("secret", { name: "leetcode-solutions", visibility: "public" });
-  assert.equal(call.url, "https://api.github.com/user/repos");
-  assert.equal(call.init.method, "POST");
-  assert.equal(call.body.private, false);
-  assert.equal(call.body.auto_init, false);
+  const repos = await listRepos("user-access-token");
+  assert.deepEqual(repos.map((repo) => repo.full_name), ["alex-c/leetcode-solutions", "alex-c/private-solutions"]);
+  assert.match(calls[0], /\/user\/installations\?per_page=100$/);
+  assert.match(calls[1], /\/user\/installations\/22\/repositories/);
 });
 
 test("listSolutionFolders imports legacy and language-folder solution paths", async (t) => {

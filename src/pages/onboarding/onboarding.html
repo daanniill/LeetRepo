@@ -21,7 +21,7 @@
           <li data-step-marker="2"><span>2</span><div><strong>Choose your repo</strong><small>Configure how solutions land</small></div></li>
           <li data-step-marker="3"><span>3</span><div><strong>Start solving</strong><small>Push manually or automatically</small></div></li>
         </ol>
-        <div class="privacy-note">LeetRepo reads submissions from the page. Your GitHub authorization stays in local extension storage.</div>
+        <div class="privacy-note">LeetRepo reads submissions locally. GitHub grants access only to repositories you select.</div>
       </section>
 
       <section class="setup-wrap">
@@ -35,40 +35,19 @@
           <form id="connect-step" class="step-pane stack gap-16">
             <div class="github-signin-copy">
               <h3>Authorize with your GitHub account</h3>
-              <p>GitHub will show exactly what LeetRepo can access. You will never need to create or paste a personal access token.</p>
+              <p>Install the LeetRepo GitHub App on the repository you want to use. You will never need to create or paste a personal access token.</p>
             </div>
             <button class="button full" type="submit" id="connect-button">Sign in with GitHub</button>
-            <p class="field-help">LeetRepo requests GitHub’s <strong>repo</strong> scope so it can list repositories, create your destination repository, and commit solutions to public or private repositories.</p>
-            <div class="device-flow card" id="device-flow" hidden>
-              <div>
-                <span class="eyebrow">Your one-time code</span>
-                <output class="device-code mono" id="device-code">----</output>
-              </div>
-              <p>Copy this code, open GitHub, and approve LeetRepo. This page will continue automatically.</p>
-              <div class="device-actions row">
-                <button class="button secondary grow" id="copy-device-code" type="button">Copy code</button>
-                <a class="button grow" id="open-github-device" target="_blank" rel="noreferrer">Open GitHub ↗</a>
-              </div>
-              <small class="device-status" id="device-status">Waiting for approval on GitHub…</small>
-            </div>
+            <p class="field-help">LeetRepo requests only <strong>Contents: read and write</strong> for selected repositories. Create a destination repository on GitHub before connecting if you do not already have one.</p>
+            <a class="button secondary full" href="https://github.com/new" target="_blank" rel="noreferrer">Create a repository on GitHub ↗</a>
           </form>
 
           <form id="configure-step" class="step-pane stack gap-16" hidden>
             <div class="connected-user row"><span class="avatar" id="avatar">GH</span><div><strong id="github-login">Connected</strong><small>GitHub account connected</small></div><span class="badge accepted">Verified</span></div>
-            <div class="field">
-              <label>Target repository</label>
-              <div class="repo-mode" role="radiogroup" aria-label="Repository choice">
-                <label><input type="radio" name="repo-mode" value="existing" checked><span>Use existing</span></label>
-                <label><input type="radio" name="repo-mode" value="new"><span>Create new</span></label>
-              </div>
-            </div>
             <div class="field" id="existing-repo-field">
-              <label for="repo">Repository</label>
+              <label for="repo">Target repository</label>
               <select class="select" id="repo"></select>
-            </div>
-            <div class="new-repo-grid" id="new-repo-fields" hidden>
-              <div class="field"><label for="new-repo-name">Repository name</label><input class="input" id="new-repo-name" value="leetcode-solutions"></div>
-              <div class="field"><label for="new-repo-visibility">Visibility</label><select class="select" id="new-repo-visibility"><option value="private">Private</option><option value="public">Public</option></select></div>
+              <small>Only repositories selected during GitHub App installation appear here.</small>
             </div>
             <div class="field">
               <label for="commit-template">Commit message format</label>

@@ -60,47 +60,70 @@ Surface solutions 30 days after they are synced or reviewed, snooze a review for
 
 ## Install locally
 
-LeetRepo has no build step and no runtime dependencies.
+The extension has no build step. Hosted authentication and AI use the Node/PostgreSQL service in `server/`.
 
-1. Configure GitHub sign-in using the instructions below.
-2. Open `chrome://extensions` in Chrome or Chromium.
-3. Enable **Developer mode**.
-4. Choose **Load unpacked** and select this repository.
-5. Open LeetRepo and complete onboarding.
+1. Configure and run the hosted service using the instructions below.
+2. Set `LEETREPO_API_BASE_URL` in [`src/config.js`](src/config.js) and the matching API origin in [`manifest.json`](manifest.json).
+3. Add the exact value returned by `chrome.identity.getRedirectURL("github")` to `EXTENSION_REDIRECT_URIS` on the server.
+4. Use an HTTPS development URL; GitHub and Chrome identity callbacks should not use a plain local HTTP URL.
+5. Open `chrome://extensions` in Chrome or Chromium.
+6. Enable **Developer mode**.
+7. Choose **Load unpacked** and select this repository.
+8. Open LeetRepo and complete onboarding.
 
 ## Configure GitHub sign-in
 
-LeetRepo uses GitHub's OAuth device flow, so users sign in with GitHub instead of creating and pasting a personal access token.
+LeetRepo uses a public GitHub App and a hosted OAuth callback. Users click one sign-in button, select the repositories the app may access, and never create or paste a personal access token.
 
-1. Create a GitHub OAuth app under **Settings → Developer settings → OAuth Apps**. Use the project's URL for the homepage and callback fields; device flow does not use the callback.
-2. Open the OAuth app's settings and enable **Device Flow**.
-3. Copy its public client ID into `GITHUB_OAUTH_CLIENT_ID` in [`src/config.js`](src/config.js). Do not add the client secret to the extension.
-4. Reload LeetRepo from `chrome://extensions`.
+Create a GitHub App under an organization you control with these settings:
 
-During onboarding, LeetRepo displays a one-time code and links to GitHub's device authorization page. The resulting OAuth access token is stored in `chrome.storage.local`, is not synced, and is sent only to GitHub.
+- Make the app public and enable **Request user authorization (OAuth) during installation**.
+- Keep expiring user authorization tokens enabled.
+- Set the callback URL to `https://api.leetrepo.app/v1/auth/github/callback`, replacing the origin if needed.
+- Grant only **Repository permissions → Contents: Read and write**. Metadata read access is included by GitHub.
+- Disable the webhook; LeetRepo does not subscribe to events.
+- Do not grant Administration permission. Users create the destination repository on GitHub before installing LeetRepo.
 
-LeetRepo requests the `repo` scope because it supports public and private repositories. GitHub defines that scope as full repository access. A production deployment that requires repository-by-repository authorization should use a GitHub App and a backend token exchange instead.
+Set the app slug, client ID, and client secret in the server environment. The client secret and refresh tokens must never be added to extension code. The backend stores the refresh token encrypted; the extension receives a short-lived user access token and sends Git commit requests directly to GitHub.
+
+## Hosted service
+
+Requirements: Node.js 24 or newer and PostgreSQL.
+
+```bash
+npm install
+cp .env.example .env
+npm run db:migrate
+npm start
+```
+
+Provide the environment variables described in [`.env.example`](.env.example). In production, terminate TLS at the hosting platform, use a managed PostgreSQL database with verified TLS, keep `TOKEN_ENCRYPTION_KEY` and provider keys in its secret manager, and run `npm run db:migrate` before starting a new release.
+
+The API provides:
+
+- GitHub App OAuth state validation and one-time extension code exchange.
+- Encrypted GitHub refresh-token storage and short-lived token refresh.
+- Hashed, revocable 30-day LeetRepo sessions.
+- A structured AI endpoint that owns the model and prompt; it is not an arbitrary LLM proxy.
+- Atomic per-user daily/monthly quotas plus a global per-minute guardrail.
+- Account deletion through **Disconnect GitHub**.
 
 ## Optional AI explanations
 
-LeetRepo always has local rule-based interview and Mermaid replay templates. AI explanations are optional, use the user's own Groq key, and are disabled by default.
-
-To enable them, open **Settings → AI explanations**, add a [Groq API key](https://console.groq.com/keys), choose a production model, and set a daily request limit.
+LeetRepo always has local rule-based interview and Mermaid replay templates. Hosted AI explanations are optional, disabled by default, and require an explicit consent checkbox in Settings.
 
 When enabled:
 
-- The key is stored in `chrome.storage.local`, is excluded from synced settings, and is never returned to extension pages after it is saved.
-- Each request contains the problem title, difficulty, language, first detected description paragraph and example input/output, and up to 24,000 characters of solution code.
-- Requests use Groq's OpenAI-compatible Chat Completions API with JSON output, a bounded completion size, and a 25-second timeout.
-- The default cap is 20 attempted requests per UTC day, configurable from 1 to 100. Failed attempts count toward the limit.
-- If Groq is unavailable, rejects the key, returns invalid output, or reaches the limit, the GitHub push continues with local templates.
+- The extension sends the problem title, difficulty, language, detected context and example, and up to 24,000 characters of solution code to the LeetRepo API.
+- The API constructs the prompt, calls the configured Groq model, validates bounded JSON output, and returns only the generated review and usage counters.
+- The free tier allows 3 attempted requests per UTC day and 30 per UTC month. Limits are enforced transactionally by GitHub's immutable numeric user ID.
+- Request bodies are not written to the application database or ordinary application logs.
+- If the service or provider is unavailable, returns invalid output, or reaches a limit, the GitHub push continues with local templates.
 - AI-generated READMEs include a reminder to verify the analysis.
-
-The request cap is a per-install guardrail, not an access-control or billing boundary. A future shared service key would require an authenticated server-side proxy with durable rate limits, payload limits, abuse monitoring, and provider-level spend caps. A shared provider key should never be bundled in the extension.
 
 ## Data handling and safety
 
-- GitHub and Groq credentials stay in local extension storage and are not synced.
+- GitHub App refresh tokens are encrypted by the hosted service. Short-lived GitHub access tokens and opaque LeetRepo session tokens stay in local extension storage and are not synced.
 - Shareable stats are rendered locally and copied or shared only after an explicit click.
 - Repository-profile generation is opt-in because it replaces the destination repository's root `README.md`.
 - Before moving a GitHub branch, LeetRepo reads the proposed tree back and aborts unless every existing repository file is still present and unchanged.
@@ -120,6 +143,14 @@ Run the test suite:
 npm test
 ```
 
+Create the Chrome Web Store ZIP after setting the production API origin:
+
+```bash
+npm run package:extension
+```
+
+The archive is written to `dist/` and contains only the extension package, public notices, and assets. Server code, dependencies, and environment files are excluded.
+
 The extraction code intentionally uses several fallback selectors because LeetCode changes its DOM regularly.
 
 ### Repository structure
@@ -128,6 +159,8 @@ The extraction code intentionally uses several fallback selectors because LeetCo
 assets/
   marketing/             Campaign artboards, product captures, and final PNGs
   icon.svg               Extension icon source
+server/                  Hosted OAuth, token refresh, AI proxy, quotas, and database schema
+scripts/                 Release packaging helpers
 src/
   background/            Manifest V3 service worker
   content/               LeetCode page integration
@@ -135,5 +168,6 @@ src/
   pages/                 Popup, options, onboarding, and dashboard UIs
   shared/                Shared UI helpers and styles
 tests/                   Node unit tests
+Dockerfile               Production API container
 manifest.json            Extension entry point and permissions
 ```

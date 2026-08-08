@@ -12,8 +12,7 @@ export const DEFAULT_SETTINGS = {
   includeProfile: false,
   spacedRepetition: true,
   aiEnabled: false,
-  aiModel: "llama-3.3-70b-versatile",
-  aiDailyLimit: 20,
+  aiConsent: false,
   commitTemplate: "solve: {number}. {title} ({difficulty})",
   theme: "system"
 };

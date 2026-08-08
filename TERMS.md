@@ -8,9 +8,9 @@ Rights to use, copy, modify, and distribute LeetRepo's source code and associate
 
 ## 1. What LeetRepo does
 
-LeetRepo helps users capture LeetCode submission information, store local solve and review history, and commit user-selected solution files and generated documentation to a GitHub repository chosen by the user. Optional AI explanations use a Groq API key supplied by the user.
+LeetRepo helps users capture LeetCode submission information, store local solve and review history, and commit user-selected solution files and generated documentation to a GitHub repository chosen by the user. Optional AI explanations are processed by the hosted LeetRepo service and its configured AI provider after the user provides explicit consent.
 
-LeetRepo does not operate a hosted account service or LeetRepo-owned backend. Features that interact with GitHub, Groq, LeetCode, or browser services depend on those third parties.
+The hosted service provides GitHub App authentication, encrypted credential storage, token refresh, AI processing, quotas, and account deletion. Core GitHub commits are sent directly from the extension to GitHub.
 
 ## 2. Eligibility
 
@@ -21,7 +21,7 @@ You may use LeetRepo only if you can legally agree to these Terms. If you use Le
 You are responsible for:
 
 - using LeetRepo only with accounts, repositories, code, and content you are authorized to access and modify;
-- protecting access to your device, browser profile, GitHub authorization, and optional Groq API key;
+- protecting access to your device, browser profile, GitHub authorization, and LeetRepo session;
 - reviewing solution code, generated documentation, AI explanations, commits, and repository-profile changes before relying on or distributing them;
 - maintaining backups or version history for repositories that LeetRepo is allowed to modify; and
 - complying with applicable law and the terms, policies, and technical restrictions of GitHub, Groq, LeetCode, your browser provider, and any other third-party service you use.
@@ -40,11 +40,13 @@ You may not use LeetRepo to:
 
 LeetRepo is not affiliated with or endorsed by LeetCode, GitHub, or Groq. Those services are governed by their own terms and privacy policies. Their availability, APIs, page structure, authorization rules, pricing, and behavior may change without notice and may affect LeetRepo.
 
-When you authorize an integration, LeetRepo sends requests to that service on your behalf. You are responsible for the repositories you select, the data you submit, provider charges associated with your accounts or API keys, and the consequences of actions you confirm or enable.
+When you authorize an integration, LeetRepo sends requests to that service on your behalf. You are responsible for the repositories you select, the data you submit, and the consequences of actions you confirm or enable.
 
 ## 6. AI-generated and informational content
 
 AI explanations and locally generated interview material may be incomplete, inaccurate, or unsuitable for a particular purpose. They are provided for study assistance only and are not professional, employment, legal, financial, or security advice. Verify generated content and code independently before relying on it.
+
+Hosted AI is subject to per-user and service-wide limits. Free-tier limits, supported models, providers, and availability may change to protect reliability, security, or operating costs. Unused limits have no monetary value and do not roll over unless LeetRepo explicitly states otherwise.
 
 ## 7. Privacy
 
@@ -58,7 +60,7 @@ LeetRepo's source code is licensed under the [MIT License](LICENSE). Third-party
 
 ## 9. Availability and changes
 
-LeetRepo may be changed, suspended, or discontinued at any time. No particular feature, integration, compatibility level, or support period is guaranteed. You are responsible for reviewing updates before installing or using them.
+LeetRepo may be changed, rate-limited, suspended, or discontinued at any time. No particular feature, integration, model, quota, compatibility level, or support period is guaranteed. You are responsible for reviewing updates before installing or using them.
 
 ## 10. Disclaimer of warranties
 
@@ -74,7 +76,7 @@ Nothing in these Terms excludes or limits liability that cannot legally be exclu
 
 ## 12. Ending use
 
-You may stop using LeetRepo at any time by disconnecting integrations and uninstalling the extension. Local and synced data are handled as described in the Privacy Notice. Provisions that by their nature should survive will continue to apply, including ownership, warranty disclaimers, and liability limitations.
+You may stop using LeetRepo at any time. **Disconnect GitHub** requests deletion of the hosted LeetRepo account and removes local authorization while preserving local study history. Uninstalling without disconnecting does not notify the hosted service; inactive data is removed under the retention schedule in the Privacy Notice. Provisions that by their nature should survive will continue to apply, including ownership, warranty disclaimers, and liability limitations.
 
 ## 13. Changes to these Terms
 

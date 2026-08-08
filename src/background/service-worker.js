@@ -1,33 +1,32 @@
 import { buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
-import { GITHUB_OAUTH_CLIENT_ID } from "../config.js";
-import { createRepo, listRepos, listSolutionFolders, pollDeviceAuthorization, pushSubmission, startDeviceAuthorization, verifyToken } from "../core/github.js";
-import {
-  addTokenUsage,
-  generateExplanation,
-  normalizeDailyLimit,
-  normalizeGroqModel,
-  reserveUsage,
-  usageForToday
-} from "../core/llm.js";
+import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.js";
+import { beginHostedGitHubSignIn, hostedRequest, newRequestId } from "../core/service.js";
 
 const getLocal = (keys) => chrome.storage.local.get(keys);
 const setLocal = (value) => chrome.storage.local.set(value);
 const getSync = (keys) => chrome.storage.sync.get(keys);
 const setSync = (value) => chrome.storage.sync.set(value);
-let llmUsageQueue = Promise.resolve();
 let localMutationQueue = Promise.resolve();
 
-function githubOAuthClientId() {
-  const clientId = String(GITHUB_OAUTH_CLIENT_ID || "").trim();
-  if (!clientId || clientId === "YOUR_GITHUB_OAUTH_CLIENT_ID") {
-    throw new Error("Add your GitHub OAuth app client ID to src/config.js, then reload LeetRepo.");
-  }
-  return clientId;
-}
-
 async function getGitHubAccessToken() {
-  const { githubAccessToken, githubToken } = await getLocal(["githubAccessToken", "githubToken"]);
-  return githubAccessToken || githubToken || "";
+  const { githubAccessToken, githubAccessTokenExpiresAt, leetrepoSessionToken } = await getLocal([
+    "githubAccessToken",
+    "githubAccessTokenExpiresAt",
+    "leetrepoSessionToken"
+  ]);
+  if (!leetrepoSessionToken) return "";
+  if (githubAccessToken && new Date(githubAccessTokenExpiresAt || 0).getTime() > Date.now() + 5 * 60 * 1000) {
+    return githubAccessToken;
+  }
+  const refreshed = await hostedRequest("/v1/auth/github/token", {
+    method: "POST",
+    sessionToken: leetrepoSessionToken
+  });
+  await setLocal({
+    githubAccessToken: refreshed.githubAccessToken,
+    githubAccessTokenExpiresAt: refreshed.githubAccessTokenExpiresAt
+  });
+  return refreshed.githubAccessToken;
 }
 
 function normalizeSettings(value = {}) {
@@ -35,62 +34,77 @@ function normalizeSettings(value = {}) {
   return {
     ...DEFAULT_SETTINGS,
     ...stored,
-    aiEnabled: stored.aiEnabled === true,
-    aiModel: normalizeGroqModel(stored.aiModel),
-    aiDailyLimit: normalizeDailyLimit(stored.aiDailyLimit),
+    aiConsent: stored.aiConsent === true,
+    aiEnabled: stored.aiEnabled === true && stored.aiConsent === true,
     theme: normalizeTheme(stored.theme)
   };
 }
 
-function mutateLlmUsage(update) {
-  const task = llmUsageQueue.then(async () => {
-    const { llmUsage } = await getLocal("llmUsage");
-    const next = update(llmUsage);
-    await setLocal({ llmUsage: next });
-    return next;
-  });
-  llmUsageQueue = task.catch(() => {});
-  return task;
+function emptyHostedUsage() {
+  return {
+    plan: "free",
+    daily: { requests: 0, inputTokens: 0, outputTokens: 0, limit: 3 },
+    monthly: { requests: 0, inputTokens: 0, outputTokens: 0, limit: 30 }
+  };
 }
 
-function reserveLlmRequest(limit) {
-  return mutateLlmUsage((usage) => reserveUsage(usage, limit));
+async function hostedUsage() {
+  const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
+  if (!leetrepoSessionToken) return emptyHostedUsage();
+  try {
+    return await hostedRequest("/v1/ai/usage", { sessionToken: leetrepoSessionToken });
+  } catch {
+    return emptyHostedUsage();
+  }
 }
 
-function recordLlmTokens(apiUsage, model) {
-  return mutateLlmUsage((usage) => addTokenUsage(usage, apiUsage, model));
-}
-
-async function explanationFor(settings, submission, groqApiKey) {
+async function explanationFor(settings, submission) {
   if (settings.includeReadme === false || settings.includeReview === false || !settings.aiEnabled) {
     return { review: null, ai: { generated: false } };
   }
   try {
-    if (!groqApiKey) throw new Error("Add a Groq API key in Settings to enable AI explanations.");
-    await reserveLlmRequest(settings.aiDailyLimit);
-    const generated = await generateExplanation({ apiKey: groqApiKey, submission, model: settings.aiModel });
-    const usage = await recordLlmTokens(generated.usage, generated.model);
+    const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
+    if (!leetrepoSessionToken) throw new Error("Reconnect GitHub to use hosted AI explanations.");
+    const generated = await hostedRequest("/v1/ai/explanations", {
+      method: "POST",
+      sessionToken: leetrepoSessionToken,
+      body: { requestId: newRequestId(), submission }
+    });
     return {
       review: generated.review,
-      ai: { generated: true, usage, limit: settings.aiDailyLimit, model: generated.model }
+      ai: { generated: true, usage: generated.usage, model: generated.model }
     };
   } catch (error) {
-    const { llmUsage } = await getLocal("llmUsage");
     return {
       review: null,
       ai: {
         generated: false,
         warning: error.message,
-        usage: usageForToday(llmUsage),
-        limit: settings.aiDailyLimit
+        usage: await hostedUsage()
       }
     };
   }
 }
 
+function launchWebAuthFlow(url) {
+  return new Promise((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow({ url, interactive: true }, (redirectUrl) => {
+      const runtimeError = chrome.runtime.lastError;
+      if (runtimeError) reject(new Error(runtimeError.message));
+      else if (!redirectUrl) reject(new Error("GitHub sign-in was cancelled."));
+      else resolve(redirectUrl);
+    });
+  });
+}
+
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
-  const { settings } = await getSync("settings");
+  const [{ settings }, { authSchemaVersion }] = await Promise.all([getSync("settings"), getLocal("authSchemaVersion")]);
   if (!settings) await setSync({ settings: DEFAULT_SETTINGS });
+  if (authSchemaVersion !== 2) {
+    await chrome.storage.local.remove(["githubAccessToken", "githubDeviceFlow", "githubToken", "githubUser", "groqApiKey", "llmUsage"]);
+    await setLocal({ authSchemaVersion: 2 });
+    if (settings) await setSync({ settings: { ...DEFAULT_SETTINGS, ...settings, connected: false, aiEnabled: false, aiConsent: false } });
+  }
   if (reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("src/pages/onboarding/onboarding.html") });
 });
 
@@ -145,76 +159,47 @@ async function recordPush(submission, result, review, settings) {
 async function handle(message) {
   switch (message.type) {
     case "GET_STATE": {
-      const [{ settings }, local] = await Promise.all([getSync("settings"), getLocal(["submissions", "lastSubmission", "attempts", "submissionNotes", "groqApiKey", "llmUsage"])]);
+      const [{ settings }, local, usage] = await Promise.all([
+        getSync("settings"),
+        getLocal(["submissions", "lastSubmission", "attempts", "submissionNotes", "leetrepoSessionToken"]),
+        hostedUsage()
+      ]);
+      const connected = Boolean(local.leetrepoSessionToken);
       return {
-        settings: normalizeSettings(settings),
+        settings: normalizeSettings({ ...settings, connected: settings?.connected === true && connected }),
         submissions: local.submissions || [],
         attempts: local.attempts || [],
         notes: local.submissionNotes || {},
         lastSubmission: local.lastSubmission || null,
         ai: {
-          hasApiKey: Boolean(local.groqApiKey),
-          usage: usageForToday(local.llmUsage)
+          available: connected,
+          usage
         }
       };
     }
     case "SAVE_SETTINGS": {
-      const [{ settings = {} }, { groqApiKey }] = await Promise.all([getSync("settings"), getLocal("groqApiKey")]);
-      const { groqApiKey: ignoredKey, ...publicSettings } = message.settings || {};
-      void ignoredKey;
-      const newApiKey = String(message.groqApiKey || "").trim();
-      const next = normalizeSettings({ ...settings, ...publicSettings });
-      if (next.aiEnabled && !newApiKey && !groqApiKey) throw new Error("Add a Groq API key before enabling AI explanations.");
-      if (newApiKey) await setLocal({ groqApiKey: newApiKey });
-      await setSync({ settings: next });
-      return { settings: next, ai: { hasApiKey: Boolean(newApiKey || groqApiKey) } };
-    }
-    case "CLEAR_GROQ_KEY": {
       const { settings = {} } = await getSync("settings");
-      await chrome.storage.local.remove("groqApiKey");
-      const next = normalizeSettings({ ...settings, aiEnabled: false });
+      const requested = { ...settings, ...(message.settings || {}) };
+      if (requested.aiEnabled === true && requested.aiConsent !== true) {
+        throw new Error("Consent to hosted AI processing before enabling AI explanations.");
+      }
+      const next = normalizeSettings(requested);
       await setSync({ settings: next });
-      return { settings: next, ai: { hasApiKey: false } };
+      return { settings: next, ai: { available: true } };
     }
     case "START_GITHUB_SIGN_IN": {
-      const authorization = await startDeviceAuthorization(githubOAuthClientId());
-      const expiresAt = Date.now() + authorization.expiresIn * 1000;
-      await setLocal({ githubDeviceFlow: {
-        deviceCode: authorization.deviceCode,
-        expiresAt,
-        interval: authorization.interval
-      } });
-      return {
-        userCode: authorization.userCode,
-        verificationUri: authorization.verificationUri,
-        expiresAt,
-        interval: authorization.interval
-      };
-    }
-    case "POLL_GITHUB_SIGN_IN": {
-      const { githubDeviceFlow } = await getLocal("githubDeviceFlow");
-      if (!githubDeviceFlow?.deviceCode) throw new Error("Start GitHub sign-in again to get a new code.");
-      if (Date.now() >= githubDeviceFlow.expiresAt) {
-        await chrome.storage.local.remove("githubDeviceFlow");
-        throw new Error("The GitHub sign-in code expired. Start again to get a new code.");
-      }
-      const result = await pollDeviceAuthorization(githubOAuthClientId(), githubDeviceFlow.deviceCode);
-      if (result.status === "pending") {
-        const interval = result.slowDown ? githubDeviceFlow.interval + 5 : githubDeviceFlow.interval;
-        if (interval !== githubDeviceFlow.interval) await setLocal({ githubDeviceFlow: { ...githubDeviceFlow, interval } });
-        return { status: "pending", interval };
-      }
-      const scopes = new Set(result.scope.split(/[\s,]+/).filter(Boolean));
-      if (!scopes.has("repo")) throw new Error("GitHub did not grant the repository access LeetRepo needs. Start sign-in again and approve the repo scope.");
-      const [user, repos] = await Promise.all([verifyToken(result.accessToken), listRepos(result.accessToken)]);
-      await setLocal({ githubAccessToken: result.accessToken, githubUser: user });
-      await chrome.storage.local.remove(["githubDeviceFlow", "githubToken"]);
-      return { status: "connected", user, repos };
-    }
-    case "CREATE_REPO": {
-      const accessToken = await getGitHubAccessToken();
-      if (!accessToken) throw new Error("Connect GitHub first.");
-      return { repo: await createRepo(accessToken, message.repo || {}) };
+      const result = await beginHostedGitHubSignIn({
+        redirectUri: chrome.identity.getRedirectURL("github"),
+        launchWebAuthFlow
+      });
+      await setLocal({
+        leetrepoSessionToken: result.sessionToken,
+        githubAccessToken: result.githubAccessToken,
+        githubAccessTokenExpiresAt: result.githubAccessTokenExpiresAt,
+        githubUser: result.user
+      });
+      await chrome.storage.local.remove(["githubDeviceFlow", "githubToken", "groqApiKey", "llmUsage"]);
+      return { status: "connected", user: result.user, repos: result.repos, ai: result.ai };
     }
     case "LIST_REPOS": {
       const accessToken = await getGitHubAccessToken();
@@ -233,9 +218,9 @@ async function handle(message) {
       });
     }
     case "PUSH_SUBMISSION": {
-      const [accessToken, { groqApiKey, submissions = [], submissionNotes = {} }, { settings }] = await Promise.all([
+      const [accessToken, { submissions = [], submissionNotes = {} }, { settings }] = await Promise.all([
         getGitHubAccessToken(),
-        getLocal(["groqApiKey", "submissions", "submissionNotes"]),
+        getLocal(["submissions", "submissionNotes"]),
         getSync("settings")
       ]);
       if (!accessToken || !settings?.connected) throw new Error("Finish GitHub setup first.");
@@ -248,7 +233,7 @@ async function handle(message) {
       submission.syncedAt = new Date().toISOString();
       submission.solvedAt = existing?.solvedAt || existing?.syncedAt || submission.syncedAt;
       submission.notes = submission.notes || submissionNotes[submission.id] || "";
-      const explanation = await explanationFor(normalizedSettings, submission, groqApiKey);
+      const explanation = await explanationFor(normalizedSettings, submission);
       const result = await pushSubmission({
         token: accessToken,
         settings: normalizedSettings,
@@ -260,9 +245,9 @@ async function handle(message) {
       return { result, submission: await recordPush(submission, result, explanation.review, normalizedSettings), ai: explanation.ai };
     }
     case "GENERATE_FEEDBACK": {
-      const [{ groqApiKey }, { settings }] = await Promise.all([getLocal("groqApiKey"), getSync("settings")]);
+      const { settings } = await getSync("settings");
       const normalizedSettings = normalizeSettings(settings);
-      const explanation = await explanationFor({ ...normalizedSettings, includeReadme: true, includeReview: true }, message.submission, groqApiKey);
+      const explanation = await explanationFor({ ...normalizedSettings, includeReadme: true, includeReview: true }, message.submission);
       const review = explanation.review || buildReview(message.submission);
       const normalized = normalizeSubmission(message.submission);
       await mutateLocal(async () => {
@@ -311,9 +296,20 @@ async function handle(message) {
       });
     }
     case "DISCONNECT": {
-      await chrome.storage.local.remove(["githubAccessToken", "githubDeviceFlow", "githubToken", "githubUser"]);
+      const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
+      if (leetrepoSessionToken) {
+        await hostedRequest("/v1/account", { method: "DELETE", sessionToken: leetrepoSessionToken });
+      }
+      await chrome.storage.local.remove([
+        "leetrepoSessionToken",
+        "githubAccessToken",
+        "githubAccessTokenExpiresAt",
+        "githubDeviceFlow",
+        "githubToken",
+        "githubUser"
+      ]);
       const { settings = {} } = await getSync("settings");
-      await setSync({ settings: { ...settings, connected: false, owner: "", repo: "" } });
+      await setSync({ settings: { ...settings, connected: false, owner: "", repo: "", aiEnabled: false } });
       return { ok: true };
     }
     case "OPEN_DASHBOARD":

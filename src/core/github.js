@@ -1,69 +1,7 @@
 import { buildProfileReadme, buildReadme, folderFor, formatCommit, languageFolderFor, normalizeSubmission, sameProblem } from "./submissions.js";
 
 const API = "https://api.github.com";
-const OAUTH = "https://github.com/login";
 const MAX_BRANCH_UPDATE_ATTEMPTS = 3;
-
-function oauthError(data, fallback) {
-  const messages = {
-    access_denied: "GitHub sign-in was cancelled.",
-    device_flow_disabled: "Device flow is not enabled for this GitHub OAuth app.",
-    expired_token: "The GitHub sign-in code expired. Start again to get a new code.",
-    incorrect_client_credentials: "The configured GitHub OAuth client ID is invalid.",
-    incorrect_device_code: "The GitHub sign-in code is no longer valid.",
-    token_expired: "The GitHub sign-in code expired. Start again to get a new code.",
-    unsupported_grant_type: "GitHub rejected the device authorization request."
-  };
-  return new Error(messages[data?.error] || data?.error_description || fallback);
-}
-
-async function oauthRequest(path, params) {
-  const response = await fetch(`${OAUTH}${path}`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams(params).toString()
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw oauthError(data, `GitHub sign-in failed (${response.status}).`);
-  return data;
-}
-
-export async function startDeviceAuthorization(clientId, scope = "repo") {
-  const data = await oauthRequest("/device/code", { client_id: clientId, scope });
-  if (data.error) throw oauthError(data, "GitHub could not start sign-in.");
-  if (!data.device_code || !data.user_code || !data.verification_uri) {
-    throw new Error("GitHub returned an incomplete sign-in response.");
-  }
-  return {
-    deviceCode: data.device_code,
-    userCode: data.user_code,
-    verificationUri: data.verification_uri,
-    expiresIn: Number(data.expires_in) || 900,
-    interval: Math.max(1, Number(data.interval) || 5)
-  };
-}
-
-export async function pollDeviceAuthorization(clientId, deviceCode) {
-  const data = await oauthRequest("/oauth/access_token", {
-    client_id: clientId,
-    device_code: deviceCode,
-    grant_type: "urn:ietf:params:oauth:grant-type:device_code"
-  });
-  if (data.access_token) {
-    return {
-      status: "authorized",
-      accessToken: data.access_token,
-      scope: data.scope || "",
-      tokenType: data.token_type || "bearer"
-    };
-  }
-  if (data.error === "authorization_pending") return { status: "pending" };
-  if (data.error === "slow_down") return { status: "pending", slowDown: true };
-  throw oauthError(data, "GitHub could not complete sign-in.");
-}
 
 function headers(token) {
   return {
@@ -85,26 +23,20 @@ async function request(token, path, init = {}) {
   return data;
 }
 
-export async function verifyToken(token) {
-  return request(token, "/user");
-}
-
 export async function listRepos(token) {
-  return request(token, "/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member");
-}
-
-export async function createRepo(token, { name, description = "LeetCode solutions synced by LeetRepo", visibility = "private" }) {
-  const repoName = String(name || "").trim();
-  if (!/^[A-Za-z0-9._-]+$/.test(repoName)) throw new Error("Repository names may contain letters, numbers, periods, underscores, and hyphens.");
-  return request(token, "/user/repos", {
-    method: "POST",
-    body: JSON.stringify({
-      name: repoName,
-      description: String(description || "").trim().slice(0, 350),
-      private: visibility !== "public",
-      auto_init: false
-    })
-  });
+  const installations = await request(token, "/user/installations?per_page=100");
+  const repositories = [];
+  for (const installation of installations.installations || []) {
+    let page = 1;
+    while (page <= 10) {
+      const result = await request(token, `/user/installations/${installation.id}/repositories?per_page=100&page=${page}`);
+      repositories.push(...(result.repositories || []));
+      if ((result.repositories || []).length < 100) break;
+      page += 1;
+    }
+  }
+  return [...new Map(repositories.map((repo) => [repo.id, repo])).values()]
+    .sort((left, right) => left.full_name.localeCompare(right.full_name));
 }
 
 export async function repoInfo(token, owner, repo) {
