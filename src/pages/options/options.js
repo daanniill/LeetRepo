@@ -27,6 +27,10 @@ async function init() {
   const badge = document.querySelector("#connection-badge");
   badge.textContent = settings.connected ? "Connected" : "Not connected";
   badge.className = `badge ${settings.connected ? "accepted" : "unknown"}`;
+  const connectionButton = document.querySelector("#disconnect");
+  connectionButton.dataset.connected = String(settings.connected);
+  connectionButton.textContent = settings.connected ? "Disconnect GitHub" : "Connect GitHub";
+  connectionButton.classList.toggle("danger", settings.connected);
   const aiBadge = document.querySelector("#ai-status-badge");
   aiBadge.textContent = state.ai.hasApiKey ? "Key saved" : "Key required";
   aiBadge.className = `badge ${state.ai.hasApiKey ? "accepted" : "unknown"}`;
@@ -72,6 +76,10 @@ document.querySelectorAll('input[name="theme"]').forEach((input) => input.addEve
 }));
 
 document.querySelector("#disconnect").addEventListener("click", async () => {
+  if (document.querySelector("#disconnect").dataset.connected !== "true") {
+    await send("OPEN_ONBOARDING");
+    return;
+  }
   await send("DISCONNECT");
   showNotice(notice, "GitHub disconnected. Your local history is unchanged.");
   init();

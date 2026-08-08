@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">LeetRepo organized solution library</title>
+  <desc id="desc">A product feature graphic showing solve activity, pattern coverage, language breakdown, and attempt history.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#edeee4"/><stop offset="1" stop-color="#cadeda"/></linearGradient>
+    <clipPath id="screen"><rect x="78" y="354" width="1044" height="524" rx="24"/></clipPath>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dy="22" stdDeviation="26" flood-color="#1c211f" flood-opacity=".23"/></filter>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <circle cx="1080" cy="90" r="210" fill="#2f8f8a" opacity=".12"/>
+  <circle cx="90" cy="820" r="180" fill="#e08a4e" opacity=".09"/>
+
+  <g transform="translate(66 52)">
+    <rect width="38" height="38" rx="12" fill="#2f8f8a"/>
+    <g fill="none" stroke="#edeee4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" transform="translate(7 6)"><path d="M5 1v14"/><circle cx="5" cy="21" r="4"/><circle cx="19" cy="5" r="4"/><path d="M19 9c0 7-5 12-12 12"/></g>
+    <text x="52" y="27" fill="#1c211f" font-family="Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif" font-size="22" font-weight="700">LeetRepo</text>
+  </g>
+
+  <g transform="translate(66 135)">
+    <text fill="#1f6360" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="800" letter-spacing="2.5">ONE SOLVE. MORE VALUE.</text>
+    <text y="64" fill="#1c211f" font-family="Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif" font-size="54" font-weight="700" letter-spacing="-2.6">Your solution repo, already organized.</text>
+    <text y="106" fill="#667069" font-family="Inter, system-ui, sans-serif" font-size="20">Track the path to Accepted, see what you practice, and know what to review next.</text>
+    <g transform="translate(0 146)" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="700">
+      <g><rect width="180" height="40" rx="20" fill="#cdece9"/><text x="90" y="26" text-anchor="middle" fill="#1f6360">Attempt history</text></g>
+      <g transform="translate(194)"><rect width="188" height="40" rx="20" fill="#e9e3c7"/><text x="94" y="26" text-anchor="middle" fill="#695c23">Pattern coverage</text></g>
+      <g transform="translate(396)"><rect width="194" height="40" rx="20" fill="#dcecc9"/><text x="97" y="26" text-anchor="middle" fill="#3d642b">Spaced repetition</text></g>
+    </g>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="58" y="334" width="1084" height="584" rx="36" fill="#211c18" stroke="#fff" stroke-opacity=".45" stroke-width="2"/>
+    <circle cx="89" cy="359" r="5" fill="#e08a4e"/><circle cx="107" cy="359" r="5" fill="#2f8f8a"/><circle cx="125" cy="359" r="5" fill="#4e5a37"/>
+    <image href="../source/dashboard-activity-dark.png" x="78" y="354" width="1044" height="862" preserveAspectRatio="xMidYMin meet" clip-path="url(#screen)"/>
+  </g>
+</svg>

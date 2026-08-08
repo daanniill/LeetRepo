@@ -1,6 +1,69 @@
 import { buildProfileReadme, buildReadme, folderFor, formatCommit, languageFolderFor, normalizeSubmission, sameProblem } from "./submissions.js";
 
 const API = "https://api.github.com";
+const OAUTH = "https://github.com/login";
+const MAX_BRANCH_UPDATE_ATTEMPTS = 3;
+
+function oauthError(data, fallback) {
+  const messages = {
+    access_denied: "GitHub sign-in was cancelled.",
+    device_flow_disabled: "Device flow is not enabled for this GitHub OAuth app.",
+    expired_token: "The GitHub sign-in code expired. Start again to get a new code.",
+    incorrect_client_credentials: "The configured GitHub OAuth client ID is invalid.",
+    incorrect_device_code: "The GitHub sign-in code is no longer valid.",
+    token_expired: "The GitHub sign-in code expired. Start again to get a new code.",
+    unsupported_grant_type: "GitHub rejected the device authorization request."
+  };
+  return new Error(messages[data?.error] || data?.error_description || fallback);
+}
+
+async function oauthRequest(path, params) {
+  const response = await fetch(`${OAUTH}${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams(params).toString()
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw oauthError(data, `GitHub sign-in failed (${response.status}).`);
+  return data;
+}
+
+export async function startDeviceAuthorization(clientId, scope = "repo") {
+  const data = await oauthRequest("/device/code", { client_id: clientId, scope });
+  if (data.error) throw oauthError(data, "GitHub could not start sign-in.");
+  if (!data.device_code || !data.user_code || !data.verification_uri) {
+    throw new Error("GitHub returned an incomplete sign-in response.");
+  }
+  return {
+    deviceCode: data.device_code,
+    userCode: data.user_code,
+    verificationUri: data.verification_uri,
+    expiresIn: Number(data.expires_in) || 900,
+    interval: Math.max(1, Number(data.interval) || 5)
+  };
+}
+
+export async function pollDeviceAuthorization(clientId, deviceCode) {
+  const data = await oauthRequest("/oauth/access_token", {
+    client_id: clientId,
+    device_code: deviceCode,
+    grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+  });
+  if (data.access_token) {
+    return {
+      status: "authorized",
+      accessToken: data.access_token,
+      scope: data.scope || "",
+      tokenType: data.token_type || "bearer"
+    };
+  }
+  if (data.error === "authorization_pending") return { status: "pending" };
+  if (data.error === "slow_down") return { status: "pending", slowDown: true };
+  throw oauthError(data, "GitHub could not complete sign-in.");
+}
 
 function headers(token) {
   return {
@@ -99,6 +162,10 @@ function isEmptyRepoError(error) {
   return error?.status === 409 && /repository is empty/i.test(error.message);
 }
 
+function isNonFastForwardError(error) {
+  return error?.status === 422 && /not a fast[- ]forward/i.test(error.message);
+}
+
 async function repositoryTree(token, owner, repo, treeSha) {
   const tree = await request(token, `/repos/${owner}/${repo}/git/trees/${treeSha}?recursive=1`);
   if (tree.truncated) throw new Error("This repository is too large to verify a safe solution update.");
@@ -139,13 +206,12 @@ export async function pushSubmission({ token, settings, submission, review, prof
     branch = info.default_branch || "main";
     parentSha = initialized.commit.sha;
   }
-  const parentCommit = await request(token, `/repos/${owner}/${repo}/git/commits/${parentSha}`);
+  let parentCommit = await request(token, `/repos/${owner}/${repo}/git/commits/${parentSha}`);
   const folder = folderFor(item);
   const languageFolder = languageFolderFor(item);
-  const previousTree = await repositoryTree(token, owner, repo, parentCommit.tree.sha);
+  let previousTree = await repositoryTree(token, owner, repo, parentCommit.tree.sha);
   const solutionPath = `${folder}/${languageFolder}/solution.${item.extension}`;
   const readmePath = `${folder}/README.md`;
-  const updatesExistingSolution = previousTree.some((entry) => entry.type === "blob" && entry.path === solutionPath);
   const solution = await createBlob(token, owner, repo, `${item.code}\n`);
   const entries = [{ path: solutionPath, mode: "100644", type: "blob", sha: solution.sha }];
   if (settings.includeReadme !== false) {
@@ -160,28 +226,39 @@ export async function pushSubmission({ token, settings, submission, review, prof
     const profile = await createBlob(token, owner, repo, buildProfileReadme(history, settings));
     entries.push({ path: "README.md", mode: "100644", type: "blob", sha: profile.sha });
   }
-  const tree = await request(token, `/repos/${owner}/${repo}/git/trees`, {
-    method: "POST",
-    body: JSON.stringify({ base_tree: parentCommit.tree.sha, tree: entries })
-  });
-  const proposedTree = await repositoryTree(token, owner, repo, tree.sha);
-  assertTreePreserved(previousTree, proposedTree, entries);
-  const commit = await request(token, `/repos/${owner}/${repo}/git/commits`, {
-    method: "POST",
-    body: JSON.stringify({
-      message: formatCommit(settings.commitTemplate, item),
-      tree: tree.sha,
-      parents: [parentSha]
-    })
-  });
-  await request(token, `/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, {
-    method: "PATCH",
-    body: JSON.stringify({ sha: commit.sha, force: false })
-  });
-  return {
-    sha: commit.sha,
-    url: `https://github.com/${settings.owner}/${settings.repo}/commit/${commit.sha}`,
-    branch,
-    updated: updatesExistingSolution
-  };
+  for (let attempt = 1; ; attempt += 1) {
+    const updatesExistingSolution = previousTree.some((entry) => entry.type === "blob" && entry.path === solutionPath);
+    const tree = await request(token, `/repos/${owner}/${repo}/git/trees`, {
+      method: "POST",
+      body: JSON.stringify({ base_tree: parentCommit.tree.sha, tree: entries })
+    });
+    const proposedTree = await repositoryTree(token, owner, repo, tree.sha);
+    assertTreePreserved(previousTree, proposedTree, entries);
+    const commit = await request(token, `/repos/${owner}/${repo}/git/commits`, {
+      method: "POST",
+      body: JSON.stringify({
+        message: formatCommit(settings.commitTemplate, item),
+        tree: tree.sha,
+        parents: [parentSha]
+      })
+    });
+    try {
+      await request(token, `/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ sha: commit.sha, force: false })
+      });
+      return {
+        sha: commit.sha,
+        url: `https://github.com/${settings.owner}/${settings.repo}/commit/${commit.sha}`,
+        branch,
+        updated: updatesExistingSolution
+      };
+    } catch (error) {
+      if (!isNonFastForwardError(error) || attempt >= MAX_BRANCH_UPDATE_ATTEMPTS) throw error;
+      const ref = await request(token, `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`);
+      parentSha = ref.object.sha;
+      parentCommit = await request(token, `/repos/${owner}/${repo}/git/commits/${parentSha}`);
+      previousTree = await repositoryTree(token, owner, repo, parentCommit.tree.sha);
+    }
+  }
 }

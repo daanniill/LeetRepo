@@ -6,7 +6,7 @@ LeetRepo is a browser extension that reads accepted LeetCode submissions and com
 
 ## Data stored by the extension
 
-- A repository-scoped GitHub personal access token is stored in local extension storage and is not synced.
+- A one-time GitHub device code is stored temporarily during sign-in. The resulting GitHub OAuth access token is stored in local extension storage and is not synced. LeetRepo requests the `repo` scope to support commits to public and private repositories.
 - An optional Groq API key is stored in local extension storage and is not synced.
 - Submission and attempt history, including problem metadata, the first detected description paragraph and example input/output, solution code, result status, personal notes, review schedule, and resulting commit details, is stored locally to power the dashboard.
 - Non-secret preferences, including the selected repository and AI configuration, may be stored through Chrome's synced extension storage when browser sync is enabled.
@@ -15,7 +15,7 @@ Local extension storage is protected by the browser profile but is not separatel
 
 ## Data sent to third parties
 
-- When syncing a solution, LeetRepo sends the selected repository details, solution code, generated README, and Git commit data to GitHub using the user's token. GitHub's privacy terms apply.
+- When signing in, LeetRepo exchanges a one-time device code directly with GitHub. When syncing a solution, it sends the selected repository details, solution code, generated README, and Git commit data to GitHub using the resulting OAuth access token. GitHub's privacy terms apply.
 - If repository-profile generation is enabled, LeetRepo also sends a generated root README containing aggregate solution statistics and recent problem metadata to GitHub. This setting is disabled by default.
 - When the user backfills an existing repository, LeetRepo reads its Git tree from GitHub and stores matching solution-folder metadata locally. The backfill action does not change the repository.
 - When AI explanations are enabled, LeetRepo sends the problem title, difficulty, programming language, first detected description paragraph and example input/output, and solution code to Groq using the user's key. Groq's privacy and data-processing terms apply.
@@ -24,7 +24,7 @@ Local extension storage is protected by the browser profile but is not separatel
 
 ## User choices and deletion
 
-AI explanations are disabled by default. Users can disable them or remove the saved Groq key from Settings at any time. Disconnecting GitHub removes the locally saved GitHub token but preserves local submission history. Uninstalling the extension removes its local extension storage according to the browser's behavior; synced preferences may remain in the user's browser-sync account.
+AI explanations are disabled by default. Users can disable them or remove the saved Groq key from Settings at any time. Disconnecting GitHub removes the locally saved GitHub authorization but preserves local submission history. Uninstalling the extension removes its local extension storage according to the browser's behavior; synced preferences may remain in the user's browser-sync account.
 
 ## Changes
 

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">LeetRepo social card</title>
+  <desc id="desc">LeetRepo logo and product interface with the message Solve it. Keep it.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f6f7f1"/><stop offset="1" stop-color="#dce7df"/></linearGradient>
+    <clipPath id="dash"><rect x="525" y="118" width="632" height="356" rx="20"/></clipPath>
+    <clipPath id="popup"><rect x="914" y="266" width="188" height="360" rx="22"/></clipPath>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dy="18" stdDeviation="22" flood-color="#1c211f" flood-opacity=".22"/></filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1120" cy="40" r="240" fill="#2f8f8a" opacity=".12"/>
+  <path d="M-50 575C155 440 281 620 489 480s341-33 466-155" fill="none" stroke="#2f8f8a" stroke-opacity=".18" stroke-width="5"/>
+
+  <g transform="translate(58 48)">
+    <rect width="40" height="40" rx="12" fill="#2f8f8a"/>
+    <g fill="none" stroke="#edeee4" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" transform="translate(8 7)"><path d="M5 1v14"/><circle cx="5" cy="21" r="4"/><circle cx="19" cy="5" r="4"/><path d="M19 9c0 7-5 12-12 12"/></g>
+    <text x="54" y="28" fill="#1c211f" font-family="Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif" font-size="23" font-weight="700">LeetRepo</text>
+  </g>
+
+  <g transform="translate(58 176)">
+    <text fill="#1f6360" font-family="Inter, system-ui, sans-serif" font-size="14" font-weight="800" letter-spacing="2.5">YOUR SOLUTIONS, ORGANIZED</text>
+    <text y="74" fill="#1c211f" font-family="Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif" font-size="62" font-weight="700" letter-spacing="-3">Solve it.</text>
+    <text y="136" fill="#1c211f" font-family="Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif" font-size="62" font-weight="700" letter-spacing="-3">Keep it.</text>
+    <text y="188" fill="#667069" font-family="Inter, system-ui, sans-serif" font-size="19">Accepted → committed → ready to review.</text>
+    <g transform="translate(0 234)">
+      <rect width="208" height="48" rx="24" fill="#2f8f8a"/>
+      <text x="104" y="31" text-anchor="middle" fill="#f6f7f1" font-family="Arial Rounded MT Bold, Trebuchet MS, system-ui, sans-serif" font-size="15" font-weight="700">Build your solve history</text>
+    </g>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="511" y="104" width="660" height="384" rx="30" fill="#211c18" stroke="#1c211f" stroke-opacity=".18"/>
+    <image href="../source/dashboard-problems-dark.png" x="525" y="118" width="632" height="356" preserveAspectRatio="xMidYMid slice" clip-path="url(#dash)"/>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="901" y="253" width="214" height="390" rx="30" fill="#211c18" stroke="#f2e9db" stroke-opacity=".15"/>
+    <image href="../source/popup-dark.png" x="914" y="266" width="188" height="360" preserveAspectRatio="xMidYMin slice" clip-path="url(#popup)"/>
+  </g>
+</svg>

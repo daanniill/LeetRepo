@@ -1,6 +1,46 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRepo, listSolutionFolders, pushSubmission } from "../src/core/github.js";
+import { createRepo, listSolutionFolders, pollDeviceAuthorization, pushSubmission, startDeviceAuthorization } from "../src/core/github.js";
+
+test("startDeviceAuthorization requests a GitHub device code with repo access", async (t) => {
+  let call;
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    call = { url, init, body: new URLSearchParams(init.body) };
+    return new Response(JSON.stringify({
+      device_code: "device-secret",
+      user_code: "ABCD-EFGH",
+      verification_uri: "https://github.com/login/device",
+      expires_in: 900,
+      interval: 5
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  const result = await startDeviceAuthorization("client-id");
+
+  assert.equal(call.url, "https://github.com/login/device/code");
+  assert.equal(call.init.method, "POST");
+  assert.equal(call.body.get("client_id"), "client-id");
+  assert.equal(call.body.get("scope"), "repo");
+  assert.equal(result.userCode, "ABCD-EFGH");
+  assert.equal(result.interval, 5);
+});
+
+test("pollDeviceAuthorization distinguishes pending and authorized responses", async (t) => {
+  const replies = [
+    { error: "authorization_pending" },
+    { access_token: "oauth-token", token_type: "bearer", scope: "repo" }
+  ];
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(replies[calls++]), { status: 200, headers: { "content-type": "application/json" } }));
+
+  assert.deepEqual(await pollDeviceAuthorization("client-id", "device-secret"), { status: "pending" });
+  assert.deepEqual(await pollDeviceAuthorization("client-id", "device-secret"), {
+    status: "authorized",
+    accessToken: "oauth-token",
+    scope: "repo",
+    tokenType: "bearer"
+  });
+});
 
 test("createRepo sends the selected visibility without auto-initializing", async (t) => {
   let call;
@@ -222,6 +262,58 @@ test("pushSubmission updates only the existing language folder without deleting 
   ]);
   assert.match(calls[5].body.content, /\*\*Solved:\*\* 2026-08-07 12:34 UTC/);
   assert.equal(result.updated, true);
+});
+
+test("pushSubmission retries on a non-fast-forward branch update", async (t) => {
+  const calls = [];
+  const replies = [
+    { status: 200, body: { default_branch: "main" } },
+    { status: 200, body: { object: { sha: "original-parent" } } },
+    { status: 200, body: { tree: { sha: "original-tree" } } },
+    { status: 200, body: { tree: [] } },
+    { status: 200, body: { sha: "solution-blob" } },
+    { status: 200, body: { sha: "readme-blob" } },
+    { status: 200, body: { sha: "first-tree" } },
+    { status: 200, body: { tree: [
+      { type: "blob", path: "0001-two-sum/python/solution.py", sha: "solution-blob" },
+      { type: "blob", path: "0001-two-sum/README.md", sha: "readme-blob" }
+    ] } },
+    { status: 200, body: { sha: "first-commit" } },
+    { status: 422, body: { message: "Update is not a fast forward" } },
+    { status: 200, body: { object: { sha: "current-parent" } } },
+    { status: 200, body: { tree: { sha: "current-tree" } } },
+    { status: 200, body: { tree: [
+      { type: "blob", path: "notes.txt", sha: "competing-file" }
+    ] } },
+    { status: 200, body: { sha: "rebased-tree" } },
+    { status: 200, body: { tree: [
+      { type: "blob", path: "notes.txt", sha: "competing-file" },
+      { type: "blob", path: "0001-two-sum/python/solution.py", sha: "solution-blob" },
+      { type: "blob", path: "0001-two-sum/README.md", sha: "readme-blob" }
+    ] } },
+    { status: 200, body: { sha: "rebased-commit" } },
+    { status: 200, body: {} }
+  ];
+  t.mock.method(globalThis, "fetch", async (url, init = {}) => {
+    const reply = replies[calls.length];
+    calls.push({ url, init, body: init.body ? JSON.parse(init.body) : null });
+    return new Response(JSON.stringify(reply.body), {
+      status: reply.status,
+      headers: { "content-type": "application/json" }
+    });
+  });
+
+  const result = await pushSubmission({
+    token: "secret",
+    settings: { owner: "alex-c", repo: "solutions", branch: "main", includeReadme: true },
+    submission: { number: 1, title: "Two Sum", language: "Python3", code: "return [0, 1]" }
+  });
+
+  assert.deepEqual(calls[8].body.parents, ["original-parent"]);
+  assert.deepEqual(calls[15].body.parents, ["current-parent"]);
+  assert.equal(calls[9].body.force, false);
+  assert.equal(calls[16].body.force, false);
+  assert.equal(result.sha, "rebased-commit");
 });
 
 test("pushSubmission aborts before moving the branch if the proposed tree loses a file", async (t) => {

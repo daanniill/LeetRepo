@@ -17,11 +17,11 @@
           <p>One folder per problem, documented and ready to review — automatically, the moment your submission is Accepted.</p>
         </div>
         <ol class="steps" aria-label="Setup progress">
-          <li class="active" data-step-marker="1"><span>1</span><div><strong>Connect GitHub</strong><small>Use a repository-scoped token</small></div></li>
+          <li class="active" data-step-marker="1"><span>1</span><div><strong>Connect GitHub</strong><small>Sign in and authorize LeetRepo</small></div></li>
           <li data-step-marker="2"><span>2</span><div><strong>Choose your repo</strong><small>Configure how solutions land</small></div></li>
           <li data-step-marker="3"><span>3</span><div><strong>Start solving</strong><small>Push manually or automatically</small></div></li>
         </ol>
-        <div class="privacy-note">LeetRepo reads submissions from the page. Your GitHub token stays in local extension storage.</div>
+        <div class="privacy-note">LeetRepo reads submissions from the page. Your GitHub authorization stays in local extension storage.</div>
       </section>
 
       <section class="setup-wrap">
@@ -33,13 +33,24 @@
           <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
 
           <form id="connect-step" class="step-pane stack gap-16">
-            <div class="field">
-              <label for="token">Fine-grained personal access token</label>
-              <input class="input mono" id="token" type="password" autocomplete="off" placeholder="github_pat_…" required>
-              <p class="field-help">Give the token access only to your target repository with <strong>Contents: read and write</strong>. LeetRepo never sends it anywhere except GitHub’s API.</p>
+            <div class="github-signin-copy">
+              <h3>Authorize with your GitHub account</h3>
+              <p>GitHub will show exactly what LeetRepo can access. You will never need to create or paste a personal access token.</p>
             </div>
-            <a class="token-link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">Create a fine-grained token on GitHub ↗</a>
-            <button class="button full" type="submit" id="connect-button">Connect GitHub</button>
+            <button class="button full" type="submit" id="connect-button">Sign in with GitHub</button>
+            <p class="field-help">LeetRepo requests GitHub’s <strong>repo</strong> scope so it can list repositories, create your destination repository, and commit solutions to public or private repositories.</p>
+            <div class="device-flow card" id="device-flow" hidden>
+              <div>
+                <span class="eyebrow">Your one-time code</span>
+                <output class="device-code mono" id="device-code">----</output>
+              </div>
+              <p>Copy this code, open GitHub, and approve LeetRepo. This page will continue automatically.</p>
+              <div class="device-actions row">
+                <button class="button secondary grow" id="copy-device-code" type="button">Copy code</button>
+                <a class="button grow" id="open-github-device" target="_blank" rel="noreferrer">Open GitHub ↗</a>
+              </div>
+              <small class="device-status" id="device-status">Waiting for approval on GitHub…</small>
+            </div>
           </form>
 
           <form id="configure-step" class="step-pane stack gap-16" hidden>

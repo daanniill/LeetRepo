@@ -1,5 +1,6 @@
 import { buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
-import { createRepo, listRepos, listSolutionFolders, pushSubmission, verifyToken } from "../core/github.js";
+import { GITHUB_OAUTH_CLIENT_ID } from "../config.js";
+import { createRepo, listRepos, listSolutionFolders, pollDeviceAuthorization, pushSubmission, startDeviceAuthorization, verifyToken } from "../core/github.js";
 import {
   addTokenUsage,
   generateExplanation,
@@ -15,6 +16,19 @@ const getSync = (keys) => chrome.storage.sync.get(keys);
 const setSync = (value) => chrome.storage.sync.set(value);
 let llmUsageQueue = Promise.resolve();
 let localMutationQueue = Promise.resolve();
+
+function githubOAuthClientId() {
+  const clientId = String(GITHUB_OAUTH_CLIENT_ID || "").trim();
+  if (!clientId || clientId === "YOUR_GITHUB_OAUTH_CLIENT_ID") {
+    throw new Error("Add your GitHub OAuth app client ID to src/config.js, then reload LeetRepo.");
+  }
+  return clientId;
+}
+
+async function getGitHubAccessToken() {
+  const { githubAccessToken, githubToken } = await getLocal(["githubAccessToken", "githubToken"]);
+  return githubAccessToken || githubToken || "";
+}
 
 function normalizeSettings(value = {}) {
   const stored = value && typeof value === "object" ? value : {};
@@ -162,28 +176,55 @@ async function handle(message) {
       await setSync({ settings: next });
       return { settings: next, ai: { hasApiKey: false } };
     }
-    case "CONNECT_GITHUB": {
-      const token = String(message.token || "").trim();
-      if (!token) throw new Error("Enter a GitHub token.");
-      const user = await verifyToken(token);
-      const repos = await listRepos(token);
-      await setLocal({ githubToken: token, githubUser: user });
-      return { user, repos };
+    case "START_GITHUB_SIGN_IN": {
+      const authorization = await startDeviceAuthorization(githubOAuthClientId());
+      const expiresAt = Date.now() + authorization.expiresIn * 1000;
+      await setLocal({ githubDeviceFlow: {
+        deviceCode: authorization.deviceCode,
+        expiresAt,
+        interval: authorization.interval
+      } });
+      return {
+        userCode: authorization.userCode,
+        verificationUri: authorization.verificationUri,
+        expiresAt,
+        interval: authorization.interval
+      };
+    }
+    case "POLL_GITHUB_SIGN_IN": {
+      const { githubDeviceFlow } = await getLocal("githubDeviceFlow");
+      if (!githubDeviceFlow?.deviceCode) throw new Error("Start GitHub sign-in again to get a new code.");
+      if (Date.now() >= githubDeviceFlow.expiresAt) {
+        await chrome.storage.local.remove("githubDeviceFlow");
+        throw new Error("The GitHub sign-in code expired. Start again to get a new code.");
+      }
+      const result = await pollDeviceAuthorization(githubOAuthClientId(), githubDeviceFlow.deviceCode);
+      if (result.status === "pending") {
+        const interval = result.slowDown ? githubDeviceFlow.interval + 5 : githubDeviceFlow.interval;
+        if (interval !== githubDeviceFlow.interval) await setLocal({ githubDeviceFlow: { ...githubDeviceFlow, interval } });
+        return { status: "pending", interval };
+      }
+      const scopes = new Set(result.scope.split(/[\s,]+/).filter(Boolean));
+      if (!scopes.has("repo")) throw new Error("GitHub did not grant the repository access LeetRepo needs. Start sign-in again and approve the repo scope.");
+      const [user, repos] = await Promise.all([verifyToken(result.accessToken), listRepos(result.accessToken)]);
+      await setLocal({ githubAccessToken: result.accessToken, githubUser: user });
+      await chrome.storage.local.remove(["githubDeviceFlow", "githubToken"]);
+      return { status: "connected", user, repos };
     }
     case "CREATE_REPO": {
-      const { githubToken } = await getLocal("githubToken");
-      if (!githubToken) throw new Error("Connect GitHub first.");
-      return { repo: await createRepo(githubToken, message.repo || {}) };
+      const accessToken = await getGitHubAccessToken();
+      if (!accessToken) throw new Error("Connect GitHub first.");
+      return { repo: await createRepo(accessToken, message.repo || {}) };
     }
     case "LIST_REPOS": {
-      const { githubToken } = await getLocal("githubToken");
-      if (!githubToken) throw new Error("Connect GitHub first.");
-      return { repos: await listRepos(githubToken) };
+      const accessToken = await getGitHubAccessToken();
+      if (!accessToken) throw new Error("Connect GitHub first.");
+      return { repos: await listRepos(accessToken) };
     }
     case "IMPORT_REPOSITORY": {
-      const [{ githubToken }, { settings }] = await Promise.all([getLocal("githubToken"), getSync("settings")]);
-      if (!githubToken || !settings?.owner || !settings?.repo) throw new Error("Choose a repository before backfilling.");
-      const imported = await listSolutionFolders(githubToken, settings.owner, settings.repo, settings.branch);
+      const [accessToken, { settings }] = await Promise.all([getGitHubAccessToken(), getSync("settings")]);
+      if (!accessToken || !settings?.owner || !settings?.repo) throw new Error("Choose a repository before backfilling.");
+      const imported = await listSolutionFolders(accessToken, settings.owner, settings.repo, settings.branch);
       return mutateLocal(async () => {
         const { submissions = [] } = await getLocal("submissions");
         const additions = imported.map(normalizeSubmission).filter((item) => !submissions.some((existing) => sameProblem(existing, item)));
@@ -192,8 +233,12 @@ async function handle(message) {
       });
     }
     case "PUSH_SUBMISSION": {
-      const [{ githubToken, groqApiKey, submissions = [], submissionNotes = {} }, { settings }] = await Promise.all([getLocal(["githubToken", "groqApiKey", "submissions", "submissionNotes"]), getSync("settings")]);
-      if (!githubToken || !settings?.connected) throw new Error("Finish GitHub setup first.");
+      const [accessToken, { groqApiKey, submissions = [], submissionNotes = {} }, { settings }] = await Promise.all([
+        getGitHubAccessToken(),
+        getLocal(["groqApiKey", "submissions", "submissionNotes"]),
+        getSync("settings")
+      ]);
+      if (!accessToken || !settings?.connected) throw new Error("Finish GitHub setup first.");
       if (!isSubmissionPushReady(message.submission)) {
         throw new Error("Submit this code on LeetCode and wait for a fresh Accepted result before pushing.");
       }
@@ -205,7 +250,7 @@ async function handle(message) {
       submission.notes = submission.notes || submissionNotes[submission.id] || "";
       const explanation = await explanationFor(normalizedSettings, submission, groqApiKey);
       const result = await pushSubmission({
-        token: githubToken,
+        token: accessToken,
         settings: normalizedSettings,
         submission,
         review: explanation.review,
@@ -266,7 +311,7 @@ async function handle(message) {
       });
     }
     case "DISCONNECT": {
-      await chrome.storage.local.remove(["githubToken", "githubUser"]);
+      await chrome.storage.local.remove(["githubAccessToken", "githubDeviceFlow", "githubToken", "githubUser"]);
       const { settings = {} } = await getSync("settings");
       await setSync({ settings: { ...settings, connected: false, owner: "", repo: "" } });
       return { ok: true };
@@ -276,6 +321,9 @@ async function handle(message) {
       return { ok: true };
     case "OPEN_OPTIONS":
       await chrome.runtime.openOptionsPage();
+      return { ok: true };
+    case "OPEN_ONBOARDING":
+      await chrome.tabs.create({ url: chrome.runtime.getURL("src/pages/onboarding/onboarding.html") });
       return { ok: true };
     default:
       throw new Error(`Unknown message: ${message.type}`);

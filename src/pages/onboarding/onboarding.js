@@ -6,6 +6,7 @@ const notice = document.querySelector("#notice");
 const panes = [document.querySelector("#connect-step"), document.querySelector("#configure-step"), document.querySelector("#finish-step")];
 let repos = [];
 let user = null;
+let signInGeneration = 0;
 
 function repoMode() {
   return document.querySelector('input[name="repo-mode"]:checked').value;
@@ -26,27 +27,77 @@ function showStep(index) {
   showNotice(notice, "");
 }
 
+function finishGitHubSignIn(result) {
+  repos = result.repos;
+  user = result.user;
+  document.querySelector("#github-login").textContent = `@${user.login}`;
+  document.querySelector("#avatar").textContent = user.login.slice(0, 2).toUpperCase();
+  const select = document.querySelector("#repo");
+  select.innerHTML = repos.map((repo) => `<option value="${repo.full_name}" data-branch="${repo.default_branch}">${repo.full_name}</option>`).join("");
+  if (!repos.length) {
+    document.querySelector('input[name="repo-mode"][value="new"]').checked = true;
+    renderRepoMode();
+  }
+  showStep(1);
+}
+
+function failGitHubSignIn(error, generation) {
+  if (generation !== signInGeneration) return;
+  signInGeneration += 1;
+  document.querySelector("#device-flow").hidden = true;
+  document.querySelector("#connect-button").hidden = false;
+  showNotice(notice, error.message, true);
+}
+
+function pollGitHubSignIn(interval, expiresAt, generation) {
+  window.setTimeout(async () => {
+    if (generation !== signInGeneration) return;
+    if (Date.now() >= expiresAt) {
+      failGitHubSignIn(new Error("The GitHub sign-in code expired. Start again to get a new code."), generation);
+      return;
+    }
+    try {
+      const result = await send("POLL_GITHUB_SIGN_IN");
+      if (result.status === "connected") {
+        signInGeneration += 1;
+        finishGitHubSignIn(result);
+        return;
+      }
+      document.querySelector("#device-status").textContent = "Waiting for approval on GitHub…";
+      pollGitHubSignIn(result.interval || interval, expiresAt, generation);
+    } catch (error) {
+      failGitHubSignIn(error, generation);
+    }
+  }, interval * 1000);
+}
+
 document.querySelector("#connect-step").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = document.querySelector("#connect-button");
-  setBusy(button, true, "Checking GitHub…");
+  setBusy(button, true, "Starting GitHub…");
+  const generation = ++signInGeneration;
   try {
-    const result = await send("CONNECT_GITHUB", { token: document.querySelector("#token").value });
-    repos = result.repos;
-    user = result.user;
-    document.querySelector("#github-login").textContent = `@${user.login}`;
-    document.querySelector("#avatar").textContent = user.login.slice(0, 2).toUpperCase();
-    const select = document.querySelector("#repo");
-    select.innerHTML = repos.map((repo) => `<option value="${repo.full_name}" data-branch="${repo.default_branch}">${repo.full_name}</option>`).join("");
-    if (!repos.length) {
-      document.querySelector('input[name="repo-mode"][value="new"]').checked = true;
-      renderRepoMode();
-    }
-    showStep(1);
+    const result = await send("START_GITHUB_SIGN_IN");
+    document.querySelector("#device-code").textContent = result.userCode;
+    document.querySelector("#open-github-device").href = result.verificationUri;
+    document.querySelector("#device-flow").hidden = false;
+    button.hidden = true;
+    pollGitHubSignIn(result.interval, result.expiresAt, generation);
   } catch (error) {
-    showNotice(notice, error.message, true);
+    failGitHubSignIn(error, generation);
   } finally {
     setBusy(button, false);
+  }
+});
+
+document.querySelector("#copy-device-code").addEventListener("click", async () => {
+  const button = document.querySelector("#copy-device-code");
+  try {
+    await navigator.clipboard.writeText(document.querySelector("#device-code").textContent);
+    button.textContent = "Copied";
+    window.setTimeout(() => button.textContent = "Copy code", 1500);
+  } catch {
+    showNotice(notice, "Could not copy the code. Select it and copy it manually.", true);
   }
 });
 
