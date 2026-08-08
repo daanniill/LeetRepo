@@ -193,7 +193,8 @@
           <div class="lr-feedback" hidden></div>
           <label class="lr-notes-label" for="lr-personal-notes">Personal notes</label>
           <textarea class="lr-notes" id="lr-personal-notes" rows="2" maxlength="4000" placeholder="What should future-you remember?"></textarea>
-          <div class="lr-auto"><span>Auto-push on Accepted</span><label class="lr-switch"><input type="checkbox"><span></span></label></div>
+          <div class="lr-auto"><span>Auto-push on Accepted</span><label class="lr-switch"><input class="lr-auto-push" type="checkbox"><span></span></label></div>
+          <div class="lr-auto"><span class="lr-ai-copy">AI-generated README<small>Sends solution code to AI</small></span><label class="lr-switch"><input class="lr-ai-readme" type="checkbox" aria-label="Use AI-generated README"><span></span></label></div>
           <button class="lr-link lr-dashboard">Open dashboard →</button>
           <div class="lr-notice" hidden></div>
         </div>
@@ -212,9 +213,25 @@
       notes[`${latest.number}-${latest.slug}`] = event.target.value;
       await chrome.runtime.sendMessage({ type: "SAVE_NOTES", submission: latest, notes: event.target.value });
     });
-    panel.querySelector(".lr-switch input").addEventListener("change", async (event) => {
+    panel.querySelector(".lr-auto-push").addEventListener("change", async (event) => {
       settings = { ...settings, autoPush: event.target.checked };
       await chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", settings: { autoPush: event.target.checked } });
+    });
+    panel.querySelector(".lr-ai-readme").addEventListener("change", async (event) => {
+      const previous = settings?.aiEnabled === true;
+      const enabled = event.target.checked;
+      settings = { ...settings, aiEnabled: enabled, aiConsent: enabled };
+      render();
+      try {
+        const response = await chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", settings: { aiEnabled: enabled, aiConsent: enabled } });
+        if (!response?.ok) throw new Error(response?.error || "Could not update the AI README setting.");
+        settings = response.settings;
+        showNotice(enabled ? "AI README enabled. Solution code will be processed by LeetRepo's AI provider." : "Basic stats-only README enabled.");
+      } catch (error) {
+        settings = { ...settings, aiEnabled: previous, aiConsent: previous };
+        showNotice(error.message, true);
+      }
+      render();
     });
   }
 
@@ -245,9 +262,10 @@
         ? "Solution already synced"
         : settings?.connected ? (latest.code ? existingSolution ? "Update on GitHub" : "Push to GitHub" : "Open the code editor") : "Connect GitHub in Settings";
     const reviewButton = panel.querySelector(".lr-review");
-    reviewButton.disabled = reviewing || !latest.code;
-    reviewButton.textContent = reviewing ? "Reviewing solution…" : "Get AI feedback";
-    panel.querySelector(".lr-switch input").checked = settings?.autoPush !== false;
+    reviewButton.disabled = reviewing || !latest.code || settings?.aiEnabled !== true;
+    reviewButton.textContent = reviewing ? "Reviewing solution…" : settings?.aiEnabled === true ? "Get AI feedback" : "Enable AI README for feedback";
+    panel.querySelector(".lr-auto-push").checked = settings?.autoPush !== false;
+    panel.querySelector(".lr-ai-readme").checked = settings?.aiEnabled === true;
     const notesInput = panel.querySelector(".lr-notes");
     if (document.activeElement !== notesInput && notesInput.value !== (latest.notes || "")) notesInput.value = latest.notes || "";
   }

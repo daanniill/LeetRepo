@@ -67,21 +67,17 @@ test("folder and commit formatting follow the configured convention", () => {
   assert.equal(formatCommit("solve: {number}. {title} [{language}]", submission), "solve: 42. Trapping Rain Water [C++]");
 });
 
-test("README includes metadata and interview prompts", () => {
+test("README defaults to basic LeetCode stats without a diagram", () => {
   const readme = buildReadme(submission);
   assert.match(readme, /# 42\. Trapping Rain Water/);
   assert.match(readme, /\*\*Runtime:\*\* 52 ms/);
-  assert.match(readme, /## Interview overview/);
-  assert.match(readme, /### Solution replay/);
-  assert.match(readme, /```mermaid\nflowchart TD/);
-  assert.match(readme, /Goal<br\/>Given an elevation map/);
-  assert.match(readme, /Sample input/);
-  assert.match(readme, /Sample output/);
   assert.match(readme, /View problem on LeetCode/);
+  assert.doesNotMatch(readme, /Interview overview/);
+  assert.doesNotMatch(readme, /```mermaid/);
 });
 
 test("README respects disabled optional sections", () => {
-  const readme = buildReadme(submission, { includeLink: false, includeStats: false, includeReview: false });
+  const readme = buildReadme(submission, { includeLink: false, includeStats: false });
   assert.doesNotMatch(readme, /Runtime/);
   assert.doesNotMatch(readme, /Interview overview/);
   assert.doesNotMatch(readme, /Solution replay/);
@@ -90,8 +86,10 @@ test("README respects disabled optional sections", () => {
 
 test("README includes personal notes only when enabled", () => {
   const withNotes = { ...submission, notes: "Re-check the decreasing-height case." };
-  assert.match(buildReadme(withNotes), /## Personal notes/);
-  assert.doesNotMatch(buildReadme(withNotes, { includeNotes: false }), /Personal notes/);
+  const review = { patterns: ["Stack"], approach: ["Scan the bars."] };
+  assert.match(buildReadme(withNotes, { aiEnabled: true }, review), /## Personal notes/);
+  assert.doesNotMatch(buildReadme(withNotes, { aiEnabled: true, includeNotes: false }, review), /Personal notes/);
+  assert.doesNotMatch(buildReadme(withNotes), /Personal notes/);
 });
 
 test("README shows the original solved timestamp", () => {
@@ -122,7 +120,7 @@ test("review queue respects generated and snoozed due dates", () => {
 });
 
 test("README renders a validated AI explanation with a verification note", () => {
-  const readme = buildReadme(submission, undefined, {
+  const readme = buildReadme(submission, { aiEnabled: true }, {
     summary: "A monotonic structure tracks useful candidates.",
     patterns: ["Monotonic Stack"],
     approach: ["Scan the input.", "Remove dominated candidates.", "Compute the answer."],
@@ -144,6 +142,17 @@ test("README renders a validated AI explanation with a verification note", () =>
   assert.match(readme, /heights=\[0,1,0,2\]/);
   assert.match(readme, /Step 2: Find boundary<br\/>pop the lower bar/);
   assert.match(readme, /AI-generated with Groq/);
+});
+
+test("README ignores a supplied AI review when the user has opted out", () => {
+  const readme = buildReadme(submission, { aiEnabled: false }, {
+    summary: "This content must not be included.",
+    patterns: ["Two Pointers"],
+    approach: ["Build a diagram."],
+    generatedBy: "Groq"
+  });
+  assert.doesNotMatch(readme, /This content must not be included/);
+  assert.doesNotMatch(readme, /mermaid|AI-generated/);
 });
 
 test("Mermaid replay falls back by pattern and escapes untrusted labels", () => {

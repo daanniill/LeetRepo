@@ -3,7 +3,7 @@ import { applyTheme, logo, send, setBusy, showNotice } from "../../shared/client
 
 document.querySelector("#logo").innerHTML = logo();
 const notice = document.querySelector("#notice");
-const toggleKeys = ["autoPush", "includeReadme", "includeStats", "includeLink", "includeNotes", "includeReview", "includeProfile", "spacedRepetition", "aiEnabled"];
+const toggleKeys = ["autoPush", "includeReadme", "includeStats", "includeLink", "includeNotes", "includeProfile", "spacedRepetition", "aiEnabled"];
 
 async function init() {
   const state = await send("GET_STATE");
@@ -17,7 +17,6 @@ async function init() {
   theme.checked = true;
   applyTheme(theme.value);
   toggleKeys.forEach((key) => document.querySelector(`#${key}`).checked = settings[key] !== false);
-  document.querySelector("#ai-consent").checked = settings.aiConsent === true;
   const badge = document.querySelector("#connection-badge");
   badge.textContent = settings.connected ? "Connected" : "Not connected";
   badge.className = `badge ${settings.connected ? "accepted" : "unknown"}`;
@@ -42,10 +41,10 @@ document.querySelector("#settings-form").addEventListener("submit", async (event
       repo: document.querySelector("#repo").value.trim(),
       branch: document.querySelector("#branch").value.trim(),
       commitTemplate: document.querySelector("#commit-template").value.trim(),
-      theme: document.querySelector('input[name="theme"]:checked')?.value || DEFAULT_SETTINGS.theme,
-      aiConsent: document.querySelector("#ai-consent").checked
+      theme: document.querySelector('input[name="theme"]:checked')?.value || DEFAULT_SETTINGS.theme
     };
     toggleKeys.forEach((key) => settings[key] = document.querySelector(`#${key}`).checked);
+    settings.aiConsent = settings.aiEnabled;
     await send("SAVE_SETTINGS", { settings });
     showNotice(notice, "Settings saved.");
     await init();

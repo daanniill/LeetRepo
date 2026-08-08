@@ -59,7 +59,7 @@ async function hostedUsage() {
 }
 
 async function explanationFor(settings, submission) {
-  if (settings.includeReadme === false || settings.includeReview === false || !settings.aiEnabled) {
+  if (settings.includeReadme === false || !settings.aiEnabled) {
     return { review: null, ai: { generated: false } };
   }
   try {
@@ -247,7 +247,7 @@ async function handle(message) {
     case "GENERATE_FEEDBACK": {
       const { settings } = await getSync("settings");
       const normalizedSettings = normalizeSettings(settings);
-      const explanation = await explanationFor({ ...normalizedSettings, includeReadme: true, includeReview: true }, message.submission);
+      const explanation = await explanationFor({ ...normalizedSettings, includeReadme: true }, message.submission);
       const review = explanation.review || buildReview(message.submission);
       const normalized = normalizeSubmission(message.submission);
       await mutateLocal(async () => {

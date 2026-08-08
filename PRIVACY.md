@@ -34,7 +34,7 @@ GitHub's privacy terms apply to data sent to GitHub.
 
 ## Optional AI processing
 
-AI explanations are disabled by default and require affirmative consent in Settings. When enabled, the extension sends the problem title, difficulty, programming language, detected problem context and example input/output, and up to 24,000 characters of solution code to the LeetRepo service. The service sends that material to Groq to generate the requested explanation.
+AI-generated READMEs are disabled by default and require affirmative opt-in during onboarding, in Settings, or from the LeetCode page panel. When enabled, the extension sends the problem title, difficulty, programming language, detected problem context and example input/output, and up to 24,000 characters of solution code to the LeetRepo service. The service sends that material to Groq to generate the requested README walkthrough.
 
 AI request bodies and generated explanations are processed in memory and are not stored in the LeetRepo application database or ordinary application logs. The hosting provider may retain limited access and security logs, and Groq processes requests under its own privacy and data-processing terms. LeetRepo logs only the API route, response status, and request duration; it does not log request bodies, OAuth query values, access tokens, or session tokens.
 
@@ -46,7 +46,7 @@ No internet-connected service can guarantee absolute security. Revoke the GitHub
 
 ## Your choices and deletion
 
-- You can keep hosted AI disabled and continue using local rule-based study templates.
+- You can keep hosted AI disabled and continue syncing basic stats-only problem READMEs.
 - Turning off AI stops future AI transmissions but preserves local history.
 - **Disconnect GitHub** deletes your hosted LeetRepo account, encrypted GitHub credentials, sessions, and aggregate AI usage. It also removes local authorization while preserving local submission history.
 - Uninstalling the extension removes local extension storage according to browser behavior. Synced preferences may remain in your browser-sync account, and uninstalling alone does not notify the hosted service. Disconnect before uninstalling if you want immediate hosted-data deletion; otherwise inactive hosted account data is removed as described above.

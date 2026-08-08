@@ -56,6 +56,7 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
     if (!selected.value) throw new Error("Choose a repository.");
     const [owner, repo] = selected.value.split("/");
     const branch = selected.selectedOptions[0]?.dataset.branch || "main";
+    const aiEnabled = document.querySelector("#setup-ai-readme").checked;
     await send("SAVE_SETTINGS", { settings: {
       connected: true,
       owner,
@@ -66,9 +67,10 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
       includeStats: document.querySelector("#setup-stats").checked,
       includeLink: document.querySelector("#setup-link").checked,
       includeNotes: document.querySelector("#setup-notes").checked,
-      includeReview: document.querySelector("#setup-review").checked,
       includeProfile: document.querySelector("#setup-profile").checked,
       spacedRepetition: document.querySelector("#setup-repetition").checked,
+      aiEnabled,
+      aiConsent: aiEnabled,
       commitTemplate: document.querySelector("#commit-template").value.trim() || DEFAULT_SETTINGS.commitTemplate
     }});
     if (document.querySelector("#setup-backfill").checked) {

@@ -108,9 +108,9 @@ The API provides:
 - Atomic per-user daily/monthly quotas plus a global per-minute guardrail.
 - Account deletion through **Disconnect GitHub**.
 
-## Optional AI explanations
+## Optional AI-generated READMEs
 
-LeetRepo always has local rule-based interview and Mermaid replay templates. Hosted AI explanations are optional, disabled by default, and require an explicit consent checkbox in Settings.
+AI-generated READMEs are optional and disabled by default. Users can opt in during onboarding, in Settings, or from the LeetCode page panel. Leaving AI off produces a basic README with captured LeetCode metadata and stats, without an interview walkthrough or Mermaid diagram.
 
 When enabled:
 
@@ -118,7 +118,7 @@ When enabled:
 - The API constructs the prompt, calls the configured Groq model, validates bounded JSON output, and returns only the generated review and usage counters.
 - The free tier allows 3 attempted requests per UTC day and 30 per UTC month. Limits are enforced transactionally by GitHub's immutable numeric user ID.
 - Request bodies are not written to the application database or ordinary application logs.
-- If the service or provider is unavailable, returns invalid output, or reaches a limit, the GitHub push continues with local templates.
+- If the service or provider is unavailable, returns invalid output, or reaches a limit, the GitHub push continues with the basic stats-only README.
 - AI-generated READMEs include a reminder to verify the analysis.
 
 ## Data handling and safety

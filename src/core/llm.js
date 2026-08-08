@@ -101,7 +101,7 @@ ${code}${truncationNote}
 
 function groqError(status, data) {
   if (status === 401) return "The AI provider rejected the configured service credential.";
-  if (status === 429) return "Groq rate-limited this request. The README will use the local review template.";
+  if (status === 429) return "Groq rate-limited this request. The README will contain basic LeetCode stats instead.";
   const message = cleanText(data?.error?.message, 180);
   return message ? `Groq request failed (${status}): ${message}` : `Groq request failed (${status}).`;
 }
@@ -144,8 +144,8 @@ export async function generateExplanation({
       signal: controller.signal
     });
   } catch (error) {
-    if (error?.name === "AbortError") throw new Error("Groq took too long to respond. The README will use the local review template.");
-    throw new Error("Groq could not be reached. The README will use the local review template.");
+    if (error?.name === "AbortError") throw new Error("Groq took too long to respond. The README will contain basic LeetCode stats instead.");
+    throw new Error("Groq could not be reached. The README will contain basic LeetCode stats instead.");
   } finally {
     clearTimeout(timer);
   }

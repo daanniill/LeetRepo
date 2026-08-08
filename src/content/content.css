@@ -62,6 +62,8 @@
 #leetrepo-panel .lr-notes { width: 100%; min-height: 48px; padding: 8px 10px; resize: vertical; border: 1px solid var(--lr-line); border-radius: 13px; outline: 0; color: var(--lr-text); background: var(--lr-surface); font: 10.5px/1.4 Inter, ui-sans-serif, sans-serif; transition: color .3s var(--lr-ease), background-color .3s var(--lr-ease), border-color .2s var(--lr-ease), box-shadow .2s var(--lr-ease); }
 #leetrepo-panel .lr-notes:focus { border-color: var(--lr-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lr-accent), transparent 82%); }
 #leetrepo-panel .lr-auto { display: flex; align-items: center; justify-content: space-between; color: var(--lr-muted); font: 10.5px Inter, ui-sans-serif, sans-serif; }
+#leetrepo-panel .lr-ai-copy { display: flex; flex-direction: column; gap: 2px; }
+#leetrepo-panel .lr-ai-copy small { color: var(--lr-muted); font-size: 8.5px; }
 #leetrepo-panel .lr-switch { position: relative; width: 34px; height: 20px; }
 #leetrepo-panel .lr-switch input { position: absolute; opacity: 0; pointer-events: none; }
 #leetrepo-panel .lr-switch > span { position: absolute; inset: 0; border-radius: 99px; background: color-mix(in srgb, var(--lr-text), transparent 82%); cursor: pointer; transition: background-color .24s var(--lr-ease), box-shadow .24s var(--lr-ease); }
