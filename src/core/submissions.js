@@ -22,6 +22,14 @@ export function normalizeTheme(value) {
   return THEME_IDS.includes(value) ? value : DEFAULT_SETTINGS.theme;
 }
 
+export function aiLimitReached(usage = {}) {
+  return [usage.daily, usage.monthly].some((period = {}) => {
+    const requests = Number(period.requests);
+    const limit = Number(period.limit);
+    return Number.isFinite(requests) && Number.isFinite(limit) && limit >= 0 && requests >= limit;
+  });
+}
+
 export const LANGUAGE_EXTENSIONS = {
   bash: "sh",
   c: "c",

@@ -42,6 +42,7 @@
 .setting-line { padding: 5px 0; display: flex; align-items: center; justify-content: space-between; }
 .setting-line strong, .setting-line small { display: block; }
 .setting-line small { margin-top: 3px; color: var(--muted); font-size: 11px; }
+.setting-line.ai-limit { opacity: .58; }
 .finish-step { text-align: center; }
 .finish-step h2 { font-size: 34px; margin: 18px 0 10px; }
 .finish-step p { max-width: 460px; margin: 0 auto 24px; color: var(--muted); line-height: 1.6; }

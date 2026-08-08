@@ -7,6 +7,16 @@ const panes = [document.querySelector("#connect-step"), document.querySelector("
 let repos = [];
 let user = null;
 
+function setAiAvailability(ai = {}) {
+  const limited = ai.limitReached === true;
+  const toggle = document.querySelector("#setup-ai-readme");
+  toggle.disabled = limited && !toggle.checked;
+  document.querySelector("#setup-ai-row").classList.toggle("ai-limit", limited);
+  document.querySelector("#setup-ai-copy").textContent = limited
+    ? "Your AI tier limit has been reached. Basic stats READMEs and local feedback remain available."
+    : "Opt in to sending solution details and code to LeetRepo's AI provider for a walkthrough and diagram. Off creates a basic stats-only README.";
+}
+
 function showStep(index) {
   panes.forEach((pane, i) => pane.hidden = i !== index);
   document.querySelector("#step-eyebrow").textContent = `Step ${index + 1} of 3`;
@@ -19,6 +29,7 @@ function showStep(index) {
 function finishGitHubSignIn(result) {
   repos = result.repos;
   user = result.user;
+  setAiAvailability(result.ai);
   document.querySelector("#github-login").textContent = `@${user.login}`;
   document.querySelector("#avatar").textContent = user.login.slice(0, 2).toUpperCase();
   const select = document.querySelector("#repo");
@@ -90,5 +101,6 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
 document.querySelector("#finish-dashboard").addEventListener("click", () => send("OPEN_DASHBOARD"));
 
 send("GET_STATE").then((state) => {
+  setAiAvailability(state.ai);
   if (state.settings.connected) showStep(2);
 }).catch(() => {});

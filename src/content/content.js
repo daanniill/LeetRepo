@@ -5,6 +5,7 @@
   let checkTimer = null;
   let pushing = false;
   let reviewing = false;
+  let ai = { limitReached: false };
   let notes = {};
   let syncedSubmissions = [];
   let pendingSubmission = null;
@@ -194,7 +195,7 @@
           <label class="lr-notes-label" for="lr-personal-notes">Personal notes</label>
           <textarea class="lr-notes" id="lr-personal-notes" rows="2" maxlength="4000" placeholder="What should future-you remember?"></textarea>
           <div class="lr-auto"><span>Auto-push on Accepted</span><label class="lr-switch"><input class="lr-auto-push" type="checkbox"><span></span></label></div>
-          <div class="lr-auto"><span class="lr-ai-copy">AI-generated README<small>Sends solution code to AI</small></span><label class="lr-switch"><input class="lr-ai-readme" type="checkbox" aria-label="Use AI-generated README"><span></span></label></div>
+          <div class="lr-auto lr-ai-option"><span class="lr-ai-copy">AI-generated README<small>Sends solution code to AI</small></span><label class="lr-switch"><input class="lr-ai-readme" type="checkbox" aria-label="Use AI-generated README"><span></span></label></div>
           <button class="lr-link lr-dashboard">Open dashboard →</button>
           <div class="lr-notice" hidden></div>
         </div>
@@ -262,22 +263,31 @@
         ? "Solution already synced"
         : settings?.connected ? (latest.code ? existingSolution ? "Update on GitHub" : "Push to GitHub" : "Open the code editor") : "Connect GitHub in Settings";
     const reviewButton = panel.querySelector(".lr-review");
-    reviewButton.disabled = reviewing || !latest.code || settings?.aiEnabled !== true;
-    reviewButton.textContent = reviewing ? "Reviewing solution…" : settings?.aiEnabled === true ? "Get AI feedback" : "Enable AI README for feedback";
+    const aiEnabled = settings?.aiEnabled === true;
+    const aiBlocked = aiEnabled && ai.limitReached === true;
+    reviewButton.disabled = reviewing || !latest.code || aiBlocked;
+    reviewButton.textContent = reviewing ? "Reviewing solution…" : aiBlocked ? "AI tier limit reached" : aiEnabled ? "Get AI feedback" : "Get local feedback";
     panel.querySelector(".lr-auto-push").checked = settings?.autoPush !== false;
-    panel.querySelector(".lr-ai-readme").checked = settings?.aiEnabled === true;
+    const aiToggle = panel.querySelector(".lr-ai-readme");
+    aiToggle.checked = aiEnabled;
+    aiToggle.disabled = ai.limitReached === true && !aiEnabled;
+    panel.querySelector(".lr-ai-option").classList.toggle("limited", ai.limitReached === true);
+    panel.querySelector(".lr-ai-copy small").textContent = ai.limitReached === true
+      ? aiEnabled ? "Limit reached — turn off for local mode" : "Limit reached — local mode active"
+      : "Sends solution code to AI";
     const notesInput = panel.querySelector(".lr-notes");
     if (document.activeElement !== notesInput && notesInput.value !== (latest.notes || "")) notesInput.value = latest.notes || "";
   }
 
   async function review() {
-    if (reviewing || !latest?.code) return;
+    if (reviewing || !latest?.code || (settings?.aiEnabled === true && ai.limitReached === true)) return;
     reviewing = true;
     render();
     showNotice("");
     try {
       const response = await chrome.runtime.sendMessage({ type: "GENERATE_FEEDBACK", submission: latest });
       if (!response?.ok) throw new Error(response?.error || "Feedback failed.");
+      ai = { ...ai, ...response.ai };
       const feedback = document.querySelector(`#${PANEL_ID} .lr-feedback`);
       const complexity = response.review.complexity?.time && response.review.complexity?.space
         ? `<div class="lr-complexity"><span>Time · ${escapeHtml(response.review.complexity.time)}</span><span>Space · ${escapeHtml(response.review.complexity.space)}</span></div>`
@@ -309,6 +319,7 @@
     try {
       const response = await chrome.runtime.sendMessage({ type: "PUSH_SUBMISSION", submission: submissionForPush() });
       if (!response?.ok) throw new Error(response?.error || "Push failed.");
+      ai = { ...ai, ...response.ai };
       syncedSubmissions = [response.submission, ...syncedSubmissions.filter((item) => String(item.number) !== String(response.submission.number))];
       acceptedSubmissionKey = "";
       const success = response.result?.updated
@@ -359,6 +370,7 @@
   mount();
   chrome.runtime.sendMessage({ type: "GET_STATE" }).then((response) => {
     settings = response?.settings || {};
+    ai = response?.ai || ai;
     notes = response?.notes || {};
     syncedSubmissions = response?.submissions || [];
     applyTheme();

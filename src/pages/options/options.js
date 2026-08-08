@@ -25,10 +25,13 @@ async function init() {
   connectionButton.textContent = settings.connected ? "Disconnect GitHub" : "Connect GitHub";
   connectionButton.classList.toggle("danger", settings.connected);
   const aiBadge = document.querySelector("#ai-status-badge");
-  aiBadge.textContent = state.ai.available ? "Hosted free tier" : "Sign-in required";
-  aiBadge.className = `badge ${state.ai.available ? "accepted" : "unknown"}`;
+  aiBadge.textContent = state.ai.limitReached ? "Tier limit reached" : state.ai.available ? "Hosted free tier" : "Sign-in required";
+  aiBadge.className = `badge ${state.ai.available && !state.ai.limitReached ? "accepted" : "unknown"}`;
   const usage = state.ai.usage;
-  document.querySelector("#ai-usage").textContent = `${usage.daily.requests} of ${usage.daily.limit} today · ${usage.monthly.requests} of ${usage.monthly.limit} this month`;
+  document.querySelector("#ai-usage").textContent = `${state.ai.limitReached ? "AI paused · " : ""}${usage.daily.requests} of ${usage.daily.limit} today · ${usage.monthly.requests} of ${usage.monthly.limit} this month`;
+  const aiToggle = document.querySelector("#aiEnabled");
+  aiToggle.disabled = state.ai.limitReached && settings.aiEnabled !== true;
+  document.querySelector("#ai-toggle-row").classList.toggle("ai-limit", state.ai.limitReached);
 }
 
 document.querySelector("#settings-form").addEventListener("submit", async (event) => {

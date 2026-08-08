@@ -150,6 +150,7 @@ h1, h2, h3, p { margin-top: 0; }
 .switch input:checked + span { background: var(--accent); }
 .switch input:checked + span::after { transform: translateX(17px); }
 .switch input:focus-visible + span { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent), transparent 72%); }
+.switch input:disabled + span { cursor: not-allowed; }
 
 .badge { display: inline-flex; align-items: center; gap: 5px; width: fit-content; padding: 4px 9px; border-radius: 12px; font-size: 11px; font-weight: 750; line-height: 1; }
 .badge.accepted, .badge.easy { color: var(--easy-ink); background: var(--easy-bg); }

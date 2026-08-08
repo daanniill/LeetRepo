@@ -1,4 +1,4 @@
-import { buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
+import { aiLimitReached, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
 import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.js";
 import { beginHostedGitHubSignIn, hostedRequest, newRequestId } from "../core/service.js";
 
@@ -62,6 +62,18 @@ async function explanationFor(settings, submission) {
   if (settings.includeReadme === false || !settings.aiEnabled) {
     return { review: null, ai: { generated: false } };
   }
+  const usage = await hostedUsage();
+  if (aiLimitReached(usage)) {
+    return {
+      review: null,
+      ai: {
+        generated: false,
+        limitReached: true,
+        usage,
+        warning: "Your AI tier limit has been reached. LeetRepo used the local fallback."
+      }
+    };
+  }
   try {
     const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
     if (!leetrepoSessionToken) throw new Error("Reconnect GitHub to use hosted AI explanations.");
@@ -72,15 +84,17 @@ async function explanationFor(settings, submission) {
     });
     return {
       review: generated.review,
-      ai: { generated: true, usage: generated.usage, model: generated.model }
+      ai: { generated: true, limitReached: aiLimitReached(generated.usage), usage: generated.usage, model: generated.model }
     };
   } catch (error) {
+    const latestUsage = await hostedUsage();
     return {
       review: null,
       ai: {
         generated: false,
         warning: error.message,
-        usage: await hostedUsage()
+        limitReached: aiLimitReached(latestUsage),
+        usage: latestUsage
       }
     };
   }
@@ -173,7 +187,8 @@ async function handle(message) {
         lastSubmission: local.lastSubmission || null,
         ai: {
           available: connected,
-          usage
+          usage,
+          limitReached: aiLimitReached(usage)
         }
       };
     }

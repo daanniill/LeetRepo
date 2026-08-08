@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  aiLimitReached,
   buildMermaidDiagram,
   buildReadme,
   buildProfileReadme,
@@ -38,6 +39,13 @@ test("theme preference accepts known themes and falls back safely", () => {
   assert.equal(normalizeTheme("teal"), "teal");
   assert.equal(normalizeTheme("dark"), "dark");
   assert.equal(normalizeTheme("unexpected"), "system");
+});
+
+test("AI quota detection covers daily and monthly tier limits", () => {
+  assert.equal(aiLimitReached({ daily: { requests: 3, limit: 3 }, monthly: { requests: 10, limit: 30 } }), true);
+  assert.equal(aiLimitReached({ daily: { requests: 1, limit: 3 }, monthly: { requests: 30, limit: 30 } }), true);
+  assert.equal(aiLimitReached({ daily: { requests: 2, limit: 3 }, monthly: { requests: 29, limit: 30 } }), false);
+  assert.equal(aiLimitReached({}), false);
 });
 
 test("normalizeSubmission maps languages to extensions", () => {

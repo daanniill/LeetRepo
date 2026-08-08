@@ -64,6 +64,7 @@
 #leetrepo-panel .lr-auto { display: flex; align-items: center; justify-content: space-between; color: var(--lr-muted); font: 10.5px Inter, ui-sans-serif, sans-serif; }
 #leetrepo-panel .lr-ai-copy { display: flex; flex-direction: column; gap: 2px; }
 #leetrepo-panel .lr-ai-copy small { color: var(--lr-muted); font-size: 8.5px; }
+#leetrepo-panel .lr-ai-option.limited { opacity: .58; }
 #leetrepo-panel .lr-switch { position: relative; width: 34px; height: 20px; }
 #leetrepo-panel .lr-switch input { position: absolute; opacity: 0; pointer-events: none; }
 #leetrepo-panel .lr-switch > span { position: absolute; inset: 0; border-radius: 99px; background: color-mix(in srgb, var(--lr-text), transparent 82%); cursor: pointer; transition: background-color .24s var(--lr-ease), box-shadow .24s var(--lr-ease); }
@@ -71,6 +72,7 @@
 #leetrepo-panel .lr-switch input:checked + span { background: var(--lr-accent); }
 #leetrepo-panel .lr-switch input:checked + span::after { transform: translateX(14px); }
 #leetrepo-panel .lr-switch input:focus-visible + span { box-shadow: 0 0 0 3px color-mix(in srgb, var(--lr-accent), transparent 70%); }
+#leetrepo-panel .lr-switch input:disabled + span { cursor: not-allowed; }
 #leetrepo-panel .lr-link { width: fit-content; padding: 0; border: 0; color: var(--lr-accent-ink); background: transparent; font: 700 10.5px Inter, ui-sans-serif, sans-serif; cursor: pointer; text-align: left; transition: color .2s var(--lr-ease), transform .2s var(--lr-ease); }
 #leetrepo-panel .lr-link:hover { transform: translateX(3px); }
 #leetrepo-panel .lr-notice { padding: 8px 9px; border-radius: 12px; color: var(--lr-accent-ink); background: var(--lr-accent-tint); font-size: 10.5px; line-height: 1.4; animation: lr-item-enter .28s var(--lr-ease) both; }

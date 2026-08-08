@@ -38,6 +38,7 @@
 .form-actions { display: flex; align-items: center; gap: 10px; }
 .form-actions .danger { margin-left: auto; }
 .ai-toggle { border-top: 1px solid var(--line); }
+.ai-toggle.ai-limit { opacity: .58; }
 .ai-meta { margin-top: 14px; display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 11px; }
 .ai-privacy { margin-top: 18px; }
 @media (max-width: 760px) { .theme-grid { grid-template-columns: 1fr 1fr; } }

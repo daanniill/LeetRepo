@@ -119,6 +119,7 @@ When enabled:
 - The free tier allows 3 attempted requests per UTC day and 30 per UTC month. Limits are enforced transactionally by GitHub's immutable numeric user ID.
 - Request bodies are not written to the application database or ordinary application logs.
 - If the service or provider is unavailable, returns invalid output, or reaches a limit, the GitHub push continues with the basic stats-only README.
+- Once a daily or monthly tier limit is reached, AI actions are disabled. Turning AI off keeps the same workflows available with local rule-based feedback and stats-only READMEs.
 - AI-generated READMEs include a reminder to verify the analysis.
 
 ## Data handling and safety

@@ -101,6 +101,13 @@ function renderDetail(item) {
   }
   const review = item.review || buildReview(item);
   const steps = review.approach || review.steps || [];
+  const aiEnabled = state.settings.aiEnabled === true;
+  const aiBlocked = aiEnabled && state.ai?.limitReached === true;
+  const feedbackLabel = aiBlocked
+    ? "AI tier limit reached"
+    : aiEnabled
+      ? item.review ? "Regenerate AI feedback" : "Get AI feedback"
+      : item.review ? "Regenerate local feedback" : "Get local feedback";
   const commitUrl = safeUrl(item.commitUrl);
   const problemUrl = leetcodeProblemUrl(item);
   panel.innerHTML = `
@@ -114,7 +121,7 @@ function renderDetail(item) {
     <ol class="review-steps">${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
     ${item.notes ? `<div class="personal-note"><strong>Personal note</strong><br>${escapeHtml(item.notes)}</div>` : ""}
     <div class="detail-actions">
-      ${item.code ? `<button class="button full" id="regenerate-feedback">${item.review ? "Regenerate feedback" : "Get AI feedback"}</button>` : ""}
+      ${item.code ? `<button class="button full" id="regenerate-feedback" ${aiBlocked ? "disabled" : ""}>${feedbackLabel}</button>` : ""}
       ${problemUrl ? `<a class="button secondary full" href="${escapeHtml(problemUrl)}" target="_blank" rel="noreferrer">View on LeetCode ↗</a>` : ""}
       ${commitUrl ? `<a class="button secondary full" href="${escapeHtml(commitUrl)}" target="_blank" rel="noreferrer">View on GitHub ↗</a>` : ""}
     </div>`;
@@ -126,6 +133,7 @@ async function regenerateFeedback(item, button) {
   try {
     const response = await send("GENERATE_FEEDBACK", { submission: item });
     item.review = response.review;
+    state.ai = { ...state.ai, ...response.ai };
     render();
     showToast(response.ai?.generated ? "AI feedback updated." : "Local interview overview updated.");
   } catch (error) {
@@ -262,5 +270,13 @@ document.querySelector("#settings-link").addEventListener("click", () => send("O
 document.querySelectorAll("[data-view]").forEach((item) => item.addEventListener("click", (event) => { event.preventDefault(); showView(item.dataset.view); }));
 document.querySelector("#copy-stats").addEventListener("click", () => copyStatsImage().catch((error) => showToast(error.message)));
 document.querySelector("#share-stats").addEventListener("click", () => shareStats().catch((error) => showToast(error.message)));
+
+if (globalThis.chrome?.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "sync" || !changes.settings) return;
+    state.settings = changes.settings.newValue;
+    render();
+  });
+}
 
 load().catch((error) => showToast(error.message));
