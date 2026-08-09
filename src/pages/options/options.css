@@ -35,6 +35,13 @@
 .setting-line { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .setting-line strong, .setting-line small { display: block; }
 .setting-line small { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.study-interval-setting { margin-top: 14px; padding: 16px 17px; border: 1px solid var(--line); border-radius: 18px; display: grid; grid-template-columns: minmax(260px, 1fr) minmax(250px, .7fr); gap: 22px; align-items: center; background: var(--surface-2); transition: opacity .2s var(--ease-out), background-color .3s var(--ease-out), border-color .3s var(--ease-out); }
+.study-interval-setting.disabled { opacity: .58; }
+.study-interval-setting label { font-size: 12px; font-weight: 800; }
+.study-interval-setting p { margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.study-interval-controls { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }
+.study-interval-controls .input, .study-interval-controls .select { min-height: 38px; }
+.study-interval-controls small { grid-column: 1 / -1; color: var(--accent-ink); font-size: 10px; line-height: 1.4; }
 .form-actions { display: flex; align-items: center; gap: 10px; }
 .form-actions #sign-out { margin-left: auto; }
 .ai-toggle { border-top: 1px solid var(--line); }
@@ -43,4 +50,4 @@
 .ai-privacy { margin-top: 18px; }
 .policy-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 @media (max-width: 760px) { .theme-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 680px) { .settings-page { padding-top: 34px; } .settings-head { align-items: flex-start; } .settings-head > .button { display: none; } .field-grid { grid-template-columns: 1fr; } .repository-actions, .ai-meta { align-items: flex-start; flex-direction: column; } .settings-panel { padding: 22px 18px; } }
+@media (max-width: 680px) { .settings-page { padding-top: 34px; } .settings-head { align-items: flex-start; } .settings-head > .button { display: none; } .field-grid, .study-interval-setting { grid-template-columns: 1fr; } .repository-actions, .ai-meta { align-items: flex-start; flex-direction: column; } .settings-panel { padding: 22px 18px; } }

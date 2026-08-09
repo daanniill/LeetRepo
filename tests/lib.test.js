@@ -65,11 +65,15 @@ test("problem identity is stable when a title or slug changes", () => {
 
 test("problem records retain language variants and default to the latest solution", () => {
   const merged = mergeSubmissionSolutions(
-    { ...submission, language: "Python3", code: "return 1", syncedAt: "2026-08-01T10:00:00.000Z" },
+    { ...submission, language: "Python3", code: "return 1", syncedAt: "2026-08-01T10:00:00.000Z", reviewIntervalDays: 14, reviewCount: 2, reviewLapses: 1, lastReviewRating: "hard" },
     { ...submission, language: "C++", code: "return 2;", syncedAt: "2026-08-07T10:00:00.000Z" }
   );
   assert.equal(merged.language, "C++");
   assert.equal(merged.code, "return 2;");
+  assert.equal(merged.reviewIntervalDays, 14);
+  assert.equal(merged.reviewCount, 2);
+  assert.equal(merged.reviewLapses, 1);
+  assert.equal(merged.lastReviewRating, "hard");
   assert.deepEqual(submissionSolutions(merged).map((solution) => solution.language), ["C++", "Python3"]);
 });
 

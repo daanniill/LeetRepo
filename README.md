@@ -52,11 +52,11 @@ Search and filter the solution library, inspect a problem's interview overview, 
 
 ### Activity
 
-See repository growth, solve activity, pattern coverage, language breakdown, and the full sequence of failed and accepted attempts.
+See repository growth, solve activity, pattern coverage, language breakdown, the full sequence of failed and accepted attempts, and create a shareable progress image locally.
 
 ### Study
 
-Surface solutions 30 days after they are synced or reviewed, snooze a review for three days, find missing patterns, and create shareable progress cards locally.
+Work through a due and upcoming review queue, recall each solution before revealing its refresher, and filter coverage by pattern or difficulty. Choose a resurface interval in days, weeks, or months; successful recalls use that interval while harder reviews return sooner.
 
 ## Install locally
 

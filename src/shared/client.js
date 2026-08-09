@@ -1,4 +1,5 @@
 import { buildReview, DEFAULT_SETTINGS, normalizeTheme } from "../core/submissions.js";
+import { scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
 
 const DEMO_SUBMISSION = {
   id: "42-trapping-rain-water",
@@ -15,10 +16,12 @@ const DEMO_SUBMISSION = {
   url: "https://leetcode.com/problems/trapping-rain-water/"
 };
 
-const DEMO_HISTORY = [
-  { ...DEMO_SUBMISSION, syncedAt: new Date(Date.now() - 120000).toISOString() },
-  { ...DEMO_SUBMISSION, id: "11-container-with-most-water", number: "11", title: "Container With Most Water", slug: "container-with-most-water", difficulty: "Medium", language: "Python3", extension: "py", syncedAt: new Date(Date.now() - 3600000).toISOString() },
-  { ...DEMO_SUBMISSION, id: "1-two-sum", number: "1", title: "Two Sum", slug: "two-sum", difficulty: "Easy", language: "Python3", extension: "py", syncedAt: new Date(Date.now() - 86400000).toISOString() }
+let DEMO_SETTINGS = { ...DEFAULT_SETTINGS, connected: true, owner: "alex-c", repo: "leetcode-solutions" };
+
+let DEMO_HISTORY = [
+  { ...DEMO_SUBMISSION, code: "let left = 0, right = height.size() - 1; while (left < right) { left++; }", syncedAt: new Date(Date.now() - 120000).toISOString(), reviewDueAt: new Date(Date.now() - 2 * 86400000).toISOString(), lastReviewedAt: new Date(Date.now() - 16 * 86400000).toISOString(), reviewIntervalDays: 14, reviewCount: 2 },
+  { ...DEMO_SUBMISSION, id: "11-container-with-most-water", number: "11", title: "Container With Most Water", slug: "container-with-most-water", url: "https://leetcode.com/problems/container-with-most-water/", difficulty: "Medium", language: "Python3", extension: "py", code: "left, right = 0, len(height) - 1\nwhile left < right:\n    left += 1", syncedAt: new Date(Date.now() - 86400000).toISOString(), reviewDueAt: new Date(Date.now() + 3 * 86400000).toISOString(), reviewIntervalDays: 14, reviewCount: 1 },
+  { ...DEMO_SUBMISSION, id: "1-two-sum", number: "1", title: "Two Sum", slug: "two-sum", url: "https://leetcode.com/problems/two-sum/", difficulty: "Easy", language: "Python3", extension: "py", code: "seen = dict()\nfor index, value in enumerate(nums):\n    seen[value] = index", syncedAt: new Date(Date.now() - 2 * 86400000).toISOString(), reviewDueAt: new Date(Date.now() - 2 * 3600000).toISOString() }
 ].map((item) => ({ ...item, review: buildReview(item) }));
 
 const DEMO_ATTEMPTS = [
@@ -66,7 +69,7 @@ function demoResponse(type, payload) {
   if (type === "GET_STATE") {
     const onboardingPreview = globalThis.location?.pathname?.endsWith("/onboarding.html");
     return Promise.resolve({
-      settings: { ...DEFAULT_SETTINGS, connected: !onboardingPreview, owner: onboardingPreview ? "" : "alex-c", repo: onboardingPreview ? "" : "leetcode-solutions" },
+      settings: { ...DEMO_SETTINGS, connected: !onboardingPreview, owner: onboardingPreview ? "" : DEMO_SETTINGS.owner, repo: onboardingPreview ? "" : DEMO_SETTINGS.repo },
       submissions: DEMO_HISTORY,
       attempts: DEMO_ATTEMPTS,
       notes: {},
@@ -81,11 +84,25 @@ function demoResponse(type, payload) {
       }
     });
   }
-  if (type === "SAVE_SETTINGS") return Promise.resolve({ settings: { ...DEFAULT_SETTINGS, ...payload.settings } });
+  if (type === "SAVE_SETTINGS") {
+    DEMO_SETTINGS = { ...DEMO_SETTINGS, ...payload.settings };
+    return Promise.resolve({ settings: DEMO_SETTINGS });
+  }
   if (type === "PUSH_SUBMISSION") return new Promise((resolve) => setTimeout(() => resolve({ submission: { ...payload.submission, syncedAt: new Date().toISOString() }, result: { url: "https://github.com/" } }), 500));
   if (type === "START_GITHUB_SIGN_IN") return Promise.resolve({ status: "connected", user: { login: "alex-c" }, repos: [{ full_name: "alex-c/leetcode-solutions", name: "leetcode-solutions", owner: { login: "alex-c" }, default_branch: "main" }] });
   if (type === "IMPORT_REPOSITORY") return Promise.resolve({ imported: 3 });
   if (type === "GENERATE_FEEDBACK") return Promise.resolve({ review: buildReview(payload.submission), ai: { generated: false } });
+  if (["SNOOZE_REVIEW", "MARK_REVIEWED", "RATE_REVIEW"].includes(type)) {
+    let updatedSubmission = null;
+    DEMO_HISTORY = DEMO_HISTORY.map((item) => {
+      if (item.id !== payload.id) return item;
+      updatedSubmission = type === "SNOOZE_REVIEW"
+        ? snoozeReview(item)
+        : scheduleReview(item, type === "MARK_REVIEWED" ? "good" : payload.rating, new Date(), studyIntervalDays(DEMO_SETTINGS));
+      return updatedSubmission;
+    });
+    return Promise.resolve({ submissions: DEMO_HISTORY, submission: updatedSubmission });
+  }
   return Promise.resolve({ ok: true });
 }
 

@@ -71,7 +71,15 @@
             <label class="setting-line"><div><strong>LeetCode link</strong><small>Link back to the original problem</small></div><span class="switch"><input id="includeLink" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>Personal notes</strong><small>Include notes in opted-in AI READMEs</small></div><span class="switch"><input id="includeNotes" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>Repository profile README</strong><small>Opt in to replacing the root README with generated stats on every push</small></div><span class="switch"><input id="includeProfile" type="checkbox"><span></span></span></label>
-            <label class="setting-line"><div><strong>Spaced repetition</strong><small>Resurface a solution 30 days after it is synced or reviewed</small></div><span class="switch"><input id="spacedRepetition" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>Spaced repetition</strong><small>Bring synced solutions back on a schedule you choose</small></div><span class="switch"><input id="spacedRepetition" type="checkbox"><span></span></span></label>
+          </div>
+          <div class="study-interval-setting" id="study-interval-setting">
+            <div><label for="study-interval-value">Resurface after</label><p>Used for new solutions and reviews marked “Got it.” Hard returns halfway through this interval; Again returns tomorrow.</p></div>
+            <div class="study-interval-controls">
+              <input class="input" id="study-interval-value" type="number" min="1" max="365" step="1" required aria-describedby="study-interval-preview">
+              <select class="select" id="study-interval-unit" aria-label="Review interval unit"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months">Months</option></select>
+              <small id="study-interval-preview"></small>
+            </div>
           </div>
         </section>
         <hr class="divider">

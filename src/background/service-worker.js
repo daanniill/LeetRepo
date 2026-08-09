@@ -3,6 +3,7 @@ import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.j
 import { beginHostedGitHubSignIn, hostedRequest, newRequestId } from "../core/service.js";
 import { hasCompletedOnboarding } from "../core/auth.js";
 import { clearLeetRepoStorage } from "../core/storage.js";
+import { normalizeStudyInterval, rescheduleFirstReview, reviewDateAfter, scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
 
 const getLocal = (keys) => chrome.storage.local.get(keys);
 const setLocal = (value) => chrome.storage.local.set(value);
@@ -34,11 +35,14 @@ async function getGitHubAccessToken() {
 
 function normalizeSettings(value = {}) {
   const stored = value && typeof value === "object" ? value : {};
+  const studyInterval = normalizeStudyInterval(stored.studyIntervalValue, stored.studyIntervalUnit);
   return {
     ...DEFAULT_SETTINGS,
     ...stored,
     aiConsent: stored.aiConsent === true,
     aiEnabled: stored.aiEnabled === true && stored.aiConsent === true,
+    studyIntervalValue: studyInterval.value,
+    studyIntervalUnit: studyInterval.unit,
     theme: normalizeTheme(stored.theme)
   };
 }
@@ -159,8 +163,6 @@ async function recordPush(submission, result, review, settings) {
     const normalized = normalizeSubmission(submission);
     const existing = submissions.find((item) => sameProblem(item, normalized)) || {};
     const syncedAt = normalized.syncedAt || new Date().toISOString();
-    const reviewDueAt = new Date(syncedAt);
-    reviewDueAt.setUTCDate(reviewDueAt.getUTCDate() + 30);
     const item = mergeSubmissionSolutions(existing, {
       ...normalized,
       solvedAt: existing.solvedAt || normalized.solvedAt || existing.syncedAt || syncedAt,
@@ -169,7 +171,9 @@ async function recordPush(submission, result, review, settings) {
       commitUrl: result.url,
       commitSha: result.sha
     });
-    item.reviewDueAt = settings.spacedRepetition === false ? null : reviewDueAt.toISOString();
+    item.reviewDueAt = settings.spacedRepetition === false
+      ? null
+      : reviewDateAfter(syncedAt, studyIntervalDays(settings));
     const next = [item, ...submissions.filter((stored) => !sameProblem(stored, item))].slice(0, 500);
     await setLocal({ submissions: next, lastSubmission: item });
     return item;
@@ -237,6 +241,15 @@ async function handle(message) {
       }
       const next = normalizeSettings({ ...requested, connected: hasCompletedOnboarding(requested, leetrepoSessionToken) });
       await setSync({ settings: next });
+      const previousInterval = normalizeStudyInterval(settings.studyIntervalValue, settings.studyIntervalUnit);
+      if (previousInterval.value !== next.studyIntervalValue || previousInterval.unit !== next.studyIntervalUnit) {
+        await mutateLocal(async () => {
+          const { submissions = [], lastSubmission } = await getLocal(["submissions", "lastSubmission"]);
+          const nextSubmissions = submissions.map((item) => rescheduleFirstReview(item, studyIntervalDays(next)));
+          const nextLast = lastSubmission ? rescheduleFirstReview(lastSubmission, studyIntervalDays(next)) : lastSubmission;
+          await setLocal({ submissions: nextSubmissions, lastSubmission: nextLast });
+        });
+      }
       return { settings: next, ai: { available: next.connected } };
     }
     case "START_GITHUB_SIGN_IN": {
@@ -363,22 +376,26 @@ async function handle(message) {
       });
     }
     case "SNOOZE_REVIEW":
-    case "MARK_REVIEWED": {
+    case "MARK_REVIEWED":
+    case "RATE_REVIEW": {
       const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
       if (!hasCompletedOnboarding(settings, leetrepoSessionToken)) throw new Error("Finish GitHub setup first.");
+      if (settings?.spacedRepetition === false) throw new Error("Turn on spaced repetition in Settings to schedule reviews.");
       const id = String(message.id || "");
       return mutateLocal(async () => {
         const { submissions = [] } = await getLocal("submissions");
         const now = new Date();
-        const due = new Date(now);
-        due.setUTCDate(due.getUTCDate() + (message.type === "SNOOZE_REVIEW" ? 3 : 30));
-        const next = submissions.map((item) => item.id === id ? {
-          ...item,
-          lastReviewedAt: message.type === "MARK_REVIEWED" ? now.toISOString() : item.lastReviewedAt,
-          reviewDueAt: due.toISOString()
-        } : item);
+        let updatedSubmission = null;
+        const next = submissions.map((item) => {
+          if (item.id !== id) return item;
+          updatedSubmission = message.type === "SNOOZE_REVIEW"
+            ? snoozeReview(item, now, 3)
+            : scheduleReview(item, message.type === "MARK_REVIEWED" ? "good" : message.rating, now, studyIntervalDays(settings));
+          return updatedSubmission;
+        });
+        if (!updatedSubmission) throw new Error("That review is no longer in your study queue.");
         await setLocal({ submissions: next });
-        return { submissions: next };
+        return { submissions: next, submission: updatedSubmission };
       });
     }
     case "SIGN_OUT": {

@@ -1,4 +1,5 @@
-import { buildReview, calculateStreak, dueForReview, historyInsights, relativeTime, reviewDueAt, submissionSolutions } from "../../core/submissions.js";
+import { buildReview, calculateStreak, historyInsights, relativeTime, submissionSolutions } from "../../core/submissions.js";
+import { buildStudyQueue, canonicalPattern, formatStudyInterval, nextReviewInterval, patternCoverage, studyIntervalDays } from "../../core/study.js";
 import { difficultyClass, escapeHtml, logo, send, setBusy } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
@@ -6,6 +7,11 @@ let state = { settings: {}, submissions: [], attempts: [] };
 let activeFilter = "All";
 let selectedId = null;
 const selectedSolutions = new Map();
+let studyTab = "due";
+let studyPattern = "All";
+let studyDifficulty = "All";
+let selectedStudyId = null;
+let studyRevealed = false;
 let toastTimer;
 
 async function load() {
@@ -185,40 +191,228 @@ function renderAnalytics() {
     </div>`).join("") : '<div class="empty"><strong>No attempts captured yet</strong>Submit from a LeetCode problem page to build the full path.</div>';
 }
 
+function reviewFor(item) {
+  return item.review || buildReview(item);
+}
+
+function studyPatternsFor(item) {
+  return [...new Set((reviewFor(item).patterns || []).map(canonicalPattern).filter(Boolean))];
+}
+
+function studyDueLabel(value, now = new Date()) {
+  const due = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(due.getTime())) return "not scheduled";
+  const difference = due.getTime() - now.getTime();
+  if (difference <= 0) {
+    const overdueDays = Math.floor(Math.abs(difference) / 86400000);
+    return overdueDays < 1 ? "due now" : `${overdueDays}d overdue`;
+  }
+  const days = Math.ceil(difference / 86400000);
+  if (difference < 86400000) return "due within a day";
+  return days === 1 ? "due tomorrow" : `due in ${days}d`;
+}
+
+function populateStudyFilters(coverage) {
+  const patternSelect = document.querySelector("#study-pattern-filter");
+  const available = coverage.filter(({ count }) => count > 0).map(({ pattern }) => pattern);
+  if (studyPattern !== "All" && !available.includes(studyPattern)) studyPattern = "All";
+  patternSelect.innerHTML = ['<option value="All">All patterns</option>', ...available.map((pattern) => `<option value="${escapeHtml(pattern)}">${escapeHtml(pattern)}</option>`)].join("");
+  patternSelect.value = studyPattern;
+  document.querySelector("#study-difficulty-filter").value = studyDifficulty;
+}
+
+function filteredStudyEntries(entries) {
+  return entries.filter(({ item }) => {
+    const patternMatch = studyPattern === "All" || studyPatternsFor(item).includes(studyPattern);
+    return patternMatch && (studyDifficulty === "All" || item.difficulty === studyDifficulty);
+  });
+}
+
+function renderStudyQueue(queue, enabled) {
+  const list = document.querySelector("#study-queue");
+  const source = studyTab === "due" ? queue.due : queue.upcoming;
+  const entries = filteredStudyEntries(source);
+  document.querySelector("#study-queue-total").textContent = entries.length;
+  document.querySelectorAll("[data-study-tab]").forEach((button) => {
+    const active = button.dataset.studyTab === studyTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  if (!enabled) {
+    list.innerHTML = '<div class="study-empty"><strong>Scheduling is paused</strong><p>Turn on spaced repetition to build a review queue.</p></div>';
+    return null;
+  }
+  if (!state.submissions.length) {
+    list.innerHTML = '<div class="study-empty"><strong>No solutions yet</strong><p>Sync an Accepted solution to start your study queue.</p></div>';
+    return null;
+  }
+  if (!entries.length) {
+    const hasFilters = studyPattern !== "All" || studyDifficulty !== "All";
+    const next = queue.upcoming[0];
+    list.innerHTML = hasFilters
+      ? '<div class="study-empty"><strong>No matching reviews</strong><p>Clear a filter to see the rest of your queue.</p><button class="button ghost" id="clear-study-filters">Clear filters</button></div>'
+      : studyTab === "due" && queue.upcoming.length
+        ? `<div class="study-empty"><strong>You’re clear for now</strong><p>Your next review is ${escapeHtml(studyDueLabel(next.dueAt))}.</p><button class="button ghost" id="show-upcoming-reviews">View upcoming</button></div>`
+        : '<div class="study-empty"><strong>Nothing scheduled</strong><p>Newly synced solutions receive their first review date automatically.</p></div>';
+    document.querySelector("#clear-study-filters")?.addEventListener("click", () => { studyPattern = "All"; studyDifficulty = "All"; selectedStudyId = null; renderStudy(); });
+    document.querySelector("#show-upcoming-reviews")?.addEventListener("click", () => { studyTab = "upcoming"; selectedStudyId = null; studyRevealed = false; renderStudy(); });
+    return null;
+  }
+  if (!entries.some(({ item }) => item.id === selectedStudyId)) {
+    selectedStudyId = entries[0].item.id;
+    studyRevealed = false;
+  }
+  list.innerHTML = entries.map(({ item, dueAt }) => {
+    const patterns = studyPatternsFor(item);
+    return `<button class="study-queue-item ${item.id === selectedStudyId ? "active" : ""}" data-study-id="${escapeHtml(item.id)}">
+      <span class="study-queue-title"><small>${String(item.number).padStart(4, "0")}</small><strong>${escapeHtml(item.title)}</strong></span>
+      <span class="study-queue-meta"><span class="badge ${difficultyClass(item.difficulty)}">${escapeHtml(item.difficulty)}</span><span>${escapeHtml(patterns[0] || "Review")}</span></span>
+      <span class="study-queue-due">${escapeHtml(studyDueLabel(dueAt))}</span>
+    </button>`;
+  }).join("");
+  list.querySelectorAll("[data-study-id]").forEach((button) => button.addEventListener("click", () => {
+    selectedStudyId = button.dataset.studyId;
+    studyRevealed = false;
+    renderStudy();
+  }));
+  return entries.find(({ item }) => item.id === selectedStudyId) || entries[0];
+}
+
+function renderStudySession(entry, enabled, preferredIntervalDays) {
+  const panel = document.querySelector("#study-session");
+  if (!enabled) {
+    panel.innerHTML = '<div class="study-session-empty"><div class="eyebrow">Spaced repetition</div><h2>Scheduling is turned off.</h2><p>Your synced solutions are safe. Turn the setting back on when you want reviews to resurface.</p><button class="button" id="open-study-settings">Open settings</button></div>';
+    panel.querySelector("#open-study-settings").addEventListener("click", () => send("OPEN_OPTIONS"));
+    return;
+  }
+  if (!entry) {
+    const message = state.submissions.length ? "Choose a review from the queue when you’re ready." : "Sync your first Accepted solution to create a study session.";
+    panel.innerHTML = `<div class="study-session-empty"><div class="eyebrow">Study session</div><h2>No active review</h2><p>${escapeHtml(message)}</p></div>`;
+    return;
+  }
+  const { item, dueAt } = entry;
+  const review = reviewFor(item);
+  const patterns = studyPatternsFor(item);
+  const problemUrl = leetcodeProblemUrl(item);
+  const commitUrl = safeUrl(item.commitUrl);
+  const steps = review.approach || review.steps || [];
+  panel.innerHTML = `
+    <div class="study-session-header">
+      <div><div class="eyebrow">${studyRevealed ? "Refresher revealed" : "Recall first"}</div><h2>${escapeHtml(item.number)}. ${escapeHtml(item.title)}</h2></div>
+      <span class="badge ${difficultyClass(item.difficulty)}">${escapeHtml(item.difficulty)}</span>
+    </div>
+    <div class="study-session-meta"><span>${escapeHtml(studyDueLabel(dueAt))}</span>${patterns.map((pattern) => `<span>${escapeHtml(pattern)}</span>`).join("")}</div>
+    ${studyRevealed ? `
+      <article class="study-refresher">
+        <p class="study-summary">${escapeHtml(review.summary || "Reconstruct the approach, invariant, and complexity before opening the code.")}</p>
+        ${review.complexity?.time ? `<div class="complexity-strip"><span><small>Time</small>${escapeHtml(review.complexity.time)}</span><span><small>Space</small>${escapeHtml(review.complexity.space)}</span></div>` : ""}
+        ${steps.length ? `<h3>Approach replay</h3><ol class="review-steps">${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>` : ""}
+        ${review.edgeCases?.length ? `<h3>Edge cases</h3><ul class="edge-case-list">${review.edgeCases.map((edgeCase) => `<li>${escapeHtml(edgeCase)}</li>`).join("")}</ul>` : ""}
+        ${item.notes ? `<div class="personal-note"><strong>Personal note</strong><br>${escapeHtml(item.notes)}</div>` : ""}
+      </article>
+      <div class="review-rating">
+        <div class="eyebrow">How did recall feel?</div>
+        <div class="rating-actions">
+          <button data-rating="again"><strong>Again</strong><span>${formatStudyInterval(nextReviewInterval(item, "again", preferredIntervalDays))}</span></button>
+          <button data-rating="hard"><strong>Hard</strong><span>${formatStudyInterval(nextReviewInterval(item, "hard", preferredIntervalDays))}</span></button>
+          <button data-rating="good"><strong>Got it</strong><span>${formatStudyInterval(nextReviewInterval(item, "good", preferredIntervalDays), state.settings.studyIntervalUnit)}</span></button>
+        </div>
+      </div>` : `
+      <div class="recall-prompt">
+        <strong>Before looking at your solution:</strong>
+        <ol><li>Describe the approach and its key invariant.</li><li>State the time and space complexity.</li><li>Name one edge case you would test.</li></ol>
+      </div>
+      <button class="button full reveal-button" id="reveal-study-review">Reveal refresher</button>`}
+    <div class="study-session-actions">
+      ${studyTab === "due" ? `<button class="button ghost" id="snooze-study-review">Snooze 3 days</button>` : ""}
+      ${problemUrl ? `<a class="button secondary" href="${escapeHtml(problemUrl)}" target="_blank" rel="noreferrer">Re-solve on LeetCode ↗</a>` : ""}
+      ${studyRevealed && commitUrl ? `<a class="button secondary" href="${escapeHtml(commitUrl)}" target="_blank" rel="noreferrer">View on GitHub ↗</a>` : ""}
+    </div>`;
+  panel.querySelector("#reveal-study-review")?.addEventListener("click", () => { studyRevealed = true; renderStudy(); });
+  panel.querySelector("#snooze-study-review")?.addEventListener("click", (event) => snoozeStudyReview(item, event.currentTarget));
+  panel.querySelectorAll("[data-rating]").forEach((button) => button.addEventListener("click", () => rateStudyReview(item, button.dataset.rating, button)));
+}
+
+async function snoozeStudyReview(item, button) {
+  setBusy(button, true, "Snoozing…");
+  try {
+    const response = await send("SNOOZE_REVIEW", { id: item.id });
+    state.submissions = response.submissions || state.submissions;
+    selectedStudyId = null;
+    studyRevealed = false;
+    render();
+    showToast("Review snoozed for 3 days.");
+  } catch (error) {
+    setBusy(button, false);
+    showToast(error.message);
+  }
+}
+
+async function rateStudyReview(item, rating, button) {
+  setBusy(button, true, "Saving…");
+  try {
+    const response = await send("RATE_REVIEW", { id: item.id, rating });
+    state.submissions = response.submissions || state.submissions;
+    selectedStudyId = null;
+    studyRevealed = false;
+    render();
+    const interval = formatStudyInterval(response.submission?.reviewIntervalDays || 1, rating === "good" ? state.settings.studyIntervalUnit : null);
+    showToast(`Review will resurface in ${interval}.`);
+  } catch (error) {
+    setBusy(button, false);
+    showToast(error.message);
+  }
+}
+
+function renderPatternCoverage(coverage, enabled) {
+  const visibleCoverage = enabled ? coverage : coverage.map((entry) => ({ ...entry, status: entry.count ? "rotation" : "unseen", dueCount: 0 }));
+  const cloud = document.querySelector("#pattern-cloud");
+  cloud.innerHTML = visibleCoverage.map(({ pattern, count, dueCount, status }) => `<button class="pattern-chip ${status} ${studyPattern === pattern ? "active" : ""}" data-study-pattern="${escapeHtml(pattern)}" ${count ? "" : "disabled"}>
+    ${escapeHtml(pattern)}<span>${dueCount ? `${dueCount} due` : count}</span>
+  </button>`).join("");
+  cloud.querySelectorAll("[data-study-pattern]:not([disabled])").forEach((button) => button.addEventListener("click", () => {
+    studyPattern = button.dataset.studyPattern;
+    studyTab = coverage.find(({ pattern }) => pattern === studyPattern)?.dueCount ? "due" : "upcoming";
+    selectedStudyId = null;
+    studyRevealed = false;
+    renderStudy();
+    document.querySelector(".study-workspace").scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+  const duePatterns = visibleCoverage.filter(({ dueCount }) => dueCount > 0);
+  const unseen = visibleCoverage.filter(({ status }) => status === "unseen");
+  document.querySelector("#gap-callout").innerHTML = !enabled
+    ? "<strong>Review scheduling is paused.</strong> Pattern coverage remains available while spaced repetition is off."
+    : duePatterns.length
+      ? `<strong>${duePatterns.length} pattern${duePatterns.length === 1 ? " has" : "s have"} reviews due.</strong> Start with ${escapeHtml(duePatterns.slice(0, 3).map(({ pattern }) => pattern).join(", "))}.`
+      : unseen.length
+        ? `<strong>${unseen.length} common patterns aren’t represented yet.</strong> Coverage grows only from solutions you sync.`
+        : "<strong>Every common pattern is represented.</strong> Keep using the review queue to maintain recall.";
+}
+
 function renderStudy() {
   const items = state.submissions;
+  const enabled = state.settings.spacedRepetition !== false;
+  const preferredIntervalDays = studyIntervalDays(state.settings);
+  const queue = buildStudyQueue(items, new Date(), preferredIntervalDays);
+  const coverage = patternCoverage(items, studyPatternsFor, new Date(), preferredIntervalDays);
+  const inRotation = coverage.filter(({ count }) => count > 0).length;
+  document.querySelector("#study-due-stat").textContent = enabled ? queue.due.length : 0;
+  document.querySelector("#study-upcoming-stat").textContent = enabled ? queue.nextSevenDays.length : 0;
+  document.querySelector("#study-reviewed-stat").textContent = queue.totalReviews;
+  document.querySelector("#study-pattern-stat").textContent = inRotation;
+  document.querySelector("#study-due-tab-count").textContent = enabled ? queue.due.length : 0;
+  document.querySelector("#study-upcoming-tab-count").textContent = enabled ? queue.upcoming.length : 0;
+  populateStudyFilters(coverage);
+  document.querySelector("#study-pattern-filter").disabled = !enabled || !items.length;
+  document.querySelector("#study-difficulty-filter").disabled = !enabled || !items.length;
+  const selectedEntry = renderStudyQueue(queue, enabled);
+  renderStudySession(selectedEntry, enabled, preferredIntervalDays);
+  renderPatternCoverage(coverage, enabled);
+
   const insights = historyInsights(items);
-  const due = state.settings.spacedRepetition === false ? [] : dueForReview(items);
-  const card = document.querySelector("#review-card");
-  if (!due.length) {
-    card.innerHTML = '<div class="eyebrow">Spaced repetition</div><h2>Nothing due today.</h2><p>Solutions return here 30 days after a sync or completed review.</p><div class="notice">Keep solving — your next review will surface automatically.</div>';
-  } else {
-    const item = due[0];
-    const review = item.review || buildReview(item);
-    card.innerHTML = `
-      <div class="row spread"><div class="eyebrow">Due for review</div><span class="badge ${difficultyClass(item.difficulty)}">${escapeHtml(item.difficulty)}</span></div>
-      <h2>${escapeHtml(item.number)}. ${escapeHtml(item.title)}</h2>
-      <div class="due-meta"><span class="badge unknown">${escapeHtml((review.patterns || ["Review"])[0])}</span><span class="muted">due ${relativeTime(reviewDueAt(item))}</span></div>
-      <p>${escapeHtml(review.summary || review.steps?.[0] || "Reconstruct the approach, invariant, and complexity before opening the code.")}</p>
-      <div class="review-actions"><a class="button grow" href="${escapeHtml(safeUrl(item.url) || "#")}" target="_blank" rel="noreferrer">Re-solve now ↗</a><button class="button secondary" data-snooze="${escapeHtml(item.id)}">Snooze 3 days</button><button class="button secondary" data-reviewed="${escapeHtml(item.id)}">Mark reviewed</button></div>`;
-    card.querySelector("[data-snooze]").addEventListener("click", async () => { await send("SNOOZE_REVIEW", { id: item.id }); await load(); showToast("Review snoozed for 3 days."); });
-    card.querySelector("[data-reviewed]").addEventListener("click", async () => { await send("MARK_REVIEWED", { id: item.id }); await load(); showToast("Review completed. It will return in 30 days."); });
-  }
-
-  const commonPatterns = ["Arrays & Hashing", "Two Pointers", "Sliding Window", "Stack", "Binary Search", "Dynamic Programming", "Graph Traversal", "Heap", "Union-Find", "Trie", "Segment Tree"];
-  const patternCounts = new Map(insights.patterns);
-  const gaps = commonPatterns.filter((pattern) => !patternCounts.has(pattern));
-  document.querySelector("#pattern-cloud").innerHTML = [
-    ...insights.patterns.map(([pattern, count]) => `<span class="pattern-chip">${escapeHtml(pattern)}<span>${count}</span></span>`),
-    ...gaps.map((pattern) => `<span class="pattern-chip gap">${escapeHtml(pattern)}<span>0</span></span>`)
-  ].join("");
-  document.querySelector("#gap-callout").innerHTML = gaps.length
-    ? `<strong>${gaps.length} common patterns uncovered.</strong> Start with ${escapeHtml(gaps.slice(0, 3).join(", "))}.`
-    : "<strong>Strong coverage.</strong> Every common pattern in this map appears in your synced solutions.";
-
   const streak = calculateStreak(items);
   document.querySelector("#share-total").textContent = items.length;
-  document.querySelector("#share-meta").innerHTML = `<span>${streak}-day streak</span><span>${items.filter((item) => item.review).length} reviewed</span><span>${insights.languages.length} languages</span>`;
+  document.querySelector("#share-meta").innerHTML = `<span>${streak}-day streak</span><span>${queue.totalReviews} reviews</span><span>${insights.languages.length} languages</span>`;
 }
 
 function showView(view) {
@@ -287,6 +481,24 @@ document.querySelectorAll("[data-filter]").forEach((button) => button.addEventLi
   document.querySelectorAll("[data-filter]").forEach((item) => item.classList.toggle("active", item === button));
   renderList();
 }));
+document.querySelectorAll("[data-study-tab]").forEach((button) => button.addEventListener("click", () => {
+  studyTab = button.dataset.studyTab;
+  selectedStudyId = null;
+  studyRevealed = false;
+  renderStudy();
+}));
+document.querySelector("#study-pattern-filter").addEventListener("change", (event) => {
+  studyPattern = event.target.value;
+  selectedStudyId = null;
+  studyRevealed = false;
+  renderStudy();
+});
+document.querySelector("#study-difficulty-filter").addEventListener("change", (event) => {
+  studyDifficulty = event.target.value;
+  selectedStudyId = null;
+  studyRevealed = false;
+  renderStudy();
+});
 document.querySelector("#refresh").addEventListener("click", load);
 document.querySelector("#settings-link").addEventListener("click", () => send("OPEN_OPTIONS"));
 document.querySelector("#sign-out").addEventListener("click", async (event) => {

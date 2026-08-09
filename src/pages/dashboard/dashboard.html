@@ -72,6 +72,10 @@
             <section class="panel analytics-card"><div class="eyebrow">Pattern coverage</div><h2>What you practice</h2><div class="bar-list" id="pattern-breakdown"></div></section>
             <section class="panel analytics-card"><div class="eyebrow">Language breakdown</div><h2>How you solve</h2><div class="bar-list" id="language-breakdown"></div></section>
           </div>
+          <section class="panel progress-share-panel">
+            <div class="progress-share-copy"><div class="eyebrow">Share progress</div><h2>A snapshot of your repository</h2><p>Generate a local image of your solve count, streak, reviews, and languages.</p><div class="row"><button class="button" id="copy-stats">Copy image</button><button class="button secondary" id="share-stats">Share</button></div></div>
+            <div class="share-card" id="share-card"><div class="share-brand">LeetRepo</div><div class="share-total" id="share-total">0</div><div>problems solved &amp; committed</div><div class="share-meta" id="share-meta"></div></div>
+          </section>
           <section class="panel attempts-card">
             <div class="section-heading"><div><div class="eyebrow">The full path</div><h2>Attempt history</h2></div><span class="muted" id="attempt-count">0 captured</span></div>
             <div id="attempt-list"></div>
@@ -80,17 +84,31 @@
 
         <section data-view-panel="study" hidden>
           <header class="dashboard-header">
-            <div><h1>Study guide</h1><p>Thirty-second refreshers, pattern gaps, and spaced repetition from your own solutions.</p></div>
+            <div><h1>Study guide</h1><p>Recall the approach, reveal the refresher, and schedule the next repetition from your own solutions.</p></div>
           </header>
-          <div class="study-grid">
-            <section class="panel review-card" id="review-card"></section>
-            <section class="panel share-panel">
-              <div class="share-card" id="share-card"><div class="share-brand">LeetRepo</div><div class="share-total" id="share-total">0</div><div>problems solved &amp; committed</div><div class="share-meta" id="share-meta"></div></div>
-              <div class="row"><button class="button grow" id="copy-stats">Copy image</button><button class="button secondary grow" id="share-stats">Share</button></div>
-            </section>
+          <section class="study-stats" aria-label="Study summary">
+            <div class="stat"><div class="stat-value accent" id="study-due-stat">0</div><div class="stat-label">due now</div></div>
+            <div class="stat"><div class="stat-value" id="study-upcoming-stat">0</div><div class="stat-label">upcoming this week</div></div>
+            <div class="stat"><div class="stat-value" id="study-reviewed-stat">0</div><div class="stat-label">reviews completed</div></div>
+            <div class="stat"><div class="stat-value" id="study-pattern-stat">0</div><div class="stat-label">patterns in rotation</div></div>
+          </section>
+          <div class="study-workspace">
+            <aside class="panel study-queue-panel" aria-label="Review queue">
+              <div class="study-queue-header"><div><div class="eyebrow">Review queue</div><h2>Your next problems</h2></div><span class="queue-total" id="study-queue-total">0</span></div>
+              <div class="study-tabs" role="tablist" aria-label="Review timing">
+                <button class="study-tab active" role="tab" aria-selected="true" data-study-tab="due">Due <span id="study-due-tab-count">0</span></button>
+                <button class="study-tab" role="tab" aria-selected="false" data-study-tab="upcoming">Upcoming <span id="study-upcoming-tab-count">0</span></button>
+              </div>
+              <div class="study-filters">
+                <label><span>Pattern</span><select id="study-pattern-filter"><option value="All">All patterns</option></select></label>
+                <label><span>Difficulty</span><select id="study-difficulty-filter"><option value="All">All levels</option><option>Easy</option><option>Medium</option><option>Hard</option></select></label>
+              </div>
+              <div class="study-queue" id="study-queue"></div>
+            </aside>
+            <section class="panel study-session" id="study-session" aria-live="polite"></section>
           </div>
           <section class="panel coverage-card">
-            <div class="section-heading"><div><div class="eyebrow">Study-gap map</div><h2>Where you’re strong — and where you’re not</h2></div></div>
+            <div class="section-heading"><div><div class="eyebrow">Pattern coverage</div><h2>Choose what to bring back into rotation</h2><p>Coverage reflects your synced solutions and review queue—not a claim of mastery.</p></div><div class="coverage-legend"><span><i class="due"></i>Due</span><span><i class="rotation"></i>In rotation</span><span><i class="practiced"></i>Practiced</span><span><i class="unseen"></i>Unseen</span></div></div>
             <div class="pattern-cloud" id="pattern-cloud"></div>
             <div class="gap-callout" id="gap-callout"></div>
           </section>
