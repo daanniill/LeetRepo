@@ -22,6 +22,18 @@ test("listRepos returns only repositories selected for GitHub App installations"
   assert.match(calls[1], /\/user\/installations\/22\/repositories/);
 });
 
+test("listRepos rejects a GitHub App with repository administration access", async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(url);
+    return new Response(JSON.stringify({
+      installations: [{ id: 22, permissions: { contents: "write", administration: "write" } }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+  await assert.rejects(listRepos("user-access-token"), /must not request Repository administration permission/);
+  assert.equal(calls.length, 1);
+});
+
 test("listSolutionFolders imports legacy and language-folder solution paths", async (t) => {
   const replies = [
     { default_branch: "main" },

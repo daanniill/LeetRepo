@@ -26,7 +26,7 @@ OAuth state expires after 10 minutes, one-time extension exchange codes expire a
 
 ## Data sent to GitHub
 
-During sign-in, the hosted service exchanges GitHub's authorization code and verifies the repositories available through your GitHub App installations. The GitHub App requests only repository **Contents: read and write** access for repositories selected during installation.
+During sign-in, the hosted service exchanges GitHub's authorization code and verifies the repositories available through your GitHub App installations. The GitHub App requests only repository **Contents: read and write** access for repositories selected during installation. It does not request Repository administration permission and cannot use GitHub's repository-deletion endpoint.
 
 When syncing, the extension sends repository details, solution code, generated README content, and Git commit data directly to GitHub using the short-lived user access token. If repository-profile generation is enabled, LeetRepo may update the selected repository's root `README.md`. When backfilling, LeetRepo reads the selected repository's Git tree and stores matching solution metadata locally.
 
@@ -49,8 +49,8 @@ No internet-connected service can guarantee absolute security. Revoke the GitHub
 - You can keep hosted AI disabled and continue syncing basic stats-only problem READMEs.
 - Turning off AI stops future AI transmissions but preserves local history.
 - **Sign out** revokes the current LeetRepo session and removes GitHub and LeetRepo authorization tokens from this extension. It preserves your hosted account, GitHub App installation, repository preference, and local study history so you can sign in again without reinstalling the GitHub App.
-- **Delete hosted account** deletes your hosted LeetRepo account, encrypted GitHub credentials, sessions, and aggregate AI usage. It also removes local authorization while preserving local submission history. It does not uninstall the GitHub App from GitHub.
-- Uninstalling the extension removes local extension storage according to browser behavior. Synced preferences may remain in your browser-sync account, and uninstalling alone does not notify the hosted service. Use **Delete hosted account** before uninstalling if you want immediate hosted-data deletion; otherwise inactive hosted account data is removed as described above.
+- **Delete LeetRepo account** deletes your hosted account, pending credential exchanges, encrypted GitHub credentials, sessions, and aggregate AI usage; clears all LeetRepo local, synced, and session extension storage; and revokes LeetRepo's GitHub authorization. It never modifies or deletes a GitHub repository. The GitHub App installation is not uninstalled and can be removed separately in GitHub settings.
+- Uninstalling the extension removes local extension storage according to browser behavior. Synced preferences may remain in your browser-sync account, and uninstalling alone does not notify the hosted service. Use **Delete LeetRepo account** before uninstalling if you want immediate comprehensive deletion; otherwise inactive hosted account data is removed as described above.
 - You can also revoke or narrow the GitHub App installation from GitHub settings.
 
 ## Chrome Web Store Limited Use disclosure

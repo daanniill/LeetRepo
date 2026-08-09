@@ -6,6 +6,7 @@ import {
   getGitHubIdentity,
   listInstalledRepositories,
   refreshUserAccessToken,
+  revokeGitHubAppAuthorization,
   tokenExpiration
 } from "./github.js";
 import { generateExplanation, MAX_CODE_CHARACTERS } from "../src/core/llm.js";
@@ -64,6 +65,30 @@ async function authenticatedSession(request, store) {
   const session = await store.getSession(hashToken(token));
   if (!session) throw new HttpError(401, "SESSION_EXPIRED", "Your session expired. Reconnect GitHub.");
   return { token, session };
+}
+
+async function githubAccessTokenForDeletion(session, config, store, fetchImpl) {
+  const storedAccessToken = decryptSecret(session.access_token_cipher, config.tokenEncryptionKey);
+  if (new Date(session.access_expires_at).getTime() > Date.now() + 60_000) return storedAccessToken;
+  if (new Date(session.refresh_expires_at).getTime() <= Date.now()) return storedAccessToken;
+  try {
+    const refreshed = await refreshUserAccessToken({
+      refreshToken: decryptSecret(session.refresh_token_cipher, config.tokenEncryptionKey),
+      clientId: config.githubClientId,
+      clientSecret: config.githubClientSecret,
+      fetchImpl
+    });
+    await store.updateCredentials(session.github_user_id, {
+      accessTokenCipher: encryptSecret(refreshed.access_token, config.tokenEncryptionKey),
+      refreshTokenCipher: encryptSecret(refreshed.refresh_token, config.tokenEncryptionKey),
+      accessExpiresAt: tokenExpiration(refreshed.expires_in),
+      refreshExpiresAt: tokenExpiration(refreshed.refresh_token_expires_in || 15_897_600)
+    });
+    return refreshed.access_token;
+  } catch (error) {
+    if (error instanceof HttpError && error.code === "GITHUB_RECONNECT_REQUIRED") return storedAccessToken;
+    throw error;
+  }
 }
 
 function redirectWithParams(redirectUri, values) {
@@ -268,7 +293,14 @@ export function createApi({ config, store, fetchImpl = fetch }) {
       }
 
       if (request.method === "DELETE" && url.pathname === "/v1/account") {
-        const token = bearerToken(request);
+        const { token, session } = await authenticatedSession(request, store);
+        const accessToken = await githubAccessTokenForDeletion(session, config, store, fetchImpl);
+        await revokeGitHubAppAuthorization({
+          accessToken,
+          clientId: config.githubClientId,
+          clientSecret: config.githubClientSecret,
+          fetchImpl
+        });
         const deleted = await store.deleteAccountForSession(hashToken(token));
         if (!deleted) throw new HttpError(401, "SESSION_EXPIRED", "Your session already expired.");
         return new Response(null, {

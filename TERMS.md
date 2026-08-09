@@ -76,7 +76,7 @@ Nothing in these Terms excludes or limits liability that cannot legally be exclu
 
 ## 12. Ending use
 
-You may stop using LeetRepo at any time. **Sign out** revokes the current session and removes local authorization while preserving the hosted account, GitHub App installation, settings, and local study history. **Delete hosted account** requests deletion of hosted credentials, sessions, and usage data while preserving local study history; it does not uninstall the GitHub App from GitHub. Uninstalling without deleting the hosted account does not notify the hosted service, and inactive data is removed under the retention schedule in the Privacy Notice. Provisions that by their nature should survive will continue to apply, including ownership, warranty disclaimers, and liability limitations.
+You may stop using LeetRepo at any time. **Sign out** revokes the current session and removes local authorization while preserving the hosted account, GitHub App installation, settings, and local study history. **Delete LeetRepo account** requests deletion of hosted credentials, sessions, and usage data, clears LeetRepo extension storage, and revokes the user's GitHub authorization. It does not modify or delete repositories, and it does not uninstall the GitHub App installation, which can be removed separately in GitHub settings. Uninstalling without deleting the account does not notify the hosted service, and inactive data is removed under the retention schedule in the Privacy Notice. Provisions that by their nature should survive will continue to apply, including ownership, warranty disclaimers, and liability limitations.
 
 ## 13. Changes to these Terms
 

@@ -1,4 +1,6 @@
+import { Buffer } from "node:buffer";
 import { HttpError } from "./errors.js";
+import { assertSafeGitHubAppPermissions } from "../src/core/github-permissions.js";
 
 const GITHUB_API = "https://api.github.com";
 const GITHUB_LOGIN = "https://github.com/login";
@@ -66,6 +68,7 @@ export async function getGitHubIdentity(accessToken, fetchImpl = fetch) {
 
 export async function listInstalledRepositories(accessToken, fetchImpl = fetch) {
   const installations = await githubApi("/user/installations?per_page=100", accessToken, fetchImpl);
+  assertSafeGitHubAppPermissions(installations.installations);
   const repositories = [];
   for (const installation of installations.installations || []) {
     let page = 1;
@@ -78,4 +81,20 @@ export async function listInstalledRepositories(accessToken, fetchImpl = fetch) 
   }
   const unique = new Map(repositories.map((repository) => [repository.id, repository]));
   return [...unique.values()].sort((left, right) => left.full_name.localeCompare(right.full_name));
+}
+
+export async function revokeGitHubAppAuthorization({ accessToken, clientId, clientSecret, fetchImpl = fetch }) {
+  const response = await fetchImpl(`${GITHUB_API}/applications/${encodeURIComponent(clientId)}/grant`, {
+    method: "DELETE",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+      "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    },
+    body: JSON.stringify({ access_token: accessToken })
+  });
+  if (response.status === 404) return false;
+  await jsonResponse(response, `GitHub authorization could not be revoked (${response.status}).`);
+  return true;
 }

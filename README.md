@@ -82,7 +82,7 @@ Create a GitHub App under an organization you control with these settings:
 - Set the callback URL to `https://leetrepo.onrender.com/v1/auth/github/callback`, replacing the origin if needed.
 - Grant only **Repository permissions → Contents: Read and write**. Metadata read access is included by GitHub.
 - Disable the webhook; LeetRepo does not subscribe to events.
-- Do not grant Administration permission. Users create the destination repository on GitHub before installing LeetRepo.
+- Do not grant Administration permission. LeetRepo rejects installations that report this permission, and without it the app cannot call GitHub's repository-deletion endpoint. Users create the destination repository on GitHub before installing LeetRepo.
 
 Set the app slug, client ID, and client secret in the server environment. The client secret and refresh tokens must never be added to extension code. The backend stores the refresh token encrypted; the extension receives a short-lived user access token and sends Git commit requests directly to GitHub.
 
@@ -107,7 +107,7 @@ The API provides:
 - A structured AI endpoint that owns the model and prompt; it is not an arbitrary LLM proxy.
 - Atomic per-user daily/monthly quotas plus a global per-minute guardrail.
 - Current-session revocation through **Sign out**, without removing the GitHub App installation.
-- Account deletion through the separate **Delete hosted account** action.
+- Comprehensive account deletion that clears extension storage, revokes GitHub authorization, and deletes hosted data without changing repositories. The GitHub App installation remains until the user removes it in GitHub settings.
 
 ## Optional AI-generated READMEs
 
@@ -126,6 +126,7 @@ When enabled:
 ## Data handling and safety
 
 - GitHub App refresh tokens are encrypted by the hosted service. Short-lived GitHub access tokens and opaque LeetRepo session tokens stay in local extension storage and are not synced.
+- The GitHub App has Contents read/write access but no Repository administration permission, so it cannot delete a GitHub repository.
 - Shareable stats are rendered locally and copied or shared only after an explicit click.
 - Repository-profile generation is opt-in because it replaces the destination repository's root `README.md`.
 - Before moving a GitHub branch, LeetRepo reads the proposed tree back and aborts unless every existing repository file is still present and unchanged.

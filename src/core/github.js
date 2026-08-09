@@ -1,4 +1,5 @@
 import { buildProfileReadme, buildReadme, folderFor, formatCommit, languageFolderFor, normalizeSubmission, sameProblem } from "./submissions.js";
+import { assertSafeGitHubAppPermissions } from "./github-permissions.js";
 
 const API = "https://api.github.com";
 const MAX_BRANCH_UPDATE_ATTEMPTS = 3;
@@ -25,6 +26,7 @@ async function request(token, path, init = {}) {
 
 export async function listRepos(token) {
   const installations = await request(token, "/user/installations?per_page=100");
+  assertSafeGitHubAppPermissions(installations.installations);
   const repositories = [];
   for (const installation of installations.installations || []) {
     let page = 1;

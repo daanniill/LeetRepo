@@ -80,7 +80,7 @@ document.querySelector("#sign-out").addEventListener("click", async () => {
   }
 });
 document.querySelector("#delete-account").addEventListener("click", async () => {
-  if (!globalThis.confirm("Delete your hosted LeetRepo account, encrypted GitHub credentials, sessions, and AI usage? Your local study history and GitHub App installation will remain.")) return;
+  if (!globalThis.confirm("Permanently delete your LeetRepo account and all LeetRepo data stored in this browser, and revoke GitHub authorization? Existing GitHub repositories and their contents will not be changed. The GitHub App installation will remain until you remove it in GitHub settings.")) return;
   const button = document.querySelector("#delete-account");
   setBusy(button, true, "Deleting…");
   try {

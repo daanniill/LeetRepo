@@ -187,3 +187,39 @@ test("sign out revokes only the current hosted session", async () => {
   assert.ok(deletedSessionHash);
   assert.equal(accountDeleted, false);
 });
+
+test("account deletion revokes GitHub authorization without touching repositories", async () => {
+  const key = config().tokenEncryptionKey;
+  const calls = [];
+  let accountDeleted = false;
+  const store = baseStore({
+    async getSession() {
+      return {
+        github_user_id: "42",
+        github_login: "alex-c",
+        access_token_cipher: encryptSecret("ghu_access", key),
+        refresh_token_cipher: encryptSecret("ghr_refresh", key),
+        access_expires_at: new Date(Date.now() + 3_600_000),
+        refresh_expires_at: new Date(Date.now() + 86_400_000)
+      };
+    },
+    async deleteAccountForSession() { accountDeleted = true; return true; }
+  });
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url, init, body: init.body ? JSON.parse(init.body) : null });
+    if (url.endsWith("/applications/client-id/grant")) return new Response(null, { status: 204 });
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+  const api = createApi({ config: config(), store, fetchImpl });
+  const response = await api(new Request("https://api.leetrepo.app/v1/account", {
+    method: "DELETE",
+    headers: { Authorization: "Bearer session-token" }
+  }));
+  assert.equal(response.status, 204);
+  assert.equal(accountDeleted, true);
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ["/applications/client-id/grant"]);
+  assert.equal(calls[0].init.method, "DELETE");
+  assert.deepEqual(calls[0].body, { access_token: "ghu_access" });
+  assert.match(calls[0].init.headers.Authorization, /^Basic /);
+  assert.equal(calls.some((call) => new URL(call.url).pathname.startsWith("/repos/")), false);
+});

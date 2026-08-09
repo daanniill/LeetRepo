@@ -2,12 +2,14 @@ import { aiLimitReached, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, n
 import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.js";
 import { beginHostedGitHubSignIn, hostedRequest, newRequestId } from "../core/service.js";
 import { hasCompletedOnboarding } from "../core/auth.js";
+import { clearLeetRepoStorage } from "../core/storage.js";
 
 const getLocal = (keys) => chrome.storage.local.get(keys);
 const setLocal = (value) => chrome.storage.local.set(value);
 const getSync = (keys) => chrome.storage.sync.get(keys);
 const setSync = (value) => chrome.storage.sync.set(value);
 let localMutationQueue = Promise.resolve();
+let accountDeletionInProgress = false;
 
 async function getGitHubAccessToken() {
   const { githubAccessToken, githubAccessTokenExpiresAt, leetrepoSessionToken } = await getLocal([
@@ -125,7 +127,10 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
 });
 
 function mutateLocal(update) {
-  const task = localMutationQueue.then(update);
+  const task = localMutationQueue.then(() => {
+    if (accountDeletionInProgress) throw new Error("Account deletion is in progress.");
+    return update();
+  });
   localMutationQueue = task.catch(() => {});
   return task;
 }
@@ -172,7 +177,7 @@ async function recordPush(submission, result, review, settings) {
   });
 }
 
-async function clearAuthentication({ clearRepository = false } = {}) {
+async function clearAuthentication() {
   await chrome.storage.local.remove([
     "leetrepoSessionToken",
     "githubAccessToken",
@@ -185,12 +190,14 @@ async function clearAuthentication({ clearRepository = false } = {}) {
   await setSync({ settings: {
     ...settings,
     connected: false,
-    aiEnabled: false,
-    ...(clearRepository ? { owner: "", repo: "", branch: "" } : {})
+    aiEnabled: false
   } });
 }
 
 async function handle(message) {
+  if (accountDeletionInProgress && message.type !== "DELETE_ACCOUNT") {
+    throw new Error("Account deletion is in progress.");
+  }
   switch (message.type) {
     case "GET_STATE": {
       const [{ settings }, local, usage] = await Promise.all([
@@ -363,12 +370,19 @@ async function handle(message) {
       return { ok: true };
     }
     case "DELETE_ACCOUNT": {
-      const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
-      if (leetrepoSessionToken) {
-        await hostedRequest("/v1/account", { method: "DELETE", sessionToken: leetrepoSessionToken });
+      if (accountDeletionInProgress) throw new Error("Account deletion is already in progress.");
+      accountDeletionInProgress = true;
+      try {
+        const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
+        if (leetrepoSessionToken) {
+          await hostedRequest("/v1/account", { method: "DELETE", sessionToken: leetrepoSessionToken });
+        }
+        await localMutationQueue;
+        await clearLeetRepoStorage(chrome.storage);
+        return { ok: true };
+      } finally {
+        accountDeletionInProgress = false;
       }
-      await clearAuthentication({ clearRepository: true });
-      return { ok: true };
     }
     case "OPEN_DASHBOARD":
       {

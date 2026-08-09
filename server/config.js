@@ -60,4 +60,3 @@ export function loadConfig(env = process.env) {
     maxRequestBytes: integer(env, "MAX_REQUEST_BYTES", 64 * 1024, 1024)
   };
 }
-

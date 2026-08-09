@@ -196,9 +196,15 @@ export class DataStore {
 
   async deleteAccountForSession(sessionHash) {
     const result = await this.pool.query(
-      `DELETE FROM users
-       WHERE github_user_id = (
+      `WITH account AS (
          SELECT github_user_id FROM sessions WHERE token_hash = $1 AND expires_at > NOW()
+       ), deleted_exchanges AS (
+         DELETE FROM auth_exchanges
+         WHERE github_user_id = (SELECT github_user_id FROM account)
+       )
+       DELETE FROM users
+       WHERE github_user_id = (
+         SELECT github_user_id FROM account
        )
        RETURNING github_user_id`,
       [sessionHash]
