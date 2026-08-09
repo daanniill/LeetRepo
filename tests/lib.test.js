@@ -12,10 +12,12 @@ import {
   historyInsights,
   isSubmissionPushReady,
   languageFolderFor,
+  mergeSubmissionSolutions,
   normalizeSubmission,
   normalizeTheme,
   relativeTime,
   sameProblem,
+  submissionSolutions,
   slugify
 } from "../src/core/submissions.js";
 
@@ -59,6 +61,36 @@ test("normalizeSubmission maps languages to extensions", () => {
 test("problem identity is stable when a title or slug changes", () => {
   assert.equal(sameProblem(submission, { ...submission, title: "Trapping Rainwater", slug: "trapping-rainwater" }), true);
   assert.equal(sameProblem(submission, { ...submission, number: 43 }), false);
+});
+
+test("problem records retain language variants and default to the latest solution", () => {
+  const merged = mergeSubmissionSolutions(
+    { ...submission, language: "Python3", code: "return 1", syncedAt: "2026-08-01T10:00:00.000Z" },
+    { ...submission, language: "C++", code: "return 2;", syncedAt: "2026-08-07T10:00:00.000Z" }
+  );
+  assert.equal(merged.language, "C++");
+  assert.equal(merged.code, "return 2;");
+  assert.deepEqual(submissionSolutions(merged).map((solution) => solution.language), ["C++", "Python3"]);
+});
+
+test("repository backfill enriches an existing language without duplicating it", () => {
+  const merged = mergeSubmissionSolutions(
+    { ...submission, title: "Trapping Rain Water", language: "C++", code: "return 1;", syncedAt: "2026-08-07T10:00:00.000Z" },
+    {
+      number: 42,
+      title: "Trapping Rain Water From Folder",
+      slug: "trapping-rain-water",
+      language: "C++",
+      extension: "cpp",
+      path: "0042-trapping-rain-water/cpp/solution.cpp",
+      commitUrl: "https://github.com/alex-c/solutions/tree/main/0042-trapping-rain-water/cpp",
+      syncedAt: "2026-08-07T10:00:00.000Z"
+    }
+  );
+  assert.equal(merged.title, "Trapping Rain Water");
+  assert.equal(merged.code, "return 1;");
+  assert.equal(submissionSolutions(merged).length, 1);
+  assert.equal(submissionSolutions(merged)[0].path, "0042-trapping-rain-water/cpp/solution.cpp");
 });
 
 test("push readiness requires code from a freshly accepted LeetCode submission", () => {

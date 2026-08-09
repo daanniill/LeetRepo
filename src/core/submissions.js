@@ -70,7 +70,7 @@ export function normalizeSubmission(input = {}) {
   const number = String(input.number || "0").replace(/\D/g, "") || "0";
   const title = String(input.title || "Untitled problem").trim();
   const language = String(input.language || "text").trim();
-  return {
+  const item = {
     id: `${number}-${slugify(title)}`,
     number,
     title,
@@ -78,6 +78,7 @@ export function normalizeSubmission(input = {}) {
     difficulty: ["Easy", "Medium", "Hard"].includes(input.difficulty) ? input.difficulty : "Unknown",
     language,
     extension: LANGUAGE_EXTENSIONS[language.toLowerCase()] || "txt",
+    path: String(input.path || "").trim(),
     code: String(input.code || "").trimEnd(),
     runtime: String(input.runtime || "—"),
     memory: String(input.memory || "—"),
@@ -94,6 +95,98 @@ export function normalizeSubmission(input = {}) {
     review: input.review && typeof input.review === "object" ? input.review : null,
     reviewDueAt: input.reviewDueAt || null,
     lastReviewedAt: input.lastReviewedAt || null
+  };
+  item.solutions = Array.isArray(input.solutions)
+    ? input.solutions.map((solution) => normalizeSolution(solution, item))
+    : [];
+  return item;
+}
+
+function normalizeSolution(input = {}, fallback = {}) {
+  const language = String(input.language || fallback.language || "text").trim();
+  const extension = String(input.extension || LANGUAGE_EXTENSIONS[language.toLowerCase()] || fallback.extension || "txt").toLowerCase();
+  const path = String(input.path || "").trim();
+  return {
+    key: String(input.key || `${language.toLowerCase()}:${extension}`),
+    path,
+    language,
+    extension,
+    code: String(input.code || "").trimEnd(),
+    runtime: String(input.runtime || "—"),
+    memory: String(input.memory || "—"),
+    status: input.status || "Accepted",
+    solvedAt: input.solvedAt || input.syncedAt || null,
+    syncedAt: input.syncedAt || null,
+    commitUrl: input.commitUrl || "",
+    commitSha: input.commitSha || "",
+    review: input.review && typeof input.review === "object" ? input.review : null
+  };
+}
+
+function mergeSolution(left, right) {
+  const next = { ...left };
+  for (const [key, value] of Object.entries(right)) {
+    if (value !== "" && value !== null && value !== "—") next[key] = value;
+  }
+  return next;
+}
+
+export function submissionSolutions(input = {}) {
+  const item = normalizeSubmission(input);
+  const variants = new Map(item.solutions.map((solution) => [solution.key, solution]));
+  const current = normalizeSolution(item);
+  variants.set(current.key, variants.has(current.key) ? mergeSolution(variants.get(current.key), current) : current);
+  return [...variants.values()].sort((left, right) => {
+    const dateDifference = (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0);
+    return dateDifference || left.key.localeCompare(right.key);
+  });
+}
+
+export function mergeSubmissionSolutions(existing = {}, incoming = {}) {
+  const hasPrevious = Object.keys(existing).length > 0;
+  const previous = normalizeSubmission(existing);
+  const update = normalizeSubmission(incoming);
+  const variants = new Map();
+  const previousSolutions = hasPrevious ? submissionSolutions(previous) : [];
+  for (const solution of [...previousSolutions, ...submissionSolutions(update)]) {
+    variants.set(solution.key, variants.has(solution.key) ? mergeSolution(variants.get(solution.key), solution) : solution);
+  }
+  const solutions = [...variants.values()].sort((left, right) => {
+    const dateDifference = (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0);
+    return dateDifference || left.key.localeCompare(right.key);
+  });
+  const latest = solutions[0];
+  const difficulty = update.difficulty === "Unknown" ? previous.difficulty : update.difficulty;
+  const merged = normalizeSubmission({
+    ...previous,
+    ...update,
+    title: hasPrevious ? previous.title : update.title,
+    slug: hasPrevious ? previous.slug : update.slug,
+    difficulty,
+    url: update.url || previous.url,
+    problemContext: update.problemContext || previous.problemContext,
+    exampleInput: update.exampleInput || previous.exampleInput,
+    exampleOutput: update.exampleOutput || previous.exampleOutput,
+    notes: update.notes || previous.notes,
+    solvedAt: previous.solvedAt || update.solvedAt,
+    reviewDueAt: update.reviewDueAt || previous.reviewDueAt,
+    lastReviewedAt: update.lastReviewedAt || previous.lastReviewedAt,
+    solutions
+  });
+  return {
+    ...merged,
+    language: latest.language,
+    extension: latest.extension,
+    path: latest.path,
+    code: latest.code,
+    runtime: latest.runtime,
+    memory: latest.memory,
+    status: latest.status,
+    syncedAt: latest.syncedAt,
+    commitUrl: latest.commitUrl,
+    commitSha: latest.commitSha,
+    review: latest.review,
+    solutions
   };
 }
 

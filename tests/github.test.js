@@ -42,16 +42,24 @@ test("listSolutionFolders imports legacy and language-folder solution paths", as
       { type: "blob", path: "0001-two-sum/README.md" },
       { type: "blob", path: "0001-two-sum/cpp/solution.cpp" },
       { type: "blob", path: "notes.txt" }
-    ] }
+    ] },
+    [{ sha: "python-commit", commit: { committer: { date: "2026-08-01T10:00:00.000Z" } } }],
+    [{ sha: "cpp-commit", commit: { committer: { date: "2026-08-07T10:00:00.000Z" } } }]
   ];
-  let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(replies[calls++]), { status: 200, headers: { "content-type": "application/json" } }));
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(url);
+    return new Response(JSON.stringify(replies[calls.length - 1]), { status: 200, headers: { "content-type": "application/json" } });
+  });
   const items = await listSolutionFolders("secret", "alex-c", "solutions");
-  assert.equal(items.length, 2);
+  assert.equal(items.length, 1);
   assert.equal(items[0].title, "Two Sum");
-  assert.equal(items[0].language, "Python3");
-  assert.equal(items[1].language, "C++");
-  assert.equal(items[1].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum/cpp");
+  assert.equal(items[0].language, "C++");
+  assert.equal(items[0].syncedAt, "2026-08-07T10:00:00.000Z");
+  assert.deepEqual(items[0].solutions.map((solution) => solution.language), ["C++", "Python3"]);
+  assert.equal(items[0].solutions[0].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum/cpp");
+  assert.match(calls[2], /path=0001-two-sum%2Fsolution.py/);
+  assert.match(calls[3], /path=0001-two-sum%2Fcpp%2Fsolution.cpp/);
 });
 
 test("pushSubmission builds one tree and advances one branch ref", async (t) => {

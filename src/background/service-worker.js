@@ -1,4 +1,4 @@
-import { aiLimitReached, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
+import { aiLimitReached, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, mergeSubmissionSolutions, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
 import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.js";
 import { beginHostedGitHubSignIn, hostedRequest, newRequestId } from "../core/service.js";
 import { hasCompletedOnboarding } from "../core/auth.js";
@@ -161,16 +161,15 @@ async function recordPush(submission, result, review, settings) {
     const syncedAt = normalized.syncedAt || new Date().toISOString();
     const reviewDueAt = new Date(syncedAt);
     reviewDueAt.setUTCDate(reviewDueAt.getUTCDate() + 30);
-    const item = {
-      ...existing,
+    const item = mergeSubmissionSolutions(existing, {
       ...normalized,
       solvedAt: existing.solvedAt || normalized.solvedAt || existing.syncedAt || syncedAt,
-      review: review || normalized.review || existing.review || buildReview(normalized),
+      review: review || normalized.review || buildReview(normalized),
       syncedAt,
-      reviewDueAt: settings.spacedRepetition === false ? null : reviewDueAt.toISOString(),
       commitUrl: result.url,
       commitSha: result.sha
-    };
+    });
+    item.reviewDueAt = settings.spacedRepetition === false ? null : reviewDueAt.toISOString();
     const next = [item, ...submissions.filter((stored) => !sameProblem(stored, item))].slice(0, 500);
     await setLocal({ submissions: next, lastSubmission: item });
     return item;
@@ -271,9 +270,23 @@ async function handle(message) {
       const imported = await listSolutionFolders(accessToken, settings.owner, settings.repo, settings.branch);
       return mutateLocal(async () => {
         const { submissions = [] } = await getLocal("submissions");
-        const additions = imported.map(normalizeSubmission).filter((item) => !submissions.some((existing) => sameProblem(existing, item)));
-        await setLocal({ submissions: [...submissions, ...additions].slice(0, 500) });
-        return { imported: additions.length };
+        const next = submissions.slice();
+        let added = 0;
+        let updated = 0;
+        for (const importedItem of imported.map(normalizeSubmission)) {
+          const index = next.findIndex((existing) => sameProblem(existing, importedItem));
+          if (index === -1) {
+            next.push(mergeSubmissionSolutions({}, importedItem));
+            added += 1;
+          } else {
+            const merged = mergeSubmissionSolutions(next[index], importedItem);
+            if (JSON.stringify(merged) !== JSON.stringify(next[index])) updated += 1;
+            next[index] = merged;
+          }
+        }
+        next.sort((left, right) => (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0));
+        await setLocal({ submissions: next.slice(0, 500) });
+        return { imported: added, updated };
       });
     }
     case "PUSH_SUBMISSION": {
@@ -310,14 +323,21 @@ async function handle(message) {
       const explanation = await explanationFor({ ...normalizedSettings, includeReadme: true }, message.submission);
       const review = explanation.review || buildReview(message.submission);
       const normalized = normalizeSubmission(message.submission);
+      let updatedSubmission = null;
       await mutateLocal(async () => {
         const { submissions = [], lastSubmission } = await getLocal(["submissions", "lastSubmission"]);
         if (!submissions.some((item) => sameProblem(item, normalized))) return;
-        const next = submissions.map((item) => sameProblem(item, normalized) ? { ...item, review } : item);
-        const nextLast = lastSubmission && sameProblem(lastSubmission, normalized) ? { ...lastSubmission, review } : lastSubmission;
+        const next = submissions.map((item) => {
+          if (!sameProblem(item, normalized)) return item;
+          updatedSubmission = mergeSubmissionSolutions(item, { ...normalized, review });
+          return updatedSubmission;
+        });
+        const nextLast = lastSubmission && sameProblem(lastSubmission, normalized)
+          ? mergeSubmissionSolutions(lastSubmission, { ...normalized, review })
+          : lastSubmission;
         await setLocal({ submissions: next, lastSubmission: nextLast });
       });
-      return { review, ai: explanation.ai };
+      return { review, submission: updatedSubmission, ai: explanation.ai };
     }
     case "RECORD_ATTEMPT": {
       const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);

@@ -96,7 +96,9 @@ document.querySelector("#backfill-repository").addEventListener("click", async (
   setBusy(button, true, "Importing…");
   try {
     const result = await send("IMPORT_REPOSITORY");
-    showNotice(notice, result.imported ? `Imported ${result.imported} existing solution folders.` : "No new LeetRepo-style solution folders were found.");
+    showNotice(notice, result.imported || result.updated
+      ? `Imported ${result.imported} new problem${result.imported === 1 ? "" : "s"} and updated ${result.updated} existing problem${result.updated === 1 ? "" : "s"}.`
+      : "No new LeetRepo-style solution folders were found.");
   } catch (error) {
     showNotice(notice, error.message, true);
   } finally {

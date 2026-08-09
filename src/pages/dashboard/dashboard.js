@@ -1,10 +1,11 @@
-import { buildReview, calculateStreak, dueForReview, historyInsights, relativeTime, reviewDueAt } from "../../core/submissions.js";
+import { buildReview, calculateStreak, dueForReview, historyInsights, relativeTime, reviewDueAt, submissionSolutions } from "../../core/submissions.js";
 import { difficultyClass, escapeHtml, logo, send, setBusy } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
 let state = { settings: {}, submissions: [], attempts: [] };
 let activeFilter = "All";
 let selectedId = null;
+const selectedSolutions = new Map();
 let toastTimer;
 
 async function load() {
@@ -19,7 +20,10 @@ async function load() {
 
 function filteredItems() {
   const query = document.querySelector("#search").value.trim().toLowerCase();
-  return state.submissions.filter((item) => (activeFilter === "All" || item.difficulty === activeFilter) && (!query || `${item.number} ${item.title} ${item.language}`.toLowerCase().includes(query)));
+  return state.submissions.filter((item) => {
+    const languages = submissionSolutions(item).map((solution) => solution.language).join(" ");
+    return (activeFilter === "All" || item.difficulty === activeFilter) && (!query || `${item.number} ${item.title} ${languages}`.toLowerCase().includes(query));
+  });
 }
 
 function safeUrl(value) {
@@ -103,40 +107,54 @@ function renderDetail(item) {
     panel.innerHTML = '<div class="empty"><strong>No problem selected</strong>Choose a synced solution to review it.</div>';
     return;
   }
-  const review = item.review || buildReview(item);
+  const solutions = submissionSolutions(item);
+  const selectedKey = selectedSolutions.get(item.id);
+  const solution = solutions.find((candidate) => candidate.key === selectedKey) || solutions[0];
+  const selectedItem = { ...item, ...solution };
+  selectedSolutions.set(item.id, solution.key);
+  const review = selectedItem.review || buildReview(selectedItem);
   const steps = review.approach || review.steps || [];
   const aiEnabled = state.settings.aiEnabled === true;
   const aiBlocked = aiEnabled && state.ai?.limitReached === true;
   const feedbackLabel = aiBlocked
     ? "AI tier limit reached"
     : aiEnabled
-      ? item.review ? "Regenerate AI feedback" : "Get AI feedback"
-      : item.review ? "Regenerate local feedback" : "Get local feedback";
-  const commitUrl = safeUrl(item.commitUrl);
-  const problemUrl = leetcodeProblemUrl(item);
+      ? selectedItem.review ? "Regenerate AI feedback" : "Get AI feedback"
+      : selectedItem.review ? "Regenerate local feedback" : "Get local feedback";
+  const commitUrl = safeUrl(selectedItem.commitUrl);
+  const problemUrl = leetcodeProblemUrl(selectedItem);
   panel.innerHTML = `
     <div class="eyebrow">${review.generatedBy ? "AI overview" : "Interview overview"}</div>
-    <h2>${escapeHtml(item.number)}. ${escapeHtml(item.title)}</h2>
-    <div class="detail-meta">${escapeHtml(item.language)} · ${escapeHtml(item.runtime)} · ${escapeHtml(item.memory)}</div>
+    <h2>${escapeHtml(selectedItem.number)}. ${escapeHtml(selectedItem.title)}</h2>
+    <div class="detail-solution-row">
+      <div class="detail-meta">${escapeHtml(selectedItem.runtime)} · ${escapeHtml(selectedItem.memory)}</div>
+      ${solutions.length > 1 ? `<label class="language-picker"><span>Language</span><select id="language-select" aria-label="Select solution language">${solutions.map((candidate) => `<option value="${escapeHtml(candidate.key)}" ${candidate.key === solution.key ? "selected" : ""}>${escapeHtml(candidate.language)}</option>`).join("")}</select></label>` : `<span class="detail-language">${escapeHtml(selectedItem.language)}</span>`}
+    </div>
     <p class="detail-summary">${escapeHtml(review.summary || "Use the replay steps below to reconstruct the solution.")}</p>
     <div class="patterns">${(review.patterns || []).map((pattern) => `<span class="badge unknown">${escapeHtml(pattern)}</span>`).join("")}</div>
     ${review.complexity?.time ? `<div class="complexity-strip"><span><small>Time</small>${escapeHtml(review.complexity.time)}</span><span><small>Space</small>${escapeHtml(review.complexity.space)}</span></div>` : ""}
     ${review.complexityCheck?.verdict === "suboptimal" ? `<div class="complexity-warning"><strong>Suboptimal solution detected</strong><br>${escapeHtml(review.complexityCheck.note || "Compare this solution with the intended pattern.")}</div>` : ""}
     <ol class="review-steps">${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
-    ${item.notes ? `<div class="personal-note"><strong>Personal note</strong><br>${escapeHtml(item.notes)}</div>` : ""}
+    ${selectedItem.notes ? `<div class="personal-note"><strong>Personal note</strong><br>${escapeHtml(selectedItem.notes)}</div>` : ""}
     <div class="detail-actions">
-      ${item.code ? `<button class="button full" id="regenerate-feedback" ${aiBlocked ? "disabled" : ""}>${feedbackLabel}</button>` : ""}
+      ${selectedItem.code ? `<button class="button full" id="regenerate-feedback" ${aiBlocked ? "disabled" : ""}>${feedbackLabel}</button>` : ""}
       ${problemUrl ? `<a class="button secondary full" href="${escapeHtml(problemUrl)}" target="_blank" rel="noreferrer">View on LeetCode ↗</a>` : ""}
       ${commitUrl ? `<a class="button secondary full" href="${escapeHtml(commitUrl)}" target="_blank" rel="noreferrer">View on GitHub ↗</a>` : ""}
     </div>`;
-  document.querySelector("#regenerate-feedback")?.addEventListener("click", (event) => regenerateFeedback(item, event.currentTarget));
+  document.querySelector("#language-select")?.addEventListener("change", (event) => {
+    selectedSolutions.set(item.id, event.target.value);
+    renderDetail(item);
+  });
+  document.querySelector("#regenerate-feedback")?.addEventListener("click", (event) => regenerateFeedback(selectedItem, event.currentTarget));
 }
 
 async function regenerateFeedback(item, button) {
   setBusy(button, true, "Reviewing…");
   try {
     const response = await send("GENERATE_FEEDBACK", { submission: item });
-    item.review = response.review;
+    if (response.submission) {
+      state.submissions = state.submissions.map((stored) => stored.id === response.submission.id ? response.submission : stored);
+    }
     state.ai = { ...state.ai, ...response.ai };
     render();
     showToast(response.ai?.generated ? "AI feedback updated." : "Local interview overview updated.");

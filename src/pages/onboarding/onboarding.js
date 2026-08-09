@@ -86,8 +86,8 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
     }});
     if (document.querySelector("#setup-backfill").checked) {
       const imported = await send("IMPORT_REPOSITORY");
-      document.querySelector("#finish-step p").textContent = imported.imported
-        ? `Imported ${imported.imported} existing solution folders. Open any LeetCode problem to keep syncing.`
+      document.querySelector("#finish-step p").textContent = imported.imported || imported.updated
+        ? `Imported ${imported.imported} new problem${imported.imported === 1 ? "" : "s"} and updated ${imported.updated} existing problem${imported.updated === 1 ? "" : "s"}. Open any LeetCode problem to keep syncing.`
         : "No LeetRepo-style solution folders were found. Open any LeetCode problem to start syncing.";
     }
     showStep(2);

@@ -53,6 +53,10 @@
 .detail-panel > * { animation: detail-enter .32s var(--ease-out) both; }
 .detail-panel h2 { margin: 8px 0 4px; font-size: 21px; line-height: 1.15; }
 .detail-meta { color: var(--muted); font-size: 11px; }
+.detail-solution-row { min-height: 31px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.detail-language { color: var(--muted); font: 10px ui-monospace, monospace; }
+.language-picker { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.language-picker select { min-height: 31px; max-width: 150px; padding: 0 28px 0 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--text); background: var(--surface); font: 10px ui-monospace, monospace; cursor: pointer; }
 .detail-summary { margin: 15px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .complexity-strip { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 12px 0; }
 .complexity-strip span { min-width: 0; padding: 9px 10px; border-radius: 14px; background: var(--surface); font: 11px/1.4 ui-monospace, monospace; overflow-wrap: anywhere; }

@@ -50,8 +50,13 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
   const selectedBranch = branch || info.default_branch || "main";
   const tree = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(selectedBranch)}?recursive=1`);
   if (tree.truncated) throw new Error("This repository is too large to backfill safely in one request.");
-  const languages = { py: "Python3", cpp: "C++", java: "Java", js: "JavaScript", ts: "TypeScript", go: "Go", rs: "Rust", cs: "C#", kt: "Kotlin", swift: "Swift", rb: "Ruby", php: "PHP" };
-  return (tree.tree || []).flatMap((entry) => {
+  const languages = {
+    bash: "Bash", sh: "Bash", c: "C", cpp: "C++", csharp: "C#", cs: "C#", dart: "Dart", elixir: "Elixir", ex: "Elixir",
+    erlang: "Erlang", erl: "Erlang", go: "Go", java: "Java", javascript: "JavaScript", js: "JavaScript", kotlin: "Kotlin", kt: "Kotlin",
+    mysql: "MySQL", sql: "SQL", php: "PHP", python: "Python3", python3: "Python3", py: "Python3", racket: "Racket", rkt: "Racket",
+    ruby: "Ruby", rb: "Ruby", rust: "Rust", rs: "Rust", scala: "Scala", swift: "Swift", typescript: "TypeScript", ts: "TypeScript"
+  };
+  const solutions = (tree.tree || []).flatMap((entry) => {
     const match = entry.type === "blob" && entry.path.match(/^(\d{4,})-([^/]+)\/(?:(?:([^/]+)\/)?solution\.([A-Za-z0-9]+))$/);
     if (!match) return [];
     const [, number, slug, languageFolder, extension] = match;
@@ -60,11 +65,33 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
       title: slug.split("-").map((part) => part ? part[0].toUpperCase() + part.slice(1) : "").join(" "),
       slug,
       difficulty: "Unknown",
-      language: languages[extension.toLowerCase()] || extension.toUpperCase(),
-      extension,
+      language: languages[languageFolder?.toLowerCase()] || languages[extension.toLowerCase()] || extension.toUpperCase(),
+      extension: extension.toLowerCase(),
+      path: entry.path,
       status: "Accepted",
       commitUrl: `https://github.com/${owner}/${repo}/tree/${encodeURIComponent(selectedBranch)}/${number}-${slug}${languageFolder ? `/${encodeURIComponent(languageFolder)}` : ""}`
     }];
+  });
+  const grouped = new Map();
+  for (const solution of solutions) {
+    const key = solution.number;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(solution);
+  }
+  const duplicateSolutions = [...grouped.values()].filter((items) => items.length > 1).flat();
+  await Promise.all(duplicateSolutions.map(async (solution) => {
+    const commits = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?sha=${encodeURIComponent(selectedBranch)}&path=${encodeURIComponent(solution.path)}&per_page=1`);
+    const latest = commits[0];
+    solution.syncedAt = latest?.commit?.committer?.date || latest?.commit?.author?.date || null;
+    solution.commitSha = latest?.sha || "";
+  }));
+  return [...grouped.values()].map((items) => {
+    const variants = items.slice().sort((left, right) => {
+      const dateDifference = (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0);
+      return dateDifference || left.path.localeCompare(right.path);
+    });
+    const latest = variants[0];
+    return { ...latest, solutions: variants };
   });
 }
 
