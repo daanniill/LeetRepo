@@ -111,9 +111,16 @@ test("README defaults to basic LeetCode stats without a diagram", () => {
   const readme = buildReadme(submission);
   assert.match(readme, /# 42\. Trapping Rain Water/);
   assert.match(readme, /\*\*Runtime:\*\* 52 ms/);
+  assert.match(readme, /## Problem description/);
+  assert.match(readme, /Given an elevation map, compute how much rain water it can trap\./);
   assert.match(readme, /View problem on LeetCode/);
   assert.doesNotMatch(readme, /Interview overview/);
   assert.doesNotMatch(readme, /```mermaid/);
+});
+
+test("README omits an empty problem description", () => {
+  const readme = buildReadme({ ...submission, problemContext: "" });
+  assert.doesNotMatch(readme, /## Problem description/);
 });
 
 test("README respects disabled optional sections", () => {

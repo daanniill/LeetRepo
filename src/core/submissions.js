@@ -394,6 +394,7 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
   const solvedAt = formatSolvedAt(item.solvedAt);
   if (solvedAt) lines.push(`- **Solved:** ${solvedAt}`);
   if (settings.includeStats !== false) lines.push(`- **Runtime:** ${item.runtime}`, `- **Memory:** ${item.memory}`);
+  if (item.problemContext) lines.push("", "## Problem description", "", item.problemContext);
   if (settings.aiEnabled === true && suppliedReview) {
     const review = suppliedReview;
     lines.push("", "## Interview overview", "", `**Patterns:** ${review.patterns.join(", ")}`, "");
