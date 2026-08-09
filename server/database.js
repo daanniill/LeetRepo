@@ -190,6 +190,10 @@ export class DataStore {
     );
   }
 
+  async deleteSession(sessionHash) {
+    await this.pool.query("DELETE FROM sessions WHERE token_hash = $1", [sessionHash]);
+  }
+
   async deleteAccountForSession(sessionHash) {
     const result = await this.pool.query(
       `DELETE FROM users

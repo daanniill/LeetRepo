@@ -1,6 +1,7 @@
 import { aiLimitReached, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
 import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.js";
 import { beginHostedGitHubSignIn, hostedRequest, newRequestId } from "../core/service.js";
+import { hasCompletedOnboarding } from "../core/auth.js";
 
 const getLocal = (keys) => chrome.storage.local.get(keys);
 const setLocal = (value) => chrome.storage.local.set(value);
@@ -40,8 +41,9 @@ function normalizeSettings(value = {}) {
   };
 }
 
-function emptyHostedUsage() {
+function emptyHostedUsage(authenticationRequired = false) {
   return {
+    authenticationRequired,
     plan: "free",
     daily: { requests: 0, inputTokens: 0, outputTokens: 0, limit: 3 },
     monthly: { requests: 0, inputTokens: 0, outputTokens: 0, limit: 30 }
@@ -53,8 +55,8 @@ async function hostedUsage() {
   if (!leetrepoSessionToken) return emptyHostedUsage();
   try {
     return await hostedRequest("/v1/ai/usage", { sessionToken: leetrepoSessionToken });
-  } catch {
-    return emptyHostedUsage();
+  } catch (error) {
+    return emptyHostedUsage(error.status === 401);
   }
 }
 
@@ -170,6 +172,24 @@ async function recordPush(submission, result, review, settings) {
   });
 }
 
+async function clearAuthentication({ clearRepository = false } = {}) {
+  await chrome.storage.local.remove([
+    "leetrepoSessionToken",
+    "githubAccessToken",
+    "githubAccessTokenExpiresAt",
+    "githubDeviceFlow",
+    "githubToken",
+    "githubUser"
+  ]);
+  const { settings = {} } = await getSync("settings");
+  await setSync({ settings: {
+    ...settings,
+    connected: false,
+    aiEnabled: false,
+    ...(clearRepository ? { owner: "", repo: "", branch: "" } : {})
+  } });
+}
+
 async function handle(message) {
   switch (message.type) {
     case "GET_STATE": {
@@ -178,29 +198,40 @@ async function handle(message) {
         getLocal(["submissions", "lastSubmission", "attempts", "submissionNotes", "leetrepoSessionToken"]),
         hostedUsage()
       ]);
-      const connected = Boolean(local.leetrepoSessionToken);
+      const connected = hasCompletedOnboarding(settings, local.leetrepoSessionToken) && usage.authenticationRequired !== true;
+      if (usage.authenticationRequired) {
+        await chrome.storage.local.remove(["leetrepoSessionToken", "githubAccessToken", "githubAccessTokenExpiresAt", "githubUser"]);
+        await setSync({ settings: { ...settings, connected: false, aiEnabled: false } });
+      }
+      const { authenticationRequired: _authenticationRequired, ...visibleUsage } = usage;
       return {
-        settings: normalizeSettings({ ...settings, connected: settings?.connected === true && connected }),
+        settings: normalizeSettings({ ...settings, connected }),
         submissions: local.submissions || [],
         attempts: local.attempts || [],
         notes: local.submissionNotes || {},
         lastSubmission: local.lastSubmission || null,
         ai: {
           available: connected,
-          usage,
-          limitReached: aiLimitReached(usage)
+          usage: visibleUsage,
+          limitReached: aiLimitReached(visibleUsage)
         }
       };
     }
     case "SAVE_SETTINGS": {
-      const { settings = {} } = await getSync("settings");
+      const [{ settings = {} }, { leetrepoSessionToken }] = await Promise.all([
+        getSync("settings"),
+        getLocal("leetrepoSessionToken")
+      ]);
       const requested = { ...settings, ...(message.settings || {}) };
+      if (requested.connected === true && !hasCompletedOnboarding(requested, leetrepoSessionToken)) {
+        throw new Error("Sign in with GitHub and choose an installed repository before finishing setup.");
+      }
       if (requested.aiEnabled === true && requested.aiConsent !== true) {
         throw new Error("Consent to hosted AI processing before enabling AI explanations.");
       }
-      const next = normalizeSettings(requested);
+      const next = normalizeSettings({ ...requested, connected: hasCompletedOnboarding(requested, leetrepoSessionToken) });
       await setSync({ settings: next });
-      return { settings: next, ai: { available: true } };
+      return { settings: next, ai: { available: next.connected } };
     }
     case "START_GITHUB_SIGN_IN": {
       const result = await beginHostedGitHubSignIn({
@@ -222,8 +253,14 @@ async function handle(message) {
       return { repos: await listRepos(accessToken) };
     }
     case "IMPORT_REPOSITORY": {
-      const [accessToken, { settings }] = await Promise.all([getGitHubAccessToken(), getSync("settings")]);
-      if (!accessToken || !settings?.owner || !settings?.repo) throw new Error("Choose a repository before backfilling.");
+      const [accessToken, { settings }, { leetrepoSessionToken }] = await Promise.all([
+        getGitHubAccessToken(),
+        getSync("settings"),
+        getLocal("leetrepoSessionToken")
+      ]);
+      if (!accessToken || !hasCompletedOnboarding(settings, leetrepoSessionToken)) {
+        throw new Error("Finish GitHub setup before backfilling.");
+      }
       const imported = await listSolutionFolders(accessToken, settings.owner, settings.repo, settings.branch);
       return mutateLocal(async () => {
         const { submissions = [] } = await getLocal("submissions");
@@ -260,7 +297,8 @@ async function handle(message) {
       return { result, submission: await recordPush(submission, result, explanation.review, normalizedSettings), ai: explanation.ai };
     }
     case "GENERATE_FEEDBACK": {
-      const { settings } = await getSync("settings");
+      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
+      if (!hasCompletedOnboarding(settings, leetrepoSessionToken)) throw new Error("Finish GitHub setup first.");
       const normalizedSettings = normalizeSettings(settings);
       const explanation = await explanationFor({ ...normalizedSettings, includeReadme: true }, message.submission);
       const review = explanation.review || buildReview(message.submission);
@@ -275,11 +313,15 @@ async function handle(message) {
       return { review, ai: explanation.ai };
     }
     case "RECORD_ATTEMPT": {
+      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
+      if (!hasCompletedOnboarding(settings, leetrepoSessionToken)) return { attempt: null };
       const allowed = new Set(["Accepted", "Wrong Answer", "Time Limit Exceeded", "Memory Limit Exceeded", "Runtime Error", "Compile Error", "Output Limit Exceeded"]);
       if (!allowed.has(message.submission?.status) || !message.submission?.code) return { attempt: null };
       return { attempt: await recordAttempt(message.submission) };
     }
     case "SAVE_NOTES": {
+      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
+      if (!hasCompletedOnboarding(settings, leetrepoSessionToken)) throw new Error("Finish GitHub setup first.");
       const normalized = normalizeSubmission({ ...message.submission, notes: message.notes });
       return mutateLocal(async () => {
         const { submissions = [], lastSubmission, submissionNotes = {} } = await getLocal(["submissions", "lastSubmission", "submissionNotes"]);
@@ -295,6 +337,8 @@ async function handle(message) {
     }
     case "SNOOZE_REVIEW":
     case "MARK_REVIEWED": {
+      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
+      if (!hasCompletedOnboarding(settings, leetrepoSessionToken)) throw new Error("Finish GitHub setup first.");
       const id = String(message.id || "");
       return mutateLocal(async () => {
         const { submissions = [] } = await getLocal("submissions");
@@ -310,28 +354,37 @@ async function handle(message) {
         return { submissions: next };
       });
     }
-    case "DISCONNECT": {
+    case "SIGN_OUT": {
+      const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
+      if (leetrepoSessionToken) {
+        await hostedRequest("/v1/auth/session", { method: "DELETE", sessionToken: leetrepoSessionToken });
+      }
+      await clearAuthentication();
+      return { ok: true };
+    }
+    case "DELETE_ACCOUNT": {
       const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
       if (leetrepoSessionToken) {
         await hostedRequest("/v1/account", { method: "DELETE", sessionToken: leetrepoSessionToken });
       }
-      await chrome.storage.local.remove([
-        "leetrepoSessionToken",
-        "githubAccessToken",
-        "githubAccessTokenExpiresAt",
-        "githubDeviceFlow",
-        "githubToken",
-        "githubUser"
-      ]);
-      const { settings = {} } = await getSync("settings");
-      await setSync({ settings: { ...settings, connected: false, owner: "", repo: "", aiEnabled: false } });
+      await clearAuthentication({ clearRepository: true });
       return { ok: true };
     }
     case "OPEN_DASHBOARD":
-      await chrome.tabs.create({ url: chrome.runtime.getURL("src/pages/dashboard/dashboard.html") });
+      {
+        const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
+        const path = hasCompletedOnboarding(settings, leetrepoSessionToken)
+          ? "src/pages/dashboard/dashboard.html"
+          : "src/pages/onboarding/onboarding.html";
+        await chrome.tabs.create({ url: chrome.runtime.getURL(path) });
+      }
       return { ok: true };
     case "OPEN_OPTIONS":
-      await chrome.runtime.openOptionsPage();
+      {
+        const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
+        if (hasCompletedOnboarding(settings, leetrepoSessionToken)) await chrome.runtime.openOptionsPage();
+        else await chrome.tabs.create({ url: chrome.runtime.getURL("src/pages/onboarding/onboarding.html") });
+      }
       return { ok: true };
     case "OPEN_ONBOARDING":
       await chrome.tabs.create({ url: chrome.runtime.getURL("src/pages/onboarding/onboarding.html") });

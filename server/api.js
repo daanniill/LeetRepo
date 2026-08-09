@@ -75,6 +75,27 @@ function redirectWithParams(redirectUri, values) {
   });
 }
 
+function redirect(location) {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: location, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }
+  });
+}
+
+function githubCallbackUrl(config) {
+  return new URL("/v1/auth/github/callback", config.publicBaseUrl).toString();
+}
+
+async function createOAuthFlow(store, extensionRedirectUri) {
+  const state = randomToken();
+  await store.createOAuthFlow({
+    stateHash: hashToken(state),
+    extensionRedirectUri,
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+  });
+  return state;
+}
+
 function clientRepository(repository) {
   return {
     id: repository.id,
@@ -134,13 +155,10 @@ export function createApi({ config, store, fetchImpl = fetch }) {
         if (!config.extensionRedirectUris.has(redirectUri)) {
           throw new HttpError(400, "INVALID_REDIRECT", "This extension redirect URL is not allowed.");
         }
-        const state = randomToken();
-        await store.createOAuthFlow({
-          stateHash: hashToken(state),
-          extensionRedirectUri: redirectUri,
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000)
-        });
-        const authorizationUrl = new URL(`https://github.com/apps/${config.githubAppSlug}/installations/new`);
+        const state = await createOAuthFlow(store, redirectUri);
+        const authorizationUrl = new URL("https://github.com/login/oauth/authorize");
+        authorizationUrl.searchParams.set("client_id", config.githubClientId);
+        authorizationUrl.searchParams.set("redirect_uri", githubCallbackUrl(config));
         authorizationUrl.searchParams.set("state", state);
         return json({ authorizationUrl: authorizationUrl.toString() }, 200, cors);
       }
@@ -159,6 +177,7 @@ export function createApi({ config, store, fetchImpl = fetch }) {
             code,
             clientId: config.githubClientId,
             clientSecret: config.githubClientSecret,
+            redirectUri: githubCallbackUrl(config),
             fetchImpl
           });
           if (!token.refresh_token) {
@@ -169,7 +188,10 @@ export function createApi({ config, store, fetchImpl = fetch }) {
             listInstalledRepositories(token.access_token, fetchImpl)
           ]);
           if (!repositories.length) {
-            throw new HttpError(403, "NO_REPOSITORIES", "Install LeetRepo on at least one repository.");
+            const installState = await createOAuthFlow(store, flow.extension_redirect_uri);
+            const installationUrl = new URL(`https://github.com/apps/${config.githubAppSlug}/installations/new`);
+            installationUrl.searchParams.set("state", installState);
+            return redirect(installationUrl.toString());
           }
           const exchangeCode = randomToken();
           await store.createAuthExchange({
@@ -249,6 +271,15 @@ export function createApi({ config, store, fetchImpl = fetch }) {
         const token = bearerToken(request);
         const deleted = await store.deleteAccountForSession(hashToken(token));
         if (!deleted) throw new HttpError(401, "SESSION_EXPIRED", "Your session already expired.");
+        return new Response(null, {
+          status: 204,
+          headers: { ...cors, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }
+        });
+      }
+
+      if (request.method === "DELETE" && url.pathname === "/v1/auth/session") {
+        const token = bearerToken(request);
+        await store.deleteSession(hashToken(token));
         return new Response(null, {
           status: 204,
           headers: { ...cors, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }

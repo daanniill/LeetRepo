@@ -1,6 +1,6 @@
 # LeetRepo Privacy Notice
 
-Last updated: August 7, 2026
+Last updated: August 8, 2026
 
 LeetRepo is a browser extension and hosted service that reads accepted LeetCode submissions, commits user-selected content to a GitHub repository, and optionally generates AI study explanations. LeetRepo does not sell user data, serve advertising, or use browsing activity for advertising.
 
@@ -48,8 +48,9 @@ No internet-connected service can guarantee absolute security. Revoke the GitHub
 
 - You can keep hosted AI disabled and continue syncing basic stats-only problem READMEs.
 - Turning off AI stops future AI transmissions but preserves local history.
-- **Disconnect GitHub** deletes your hosted LeetRepo account, encrypted GitHub credentials, sessions, and aggregate AI usage. It also removes local authorization while preserving local submission history.
-- Uninstalling the extension removes local extension storage according to browser behavior. Synced preferences may remain in your browser-sync account, and uninstalling alone does not notify the hosted service. Disconnect before uninstalling if you want immediate hosted-data deletion; otherwise inactive hosted account data is removed as described above.
+- **Sign out** revokes the current LeetRepo session and removes GitHub and LeetRepo authorization tokens from this extension. It preserves your hosted account, GitHub App installation, repository preference, and local study history so you can sign in again without reinstalling the GitHub App.
+- **Delete hosted account** deletes your hosted LeetRepo account, encrypted GitHub credentials, sessions, and aggregate AI usage. It also removes local authorization while preserving local submission history. It does not uninstall the GitHub App from GitHub.
+- Uninstalling the extension removes local extension storage according to browser behavior. Synced preferences may remain in your browser-sync account, and uninstalling alone does not notify the hosted service. Use **Delete hosted account** before uninstalling if you want immediate hosted-data deletion; otherwise inactive hosted account data is removed as described above.
 - You can also revoke or narrow the GitHub App installation from GitHub settings.
 
 ## Chrome Web Store Limited Use disclosure

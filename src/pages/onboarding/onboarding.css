@@ -14,6 +14,7 @@
 .steps li.active { transform: translateX(4px); }
 .steps li.active > span { transform: scale(1.06); }
 .privacy-note { max-width: 440px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.5; }
+.privacy-note a, .legal-consent a { color: var(--accent-ink); font-weight: 700; }
 .setup-wrap { min-height: 100vh; padding: clamp(30px, 6vw, 86px); display: grid; place-items: center; }
 .setup-panel { width: min(100%, 720px); min-height: 560px; padding: clamp(26px, 4vw, 44px); display: flex; flex-direction: column; justify-content: center; }
 .setup-head { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-start; }
@@ -24,6 +25,11 @@
 .field-help { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .github-signin-copy h3 { margin: 0 0 7px; font-size: 18px; }
 .github-signin-copy p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.data-disclosure { padding: 14px 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-2); color: var(--muted); font-size: 11px; line-height: 1.5; }
+.data-disclosure strong { color: var(--text); }
+.data-disclosure ul { margin: 8px 0 0; padding-left: 18px; }
+.data-disclosure li + li { margin-top: 5px; }
+.legal-consent { margin: -2px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; text-align: center; }
 .connected-user { padding: 11px 13px; border-radius: 18px; background: var(--surface-2); }
 .connected-user .badge { margin-left: auto; }
 .connected-user strong, .connected-user small { display: block; }

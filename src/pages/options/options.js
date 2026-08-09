@@ -7,6 +7,10 @@ const toggleKeys = ["autoPush", "includeReadme", "includeStats", "includeLink", 
 
 async function init() {
   const state = await send("GET_STATE");
+  if (!state.settings.connected) {
+    globalThis.location.replace("../onboarding/onboarding.html");
+    return;
+  }
   const { settings } = state;
   document.querySelector("#owner").value = settings.owner || "";
   document.querySelector("#repo").value = settings.repo || "";
@@ -20,10 +24,6 @@ async function init() {
   const badge = document.querySelector("#connection-badge");
   badge.textContent = settings.connected ? "Connected" : "Not connected";
   badge.className = `badge ${settings.connected ? "accepted" : "unknown"}`;
-  const connectionButton = document.querySelector("#disconnect");
-  connectionButton.dataset.connected = String(settings.connected);
-  connectionButton.textContent = settings.connected ? "Disconnect GitHub" : "Connect GitHub";
-  connectionButton.classList.toggle("danger", settings.connected);
   const aiBadge = document.querySelector("#ai-status-badge");
   aiBadge.textContent = state.ai.limitReached ? "Tier limit reached" : state.ai.available ? "Hosted free tier" : "Sign-in required";
   aiBadge.className = `badge ${state.ai.available && !state.ai.limitReached ? "accepted" : "unknown"}`;
@@ -68,14 +68,28 @@ document.querySelectorAll('input[name="theme"]').forEach((input) => input.addEve
   }
 }));
 
-document.querySelector("#disconnect").addEventListener("click", async () => {
-  if (document.querySelector("#disconnect").dataset.connected !== "true") {
-    await send("OPEN_ONBOARDING");
-    return;
+document.querySelector("#sign-out").addEventListener("click", async () => {
+  const button = document.querySelector("#sign-out");
+  setBusy(button, true, "Signing out…");
+  try {
+    await send("SIGN_OUT");
+    globalThis.location.replace("../onboarding/onboarding.html");
+  } catch (error) {
+    showNotice(notice, error.message, true);
+    setBusy(button, false);
   }
-  await send("DISCONNECT");
-  showNotice(notice, "GitHub disconnected and hosted account data deleted. Your local history is unchanged.");
-  init();
+});
+document.querySelector("#delete-account").addEventListener("click", async () => {
+  if (!globalThis.confirm("Delete your hosted LeetRepo account, encrypted GitHub credentials, sessions, and AI usage? Your local study history and GitHub App installation will remain.")) return;
+  const button = document.querySelector("#delete-account");
+  setBusy(button, true, "Deleting…");
+  try {
+    await send("DELETE_ACCOUNT");
+    globalThis.location.replace("../onboarding/onboarding.html");
+  } catch (error) {
+    showNotice(notice, error.message, true);
+    setBusy(button, false);
+  }
 });
 document.querySelector("#backfill-repository").addEventListener("click", async () => {
   const button = document.querySelector("#backfill-repository");

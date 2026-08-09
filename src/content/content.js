@@ -343,12 +343,17 @@
   }
 
   function scheduleRefresh() {
+    if (!settings?.connected) return;
     clearTimeout(checkTimer);
     checkTimer = setTimeout(refresh, 700);
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === "GET_SUBMISSION") {
+      if (settings?.connected === false) {
+        sendResponse({ submission: null });
+        return;
+      }
       latest = extractSubmission();
       sendResponse({ submission: submissionForPush(latest) });
     }
@@ -357,8 +362,17 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes.settings) {
       settings = changes.settings.newValue;
+      if (!settings?.connected) {
+        document.getElementById(PANEL_ID)?.remove();
+        clearTimeout(checkTimer);
+        latest = null;
+        pendingSubmission = null;
+        acceptedSubmissionKey = "";
+        return;
+      }
+      mount();
       applyTheme();
-      render();
+      refresh();
     }
     if (area === "local" && changes.submissions) {
       syncedSubmissions = changes.submissions.newValue || [];
@@ -367,17 +381,18 @@
     }
   });
 
-  mount();
   chrome.runtime.sendMessage({ type: "GET_STATE" }).then((response) => {
     settings = response?.settings || {};
     ai = response?.ai || ai;
     notes = response?.notes || {};
     syncedSubmissions = response?.submissions || [];
+    if (!settings.connected) return;
+    mount();
     applyTheme();
     refresh();
   });
   document.addEventListener("click", (event) => {
-    if (!isLeetCodeSubmitButton(event.target)) return;
+    if (!settings?.connected || !isLeetCodeSubmitButton(event.target)) return;
     const submission = extractSubmission();
     if (!submission.code) return;
     acceptedSubmissionKey = "";
@@ -387,6 +402,7 @@
     render();
   }, true);
   new MutationObserver((mutations) => {
+    if (!settings?.connected) return;
     const resultStatus = pendingSubmission && Date.now() - pendingSubmission.startedAt >= 250
       ? resultStatusFromMutations(mutations)
       : null;

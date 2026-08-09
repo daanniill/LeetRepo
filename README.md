@@ -106,7 +106,8 @@ The API provides:
 - Hashed, revocable 30-day LeetRepo sessions.
 - A structured AI endpoint that owns the model and prompt; it is not an arbitrary LLM proxy.
 - Atomic per-user daily/monthly quotas plus a global per-minute guardrail.
-- Account deletion through **Disconnect GitHub**.
+- Current-session revocation through **Sign out**, without removing the GitHub App installation.
+- Account deletion through the separate **Delete hosted account** action.
 
 ## Optional AI-generated READMEs
 

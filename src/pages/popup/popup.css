@@ -3,6 +3,13 @@ html, body { width: 376px; min-height: 590px; }
 .popup-header .logo-mark { width: 27px; height: 27px; border-radius: 9px; }
 .popup-header .logo-mark svg { width: 16px; }
 .popup-main { padding: 16px; display: flex; flex-direction: column; gap: 15px; }
+.auth-gate { min-height: 500px; padding: 48px 28px 28px; display: flex; flex-direction: column; justify-content: center; gap: 22px; text-align: center; }
+.auth-gate[hidden] { display: none; }
+.auth-mark { width: 58px; height: 58px; margin: 0 auto; border-radius: 20px; display: grid; place-items: center; color: var(--bg); background: var(--accent); font: 800 14px var(--font-heading); }
+.auth-gate h1 { margin: 11px 0 9px; font-size: 26px; line-height: 1.08; }
+.auth-gate p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.auth-gate .legal-copy { font-size: 10px; }
+.auth-gate .legal-copy a, .legal-links a { color: var(--accent-ink); font-weight: 700; }
 .problem-card { padding: 15px; display: flex; flex-direction: column; gap: 13px; }
 .problem-card:hover { border-color: color-mix(in srgb, var(--accent), transparent 65%); box-shadow: 0 9px 24px color-mix(in srgb, var(--text), transparent 93%); }
 .problem-card h1 { margin: 0 0 6px; font-size: 17px; line-height: 1.2; }
@@ -20,4 +27,7 @@ html, body { width: 376px; min-height: 590px; }
 .recent-item:last-child { border-bottom: 0; }
 .recent-item time { margin-left: auto; color: var(--muted); font-size: 11px; }
 .recent-empty { color: var(--muted); font-size: 12px; padding: 10px 0; }
+.legal-links { display: flex; justify-content: center; gap: 7px; color: var(--muted); font-size: 10px; }
+.legal-links a { text-decoration: none; }
+.legal-links a:hover { text-decoration: underline; }
 @keyframes recent-enter { from { opacity: 0; transform: translateY(5px); } }

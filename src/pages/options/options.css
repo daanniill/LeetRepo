@@ -36,10 +36,11 @@
 .setting-line strong, .setting-line small { display: block; }
 .setting-line small { margin-top: 4px; color: var(--muted); font-size: 11px; }
 .form-actions { display: flex; align-items: center; gap: 10px; }
-.form-actions .danger { margin-left: auto; }
+.form-actions #sign-out { margin-left: auto; }
 .ai-toggle { border-top: 1px solid var(--line); }
 .ai-toggle.ai-limit { opacity: .58; }
 .ai-meta { margin-top: 14px; display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 11px; }
 .ai-privacy { margin-top: 18px; }
+.policy-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 @media (max-width: 760px) { .theme-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 680px) { .settings-page { padding-top: 34px; } .settings-head { align-items: flex-start; } .settings-head > .button { display: none; } .field-grid { grid-template-columns: 1fr; } .repository-actions, .ai-meta { align-items: flex-start; flex-direction: column; } .settings-panel { padding: 22px 18px; } }

@@ -17,11 +17,11 @@
           <p>One folder per problem, documented and ready to review — automatically, the moment your submission is Accepted.</p>
         </div>
         <ol class="steps" aria-label="Setup progress">
-          <li class="active" data-step-marker="1"><span>1</span><div><strong>Connect GitHub</strong><small>Sign in and authorize LeetRepo</small></div></li>
+          <li class="active" data-step-marker="1"><span>1</span><div><strong>Connect GitHub</strong><small>Sign in and install only if needed</small></div></li>
           <li data-step-marker="2"><span>2</span><div><strong>Choose your repo</strong><small>Configure how solutions land</small></div></li>
           <li data-step-marker="3"><span>3</span><div><strong>Start solving</strong><small>Push manually or automatically</small></div></li>
         </ol>
-        <div class="privacy-note">LeetRepo reads submissions locally. GitHub grants access only to repositories you select.</div>
+        <div class="privacy-note">LeetRepo does not read or store submission details until setup is complete. GitHub grants access only to repositories you select. <a href="../legal/legal.html?document=privacy" target="_blank" rel="noreferrer">Privacy Notice</a> · <a href="../legal/legal.html?document=terms" target="_blank" rel="noreferrer">Terms</a></div>
       </section>
 
       <section class="setup-wrap">
@@ -35,9 +35,18 @@
           <form id="connect-step" class="step-pane stack gap-16">
             <div class="github-signin-copy">
               <h3>Authorize with your GitHub account</h3>
-              <p>Install the LeetRepo GitHub App on the repository you want to use. You will never need to create or paste a personal access token.</p>
+              <p>Sign in to GitHub. If LeetRepo is not installed yet, GitHub will then ask which repositories you want it to access. Returning users will continue without reinstalling.</p>
             </div>
             <button class="button full" type="submit" id="connect-button">Sign in with GitHub</button>
+            <div class="data-disclosure" aria-label="Data use summary">
+              <strong>Before you continue</strong>
+              <ul>
+                <li>Your GitHub ID, username, avatar, and encrypted GitHub credentials are stored by LeetRepo’s service.</li>
+                <li>Submission history and notes stay in extension storage; sync content is sent to your selected GitHub repository.</li>
+                <li>Solution code is sent to the AI provider only if you separately enable AI-generated READMEs.</li>
+              </ul>
+            </div>
+            <p class="legal-consent">By continuing, you agree to the <a href="../legal/legal.html?document=terms" target="_blank" rel="noreferrer">Terms and Conditions</a> and acknowledge the <a href="../legal/legal.html?document=privacy" target="_blank" rel="noreferrer">Privacy Notice</a>.</p>
             <p class="field-help">LeetRepo requests only <strong>Contents: read and write</strong> for selected repositories. Create a destination repository on GitHub before connecting if you do not already have one.</p>
             <a class="button secondary full" href="https://github.com/new" target="_blank" rel="noreferrer">Create a repository on GitHub ↗</a>
           </form>

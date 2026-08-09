@@ -15,7 +15,12 @@ function syncedSolutionFor(item) {
 }
 
 async function init() {
-  [state, submission] = await Promise.all([send("GET_STATE"), currentSubmission()]);
+  state = await send("GET_STATE");
+  const connected = state.settings.connected === true;
+  document.querySelector("#auth-gate").hidden = connected;
+  document.querySelector("#app-content").hidden = !connected;
+  if (!connected) return;
+  submission = await currentSubmission();
   renderState();
   renderSubmission();
 }
@@ -88,5 +93,9 @@ document.querySelector("#personal-notes").addEventListener("change", async (even
 
 for (const id of ["dashboard-link", "open-dashboard", "dashboard-button"]) document.querySelector(`#${id}`).addEventListener("click", (event) => { event.preventDefault(); send("OPEN_DASHBOARD"); });
 document.querySelector("#open-settings").addEventListener("click", () => send("OPEN_OPTIONS"));
+document.querySelector("#start-onboarding").addEventListener("click", async () => {
+  await send("OPEN_ONBOARDING");
+  globalThis.close();
+});
 
 init().catch((error) => showNotice(notice, error.message, true));

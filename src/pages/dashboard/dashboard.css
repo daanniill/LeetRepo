@@ -2,6 +2,7 @@
 .dashboard-nav nav { display: flex; align-self: stretch; gap: 4px; }
 .nav-item { min-width: 76px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: transparent; cursor: pointer; font-size: 12px; transition: color .2s var(--ease-out), border-color .2s var(--ease-out), background-color .2s var(--ease-out); }
 .nav-item:hover, .nav-item.active { color: var(--accent-ink); border-bottom-color: var(--accent); font-weight: 700; }
+.nav-item.sign-out:hover { color: var(--hard-ink); border-bottom-color: var(--hard-ink); }
 .repo-link { max-width: 280px; margin-left: auto; color: var(--muted); font: 11px ui-monospace, monospace; text-decoration: none; }
 .dashboard-main { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 40px 0 72px; }
 [data-view-panel][hidden] { display: none; }

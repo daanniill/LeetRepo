@@ -22,11 +22,13 @@ async function githubApi(path, token, fetchImpl) {
   return jsonResponse(response, `GitHub request failed (${response.status}).`);
 }
 
-export async function exchangeAuthorizationCode({ code, clientId, clientSecret, fetchImpl = fetch }) {
+export async function exchangeAuthorizationCode({ code, clientId, clientSecret, redirectUri = "", fetchImpl = fetch }) {
+  const values = { client_id: clientId, client_secret: clientSecret, code };
+  if (redirectUri) values.redirect_uri = redirectUri;
   const response = await fetchImpl(`${GITHUB_LOGIN}/oauth/access_token`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, code }).toString()
+    body: new URLSearchParams(values).toString()
   });
   const data = await jsonResponse(response, "GitHub sign-in failed.");
   if (data.error) throw new HttpError(502, "GITHUB_OAUTH_ERROR", data.error_description || "GitHub sign-in failed.");

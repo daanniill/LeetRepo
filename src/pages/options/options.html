@@ -87,7 +87,12 @@
           </div>
           <div class="notice ai-privacy">Turning this option on means you agree that LeetRepo may send the problem title, difficulty, language, detected problem context and example, and up to 24,000 characters of solution code to the LeetRepo service and its AI provider. Request bodies are processed to generate the README and are not retained in ordinary application logs. AI output may be incorrect.</div>
         </section>
-        <div class="form-actions"><button class="button" id="save-button" type="submit">Save settings</button><button class="button danger" id="disconnect" type="button">Disconnect GitHub</button></div>
+        <hr class="divider">
+        <section>
+          <div class="section-title"><div><h2>Data &amp; privacy</h2><p>Review what stays local, what LeetRepo stores, and what is sent to GitHub or the optional AI provider.</p></div></div>
+          <div class="policy-actions"><a class="button secondary" href="../legal/legal.html?document=privacy" target="_blank" rel="noreferrer">Privacy Notice ↗</a><a class="button secondary" href="../legal/legal.html?document=terms" target="_blank" rel="noreferrer">Terms and Conditions ↗</a><button class="button danger" id="delete-account" type="button">Delete hosted account</button></div>
+        </section>
+        <div class="form-actions"><button class="button" id="save-button" type="submit">Save settings</button><button class="button secondary" id="sign-out" type="button">Sign out</button></div>
       </form>
     </main>
     <script type="module" src="options.js"></script>

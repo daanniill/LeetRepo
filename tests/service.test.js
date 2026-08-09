@@ -7,7 +7,7 @@ test("hosted GitHub sign-in exchanges only the one-time callback code", async ()
   const fetchImpl = async (url, init = {}) => {
     calls.push({ url, init, body: init.body ? JSON.parse(init.body) : null });
     if (url.includes("/v1/auth/github/start")) {
-      return new Response(JSON.stringify({ authorizationUrl: "https://github.com/apps/leetrepo/installations/new?state=state" }), { status: 200 });
+      return new Response(JSON.stringify({ authorizationUrl: "https://github.com/login/oauth/authorize?client_id=client-id&state=state" }), { status: 200 });
     }
     return new Response(JSON.stringify({
       sessionToken: "session-token",
@@ -19,7 +19,7 @@ test("hosted GitHub sign-in exchanges only the one-time callback code", async ()
   const result = await beginHostedGitHubSignIn({
     redirectUri: "https://extension-id.chromiumapp.org/github",
     launchWebAuthFlow: async (url) => {
-      assert.match(url, /^https:\/\/github\.com\/apps\/leetrepo/);
+      assert.match(url, /^https:\/\/github\.com\/login\/oauth\/authorize/);
       return "https://extension-id.chromiumapp.org/github?code=one-time-code";
     },
     fetchImpl
@@ -44,4 +44,3 @@ test("newRequestId returns an API-safe unique identifier", () => {
   assert.match(first, /^[A-Za-z0-9_-]{16,100}$/);
   assert.notEqual(first, second);
 });
-

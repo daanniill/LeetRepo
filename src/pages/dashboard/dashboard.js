@@ -9,6 +9,10 @@ let toastTimer;
 
 async function load() {
   state = await send("GET_STATE");
+  if (!state.settings.connected) {
+    globalThis.location.replace("../onboarding/onboarding.html");
+    return;
+  }
   state.attempts ||= [];
   render();
 }
@@ -267,6 +271,19 @@ document.querySelectorAll("[data-filter]").forEach((button) => button.addEventLi
 }));
 document.querySelector("#refresh").addEventListener("click", load);
 document.querySelector("#settings-link").addEventListener("click", () => send("OPEN_OPTIONS"));
+document.querySelector("#sign-out").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  button.textContent = "Signing out…";
+  try {
+    await send("SIGN_OUT");
+    globalThis.location.replace("../onboarding/onboarding.html");
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = "Sign out";
+    showToast(error.message);
+  }
+});
 document.querySelectorAll("[data-view]").forEach((item) => item.addEventListener("click", (event) => { event.preventDefault(); showView(item.dataset.view); }));
 document.querySelector("#copy-stats").addEventListener("click", () => copyStatsImage().catch((error) => showToast(error.message)));
 document.querySelector("#share-stats").addEventListener("click", () => shareStats().catch((error) => showToast(error.message)));

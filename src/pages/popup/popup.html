@@ -15,7 +15,17 @@
         <button class="icon-button" id="open-settings" title="Settings" aria-label="Settings">☷</button>
       </div>
     </header>
-    <main class="popup-main">
+    <main class="auth-gate" id="auth-gate" hidden>
+      <div class="auth-mark" aria-hidden="true">GH</div>
+      <div>
+        <span class="eyebrow">Setup required</span>
+        <h1>Connect GitHub to use LeetRepo.</h1>
+        <p>Sign in and finish setup before LeetRepo reads or stores submission details. GitHub asks you to install the app only when no installation exists.</p>
+      </div>
+      <button class="button full" id="start-onboarding">Continue with GitHub</button>
+      <p class="legal-copy">By continuing, you agree to the <a href="../legal/legal.html?document=terms" target="_blank" rel="noreferrer">Terms</a> and acknowledge the <a href="../legal/legal.html?document=privacy" target="_blank" rel="noreferrer">Privacy Notice</a>.</p>
+    </main>
+    <main class="popup-main" id="app-content" hidden>
       <section class="problem-card card" id="problem-card">
         <div class="row spread"><span class="eyebrow">On this tab</span><span class="badge unknown" id="status-badge">Waiting</span></div>
         <div>
@@ -39,6 +49,7 @@
       </section>
       <div class="notice" id="notice" hidden></div>
       <button class="button secondary full" id="dashboard-button">Open dashboard →</button>
+      <div class="legal-links"><a href="../legal/legal.html?document=privacy" target="_blank" rel="noreferrer">Privacy</a><span>·</span><a href="../legal/legal.html?document=terms" target="_blank" rel="noreferrer">Terms</a></div>
     </main>
     <script type="module" src="popup.js"></script>
   </body>

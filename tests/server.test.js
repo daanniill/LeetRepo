@@ -31,6 +31,7 @@ function baseStore(overrides = {}) {
     async exchangeAuthCode() { return null; },
     async getSession() { return null; },
     async updateCredentials() {},
+    async deleteSession() {},
     async deleteAccountForSession() { return false; },
     async reserveAiRequest() {},
     async finishAiRequest() {},
@@ -48,12 +49,41 @@ test("OAuth start accepts only configured extension redirects and stores hashed 
   const response = await api(new Request("https://api.leetrepo.app/v1/auth/github/start?redirect_uri=https%3A%2F%2Fextension-id.chromiumapp.org%2Fgithub"));
   const body = await response.json();
   assert.equal(response.status, 200);
-  assert.match(body.authorizationUrl, /^https:\/\/github\.com\/apps\/leetrepo\/installations\/new\?state=/);
+  const authorizationUrl = new URL(body.authorizationUrl);
+  assert.equal(authorizationUrl.origin, "https://github.com");
+  assert.equal(authorizationUrl.pathname, "/login/oauth/authorize");
+  assert.equal(authorizationUrl.searchParams.get("client_id"), "client-id");
+  assert.equal(authorizationUrl.searchParams.get("redirect_uri"), "https://api.leetrepo.app/v1/auth/github/callback");
+  assert.ok(authorizationUrl.searchParams.get("state"));
   assert.equal(flow.extensionRedirectUri, "https://extension-id.chromiumapp.org/github");
   assert.doesNotMatch(body.authorizationUrl, new RegExp(flow.stateHash.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
   const rejected = await api(new Request("https://api.leetrepo.app/v1/auth/github/start?redirect_uri=https%3A%2F%2Fevil.example%2Fcallback"));
   assert.equal(rejected.status, 400);
+});
+
+test("OAuth callback sends first-time users to GitHub App installation", async () => {
+  const createdFlows = [];
+  const store = baseStore({
+    async consumeOAuthFlow() { return { extension_redirect_uri: "https://extension-id.chromiumapp.org/github" }; },
+    async createOAuthFlow(value) { createdFlows.push(value); }
+  });
+  const fetchImpl = async (url) => {
+    if (url.endsWith("/login/oauth/access_token")) {
+      return new Response(JSON.stringify({ access_token: "ghu_access", refresh_token: "ghr_refresh", expires_in: 28800, refresh_token_expires_in: 15897600 }), { status: 200 });
+    }
+    if (url.endsWith("/user")) return new Response(JSON.stringify({ id: 42, login: "alex-c" }), { status: 200 });
+    if (url.includes("/user/installations?")) return new Response(JSON.stringify({ installations: [] }), { status: 200 });
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+  const api = createApi({ config: config(), store, fetchImpl });
+  const response = await api(new Request("https://api.leetrepo.app/v1/auth/github/callback?state=state&code=github-code"));
+  const location = new URL(response.headers.get("location"));
+  assert.equal(response.status, 302);
+  assert.equal(location.pathname, "/apps/leetrepo/installations/new");
+  assert.ok(location.searchParams.get("state"));
+  assert.equal(createdFlows.length, 1);
+  assert.equal(createdFlows[0].extensionRedirectUri, "https://extension-id.chromiumapp.org/github");
 });
 
 test("OAuth callback verifies the installation through the user token and creates a one-time exchange", async () => {
@@ -141,3 +171,19 @@ test("AES-GCM credential storage rejects tampering", () => {
   assert.throws(() => decryptSecret(`${encrypted.slice(0, -1)}A`, key));
 });
 
+test("sign out revokes only the current hosted session", async () => {
+  let deletedSessionHash = "";
+  let accountDeleted = false;
+  const store = baseStore({
+    async deleteSession(value) { deletedSessionHash = value; },
+    async deleteAccountForSession() { accountDeleted = true; return true; }
+  });
+  const api = createApi({ config: config(), store });
+  const response = await api(new Request("https://api.leetrepo.app/v1/auth/session", {
+    method: "DELETE",
+    headers: { Authorization: "Bearer session-token" }
+  }));
+  assert.equal(response.status, 204);
+  assert.ok(deletedSessionHash);
+  assert.equal(accountDeleted, false);
+});
