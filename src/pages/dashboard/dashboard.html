@@ -25,7 +25,7 @@
         <section data-view-panel="problems">
           <header class="dashboard-header">
             <div><h1>Synced problems</h1></div>
-            <div class="header-actions"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Search problems…"></label><button class="button secondary" id="refresh">Refresh</button></div>
+            <div class="header-actions"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" aria-label="Search synced problems" placeholder="Search title, pattern, language…"></label><button class="button secondary" id="refresh">Refresh</button></div>
           </header>
 
           <section class="stats-row">
@@ -38,10 +38,10 @@
           <section class="library-panel panel">
             <div class="library-toolbar">
               <div class="filters" role="group" aria-label="Filter by difficulty">
-                <button class="filter active" data-filter="All">All</button>
-                <button class="filter" data-filter="Easy">Easy</button>
-                <button class="filter" data-filter="Medium">Medium</button>
-                <button class="filter" data-filter="Hard">Hard</button>
+                <button class="filter active" data-filter="All" aria-pressed="true">All</button>
+                <button class="filter" data-filter="Easy" aria-pressed="false">Easy</button>
+                <button class="filter" data-filter="Medium" aria-pressed="false">Medium</button>
+                <button class="filter" data-filter="Hard" aria-pressed="false">Hard</button>
               </div>
               <span class="muted" id="result-count">0 results</span>
             </div>

@@ -1,4 +1,4 @@
-import { buildReview, calculateStreak, historyInsights, relativeTime, submissionSolutions } from "../../core/submissions.js";
+import { buildReview, calculateStreak, historyInsights, relativeTime, submissionSearchText, submissionSolutions } from "../../core/submissions.js";
 import { buildStudyQueue, canonicalPattern, formatStudyInterval, nextReviewInterval, patternCoverage, studyIntervalDays } from "../../core/study.js";
 import { difficultyClass, escapeHtml, logo, send, setBusy } from "../../shared/client.js";
 
@@ -27,8 +27,7 @@ async function load() {
 function filteredItems() {
   const query = document.querySelector("#search").value.trim().toLowerCase();
   return state.submissions.filter((item) => {
-    const languages = submissionSolutions(item).map((solution) => solution.language).join(" ");
-    return (activeFilter === "All" || item.difficulty === activeFilter) && (!query || `${item.number} ${item.title} ${languages}`.toLowerCase().includes(query));
+    return (activeFilter === "All" || item.difficulty === activeFilter) && (!query || submissionSearchText(item).includes(query));
   });
 }
 
@@ -141,8 +140,9 @@ function renderDetail(item) {
     ${review.complexity?.time ? `<div class="complexity-strip"><span><small>Time</small>${escapeHtml(review.complexity.time)}</span><span><small>Space</small>${escapeHtml(review.complexity.space)}</span></div>` : ""}
     ${review.complexityCheck?.verdict === "suboptimal" ? `<div class="complexity-warning"><strong>Suboptimal solution detected</strong><br>${escapeHtml(review.complexityCheck.note || "Compare this solution with the intended pattern.")}</div>` : ""}
     <ol class="review-steps">${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
-    ${selectedItem.notes ? `<div class="personal-note"><strong>Personal note</strong><br>${escapeHtml(selectedItem.notes)}</div>` : ""}
+    <div class="detail-note"><label for="detail-note-input">Personal note</label><textarea id="detail-note-input" rows="3" maxlength="4000" aria-describedby="detail-note-help" placeholder="What should future-you remember?">${escapeHtml(selectedItem.notes || "")}</textarea><small id="detail-note-help">Saved locally. Included in AI-generated READMEs when that option is enabled.</small></div>
     <div class="detail-actions">
+      <button class="button secondary full" id="save-detail-note">Save note</button>
       ${selectedItem.code ? `<button class="button full" id="regenerate-feedback" ${aiBlocked ? "disabled" : ""}>${feedbackLabel}</button>` : ""}
       ${problemUrl ? `<a class="button secondary full" href="${escapeHtml(problemUrl)}" target="_blank" rel="noreferrer">View on LeetCode ↗</a>` : ""}
       ${commitUrl ? `<a class="button secondary full" href="${escapeHtml(commitUrl)}" target="_blank" rel="noreferrer">View on GitHub ↗</a>` : ""}
@@ -152,6 +152,20 @@ function renderDetail(item) {
     renderDetail(item);
   });
   document.querySelector("#regenerate-feedback")?.addEventListener("click", (event) => regenerateFeedback(selectedItem, event.currentTarget));
+  document.querySelector("#save-detail-note")?.addEventListener("click", (event) => saveDetailNote(item, document.querySelector("#detail-note-input").value, event.currentTarget));
+}
+
+async function saveDetailNote(item, notes, button) {
+  setBusy(button, true, "Saving…");
+  try {
+    await send("SAVE_NOTES", { submission: item, notes });
+    state.submissions = state.submissions.map((stored) => stored.id === item.id ? { ...stored, notes } : stored);
+    showToast(notes.trim() ? "Personal note saved." : "Personal note cleared.");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    setBusy(button, false);
+  }
 }
 
 async function regenerateFeedback(item, button) {
@@ -478,7 +492,11 @@ function showToast(message) {
 document.querySelector("#search").addEventListener("input", renderList);
 document.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => {
   activeFilter = button.dataset.filter;
-  document.querySelectorAll("[data-filter]").forEach((item) => item.classList.toggle("active", item === button));
+  document.querySelectorAll("[data-filter]").forEach((item) => {
+    const active = item === button;
+    item.classList.toggle("active", active);
+    item.setAttribute("aria-pressed", String(active));
+  });
   renderList();
 }));
 document.querySelectorAll("[data-study-tab]").forEach((button) => button.addEventListener("click", () => {

@@ -69,6 +69,11 @@
 .patterns, .profile-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 13px 0; }
 .detail-actions { display: flex; flex-direction: column; gap: 8px; }
 .personal-note { margin: 12px 0; padding: 10px 12px; border-radius: 14px; color: var(--muted); background: var(--surface); font-size: 11px; line-height: 1.45; }
+.detail-note { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; color: var(--muted); }
+.detail-note > label { color: var(--accent-ink); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.detail-note textarea { width: 100%; min-height: 76px; resize: vertical; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; outline: none; color: var(--text); background: var(--surface); font-size: 11px; line-height: 1.45; }
+.detail-note textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent), transparent 80%); }
+.detail-note small { font-size: 9px; line-height: 1.4; }
 .empty-list { padding: 70px 20px; text-align: center; color: var(--muted); }
 .profile-hero { margin-top: 26px; padding: 24px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px 24px; }
 .profile-hero h2 { margin: 7px 0 6px; font-size: 27px; }

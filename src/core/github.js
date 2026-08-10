@@ -78,13 +78,14 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(solution);
   }
-  const duplicateSolutions = [...grouped.values()].filter((items) => items.length > 1).flat();
-  await Promise.all(duplicateSolutions.map(async (solution) => {
-    const commits = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?sha=${encodeURIComponent(selectedBranch)}&path=${encodeURIComponent(solution.path)}&per_page=1`);
-    const latest = commits[0];
-    solution.syncedAt = latest?.commit?.committer?.date || latest?.commit?.author?.date || null;
-    solution.commitSha = latest?.sha || "";
-  }));
+  for (let index = 0; index < solutions.length; index += 10) {
+    await Promise.all(solutions.slice(index, index + 10).map(async (solution) => {
+      const commits = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?sha=${encodeURIComponent(selectedBranch)}&path=${encodeURIComponent(solution.path)}&per_page=1`);
+      const latest = commits[0];
+      solution.syncedAt = latest?.commit?.committer?.date || latest?.commit?.author?.date || null;
+      solution.commitSha = latest?.sha || "";
+    }));
+  }
   return [...grouped.values()].map((items) => {
     const variants = items.slice().sort((left, right) => {
       const dateDifference = (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0);

@@ -34,17 +34,19 @@ test("listRepos rejects a GitHub App with repository administration access", asy
   assert.equal(calls.length, 1);
 });
 
-test("listSolutionFolders imports legacy and language-folder solution paths", async (t) => {
+test("listSolutionFolders imports every solution with its latest commit metadata", async (t) => {
   const replies = [
     { default_branch: "main" },
     { tree: [
       { type: "blob", path: "0001-two-sum/solution.py" },
       { type: "blob", path: "0001-two-sum/README.md" },
       { type: "blob", path: "0001-two-sum/cpp/solution.cpp" },
+      { type: "blob", path: "0002-add-two-numbers/python/solution.py" },
       { type: "blob", path: "notes.txt" }
     ] },
     [{ sha: "python-commit", commit: { committer: { date: "2026-08-01T10:00:00.000Z" } } }],
-    [{ sha: "cpp-commit", commit: { committer: { date: "2026-08-07T10:00:00.000Z" } } }]
+    [{ sha: "cpp-commit", commit: { committer: { date: "2026-08-07T10:00:00.000Z" } } }],
+    [{ sha: "add-two-numbers-commit", commit: { author: { date: "2026-08-05T10:00:00.000Z" } } }]
   ];
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url) => {
@@ -52,14 +54,18 @@ test("listSolutionFolders imports legacy and language-folder solution paths", as
     return new Response(JSON.stringify(replies[calls.length - 1]), { status: 200, headers: { "content-type": "application/json" } });
   });
   const items = await listSolutionFolders("secret", "alex-c", "solutions");
-  assert.equal(items.length, 1);
+  assert.equal(items.length, 2);
   assert.equal(items[0].title, "Two Sum");
   assert.equal(items[0].language, "C++");
   assert.equal(items[0].syncedAt, "2026-08-07T10:00:00.000Z");
   assert.deepEqual(items[0].solutions.map((solution) => solution.language), ["C++", "Python3"]);
   assert.equal(items[0].solutions[0].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum/cpp");
+  assert.equal(items[1].title, "Add Two Numbers");
+  assert.equal(items[1].syncedAt, "2026-08-05T10:00:00.000Z");
+  assert.equal(items[1].commitSha, "add-two-numbers-commit");
   assert.match(calls[2], /path=0001-two-sum%2Fsolution.py/);
   assert.match(calls[3], /path=0001-two-sum%2Fcpp%2Fsolution.cpp/);
+  assert.match(calls[4], /path=0002-add-two-numbers%2Fpython%2Fsolution.py/);
 });
 
 test("pushSubmission builds one tree and advances one branch ref", async (t) => {

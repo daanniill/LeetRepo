@@ -434,17 +434,31 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
   return lines.join("\n");
 }
 
+function submissionPatterns(item) {
+  return [...new Set(submissionSolutions(item).flatMap((solution) => {
+    const review = solution.review || buildReview({ ...item, ...solution });
+    return review.patterns || [];
+  }))];
+}
+
 export function historyInsights(items = []) {
   const patterns = new Map();
   const languages = new Map();
   for (const input of items) {
     const item = normalizeSubmission(input);
-    languages.set(item.language, (languages.get(item.language) || 0) + 1);
-    const review = item.review || buildReview(item);
-    for (const pattern of review.patterns || []) patterns.set(pattern, (patterns.get(pattern) || 0) + 1);
+    for (const solution of submissionSolutions(item)) {
+      languages.set(solution.language, (languages.get(solution.language) || 0) + 1);
+    }
+    for (const pattern of submissionPatterns(item)) patterns.set(pattern, (patterns.get(pattern) || 0) + 1);
   }
   const sortCounts = (entries) => [...entries].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return { patterns: sortCounts(patterns), languages: sortCounts(languages) };
+}
+
+export function submissionSearchText(input = {}) {
+  const item = normalizeSubmission(input);
+  const languages = submissionSolutions(item).map((solution) => solution.language);
+  return [item.number, item.title, item.difficulty, item.notes, ...languages, ...submissionPatterns(item)].join(" ").toLowerCase();
 }
 
 export function buildProfileReadme(items = [], settings = {}) {

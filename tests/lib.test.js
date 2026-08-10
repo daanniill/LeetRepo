@@ -17,6 +17,7 @@ import {
   normalizeTheme,
   relativeTime,
   sameProblem,
+  submissionSearchText,
   submissionSolutions,
   slugify
 } from "../src/core/submissions.js";
@@ -75,6 +76,10 @@ test("problem records retain language variants and default to the latest solutio
   assert.equal(merged.reviewLapses, 1);
   assert.equal(merged.lastReviewRating, "hard");
   assert.deepEqual(submissionSolutions(merged).map((solution) => solution.language), ["C++", "Python3"]);
+  assert.deepEqual(historyInsights([merged]).languages, [["C++", 1], ["Python3", 1]]);
+  const searchable = { ...merged, notes: "Re-check equal heights.", review: { patterns: ["Two Pointers"] } };
+  assert.match(submissionSearchText(searchable), /two pointers/);
+  assert.match(submissionSearchText(searchable), /re-check equal heights/);
 });
 
 test("repository backfill enriches an existing language without duplicating it", () => {
