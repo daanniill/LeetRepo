@@ -42,13 +42,13 @@
 .activity-legend i:nth-of-type(4), .heat-cell.l3 { background: var(--accent); }
 
 .heatmap-wrap { --heat-cell: 14px; --heat-gap: 4px; margin-top: var(--space-4); overflow-x: auto; overflow-y: hidden; padding-bottom: var(--space-1); }
-.heatmap-inner { width: max-content; min-width: 100%; display: grid; grid-template-columns: 30px 1fr; gap: 5px var(--space-2); }
-.heatmap-months { grid-column: 2; display: grid; grid-auto-flow: column; grid-auto-columns: var(--heat-cell); gap: var(--heat-gap); color: var(--muted); font-size: var(--text-3xs); height: 13px; }
+.heatmap-inner { width: 100%; min-width: 980px; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 5px var(--space-2); }
+.heatmap-months { grid-column: 2; display: grid; grid-template-columns: repeat(var(--heat-columns), minmax(var(--heat-cell), 1fr)); gap: var(--heat-gap); color: var(--muted); font-size: var(--text-3xs); height: 13px; }
 .heatmap-months span { grid-row: 1; white-space: nowrap; }
-.heatmap-days { grid-column: 1; grid-row: 2; display: grid; grid-template-rows: repeat(7, var(--heat-cell)); gap: var(--heat-gap); color: var(--muted); font-size: var(--text-3xs); }
+.heatmap-days { grid-column: 1; grid-row: 2; display: grid; grid-template-rows: repeat(7, 1fr); gap: var(--heat-gap); color: var(--muted); font-size: var(--text-3xs); }
 .heatmap-days span { grid-column: 1; display: flex; align-items: center; line-height: 1; }
-.heatmap { grid-column: 2; grid-row: 2; display: grid; grid-template-rows: repeat(7, var(--heat-cell)); grid-auto-flow: column; grid-auto-columns: var(--heat-cell); gap: var(--heat-gap); }
-.heat-cell { border-radius: 3px; background: color-mix(in srgb, var(--text), transparent 93%); transition: background-color var(--dur-3) var(--ease-out), transform var(--dur-2) var(--ease-spring); }
+.heatmap { grid-column: 2; grid-row: 2; display: grid; grid-template-columns: repeat(var(--heat-columns), minmax(var(--heat-cell), 1fr)); grid-template-rows: repeat(7, auto); grid-auto-flow: column; gap: var(--heat-gap); }
+.heat-cell { min-width: 0; aspect-ratio: 1; border-radius: 3px; background: color-mix(in srgb, var(--text), transparent 93%); transition: background-color var(--dur-3) var(--ease-out), transform var(--dur-2) var(--ease-spring); }
 .heat-cell:hover { transform: scale(1.35); }
 .heat-cell.blank { background: transparent; }
 

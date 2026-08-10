@@ -248,6 +248,14 @@ test("streak may start yesterday when today has no push", () => {
   assert.equal(calculateStreak(history, new Date("2026-08-07T20:00:00.000Z")), 2);
 });
 
+test("streak retains original solve days when solutions are re-synced", () => {
+  const history = ["2026-08-09", "2026-08-08"].map((date) => ({
+    solvedAt: `${date}T12:00:00.000Z`,
+    syncedAt: "2026-08-10T12:00:00.000Z"
+  }));
+  assert.equal(calculateStreak(history, new Date("2026-08-10T20:00:00.000Z")), 2);
+});
+
 test("relativeTime uses compact labels", () => {
   const now = Date.parse("2026-08-07T12:00:00.000Z");
   assert.equal(relativeTime("2026-08-07T11:58:00.000Z", now), "2m ago");

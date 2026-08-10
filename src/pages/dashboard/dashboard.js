@@ -1,4 +1,4 @@
-import { buildReview, calculateStreak, historyInsights, relativeTime, submissionSearchText, submissionSolutions } from "../../core/submissions.js";
+import { buildReview, calculateStreak, historyInsights, relativeTime, solveTimestamp, submissionSearchText, submissionSolutions } from "../../core/submissions.js";
 import { buildStudyQueue, canonicalPattern, formatStudyInterval, nextReviewInterval, patternCoverage, studyIntervalDays } from "../../core/study.js";
 import { difficultyClass, escapeHtml, logo, send, setBusy } from "../../shared/client.js";
 
@@ -77,8 +77,9 @@ function dayKey(value) {
 function renderHeatmap(items) {
   const dayCounts = new Map();
   items.forEach((item) => {
-    if (!item.syncedAt) return;
-    const key = dayKey(item.syncedAt);
+    const timestamp = solveTimestamp(item);
+    if (!timestamp) return;
+    const key = dayKey(timestamp);
     dayCounts.set(key, (dayCounts.get(key) || 0) + 1);
   });
   const today = new Date();
@@ -90,14 +91,14 @@ function renderHeatmap(items) {
   const cells = [];
   const months = [];
   let lastMonth = -1;
-  let synced = 0;
+  let solved = 0;
   for (let offset = 0; offset < totalDays; offset += 1) {
     const day = new Date(start);
     day.setDate(start.getDate() + offset);
     const count = dayCounts.get(dayKey(day)) || 0;
-    synced += count;
+    solved += count;
     const label = day.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-    cells.push(`<span class="heat-cell ${count ? `l${Math.min(count, 3)}` : ""}" title="${escapeHtml(label)} — ${count} synced"></span>`);
+    cells.push(`<span class="heat-cell ${count ? `l${Math.min(count, 3)}` : ""}" title="${escapeHtml(label)} — ${count} solved"></span>`);
     if (day.getDay() === 0 && day.getMonth() !== lastMonth) {
       lastMonth = day.getMonth();
       months.push(`<span style="grid-column:${Math.floor(offset / 7) + 1}">${day.toLocaleDateString(undefined, { month: "short" })}</span>`);
@@ -105,8 +106,9 @@ function renderHeatmap(items) {
   }
   for (let index = cells.length % 7; index && index < 7; index += 1) cells.push('<span class="heat-cell blank"></span>');
   const heatmap = document.querySelector("#heatmap");
+  heatmap.closest(".heatmap-inner").style.setProperty("--heat-columns", String(cells.length / 7));
   heatmap.innerHTML = cells.join("");
-  heatmap.setAttribute("aria-label", `Solve activity heatmap: ${synced} solutions synced in the last 12 months`);
+  heatmap.setAttribute("aria-label", `Solve activity heatmap: ${solved} problems solved in the last 12 months`);
   document.querySelector("#heatmap-months").innerHTML = months.join("");
 }
 

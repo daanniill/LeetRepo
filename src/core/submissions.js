@@ -504,8 +504,12 @@ export function relativeTime(value, now = Date.now()) {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
+export function solveTimestamp(item = {}) {
+  return item.solvedAt || item.syncedAt || null;
+}
+
 export function calculateStreak(items = [], now = new Date()) {
-  const days = new Set(items.filter((x) => x.syncedAt).map((x) => new Date(x.syncedAt).toISOString().slice(0, 10)));
+  const days = new Set(items.map(solveTimestamp).filter(Boolean).map((value) => new Date(value).toISOString().slice(0, 10)));
   let cursor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const today = cursor.toISOString().slice(0, 10);
   if (!days.has(today)) cursor.setUTCDate(cursor.getUTCDate() - 1);
