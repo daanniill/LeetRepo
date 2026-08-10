@@ -183,9 +183,9 @@
         <div class="lr-head">
           <span class="lr-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>
           <span class="lr-brand">LeetRepo</span>
-          <button class="lr-minimize" title="Minimize LeetRepo" aria-label="Minimize LeetRepo">−</button>
+          <button class="lr-minimize" title="Minimize LeetRepo" aria-label="Minimize LeetRepo" aria-expanded="true">−</button>
         </div>
-        <div class="lr-body">
+        <div class="lr-body"><div class="lr-body-inner">
           <div class="lr-title">Reading this problem…</div>
           <div class="lr-meta"></div>
           <div class="lr-status">Waiting for an Accepted submission</div>
@@ -198,12 +198,16 @@
           <div class="lr-auto lr-ai-option"><span class="lr-ai-copy">AI-generated README<small>Sends solution code to AI</small></span><label class="lr-switch"><input class="lr-ai-readme" type="checkbox" aria-label="Use AI-generated README"><span></span></label></div>
           <button class="lr-link lr-dashboard">Open dashboard →</button>
           <div class="lr-notice" hidden></div>
-        </div>
+        </div></div>
       </div>`;
     document.body.appendChild(panel);
     panel.querySelector(".lr-minimize").addEventListener("click", () => {
-      panel.classList.toggle("lr-collapsed");
-      panel.querySelector(".lr-minimize").textContent = panel.classList.contains("lr-collapsed") ? "+" : "−";
+      const collapsed = panel.classList.toggle("lr-collapsed");
+      const minimize = panel.querySelector(".lr-minimize");
+      minimize.textContent = collapsed ? "+" : "−";
+      minimize.setAttribute("aria-expanded", String(!collapsed));
+      minimize.setAttribute("aria-label", collapsed ? "Expand LeetRepo" : "Minimize LeetRepo");
+      minimize.title = collapsed ? "Expand LeetRepo" : "Minimize LeetRepo";
     });
     panel.querySelector(".lr-button:not(.secondary)").addEventListener("click", () => push(false));
     panel.querySelector(".lr-review").addEventListener("click", review);

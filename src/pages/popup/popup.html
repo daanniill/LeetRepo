@@ -11,8 +11,8 @@
     <header class="popup-header">
       <a class="brand" href="#" id="dashboard-link"><span id="logo"></span>LeetRepo</a>
       <div class="row">
-        <button class="icon-button" id="open-dashboard" title="Open dashboard" aria-label="Open dashboard">↗</button>
-        <button class="icon-button" id="open-settings" title="Settings" aria-label="Settings">☷</button>
+        <button class="icon-button" id="open-dashboard" title="Open dashboard" aria-label="Open dashboard"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v5a1.8 1.8 0 0 1-1.8 1.8H5A1.8 1.8 0 0 1 3.2 19V7.8A1.8 1.8 0 0 1 5 6h5"/></svg></button>
+        <button class="icon-button" id="open-settings" title="Settings" aria-label="Settings"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.84 2.83l-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.88 1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.7 8.9a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.88.34H9.1a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.88V9.1a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.56 1.04Z"/></svg></button>
       </div>
     </header>
     <main class="auth-gate" id="auth-gate" hidden>
@@ -47,7 +47,7 @@
         <div class="eyebrow recent-label">Recent pushes</div>
         <div class="recent-list" id="recent-list"></div>
       </section>
-      <div class="notice" id="notice" hidden></div>
+      <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
       <button class="button secondary full" id="dashboard-button">Open dashboard →</button>
       <div class="legal-links"><a href="../legal/legal.html?document=privacy" target="_blank" rel="noreferrer">Privacy</a><span>·</span><a href="../legal/legal.html?document=terms" target="_blank" rel="noreferrer">Terms</a></div>
     </main>

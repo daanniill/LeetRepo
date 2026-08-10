@@ -22,7 +22,10 @@ function showStep(index) {
   document.querySelector("#step-eyebrow").textContent = `Step ${index + 1} of 3`;
   document.querySelector("#step-count").textContent = `0${index + 1} / 03`;
   document.querySelector("#step-title").textContent = ["Connect GitHub", "Configure your repo", "Setup complete"][index];
-  document.querySelectorAll("[data-step-marker]").forEach((item, i) => item.classList.toggle("active", i === index));
+  document.querySelectorAll("[data-step-marker]").forEach((item, i) => {
+    item.classList.toggle("active", i === index);
+    item.classList.toggle("done", i < index);
+  });
   showNotice(notice, "");
 }
 

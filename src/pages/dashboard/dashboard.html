@@ -25,13 +25,13 @@
         <section data-view-panel="problems">
           <header class="dashboard-header">
             <div><h1>Synced problems</h1></div>
-            <div class="header-actions"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" aria-label="Search synced problems" placeholder="Search title, pattern, language…"></label><button class="button secondary" id="refresh">Refresh</button></div>
+            <div class="header-actions"><label class="search"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="search" type="search" aria-label="Search synced problems" placeholder="Search title, pattern, language…"></label><button class="button secondary" id="refresh">Refresh</button></div>
           </header>
 
           <section class="stats-row">
             <div class="stat"><div class="stat-value" id="total-stat">0</div><div class="stat-label">problems synced</div></div>
             <div class="stat"><div class="stat-value accent" id="streak-stat">0</div><div class="stat-label">day streak</div></div>
-            <div class="stat"><div class="stat-value difficulty-counts" id="difficulty-stat">0 / 0 / 0</div><div class="stat-label">easy / medium / hard</div></div>
+            <div class="stat"><div class="stat-value difficulty-counts" id="difficulty-stat"><b>0</b><i>/</i><b>0</b><i>/</i><b>0</b></div><div class="stat-label">easy / medium / hard</div></div>
             <div class="stat"><div class="stat-value" id="reviewed-stat">0</div><div class="stat-label">interview overviews</div></div>
           </section>
 
@@ -48,9 +48,9 @@
             <div class="library-grid">
               <div class="table-wrap">
                 <div class="table-head"><span>Problem</span><span>Diff</span><span>Lang</span><span>Synced</span></div>
-                <div id="problem-list"></div>
+                <div id="problem-list" role="listbox" aria-label="Synced problems"></div>
               </div>
-              <aside class="detail-panel" id="detail-panel"><div class="empty"><strong>Select a problem</strong>Its interview overview will appear here.</div></aside>
+              <aside class="detail-panel" id="detail-panel" aria-live="polite"><div class="empty"><strong>Select a problem</strong>Its interview overview will appear here.</div></aside>
             </div>
           </section>
         </section>
@@ -65,8 +65,14 @@
             <a class="button secondary" id="view-repository" target="_blank" rel="noreferrer">View repository ↗</a>
           </section>
           <section class="activity-card panel">
-            <div class="row spread"><div><h2>Solve activity</h2><p>Accepted submissions synced in the last 20 weeks</p></div><div class="activity-legend"><span>Less</span><i></i><i></i><i></i><i></i><span>More</span></div></div>
-            <div class="heatmap" id="heatmap" aria-label="Solve activity heatmap"></div>
+            <div class="row spread"><div><h2>Solve activity</h2><p>Accepted submissions synced in the last 12 months</p></div><div class="activity-legend"><span>Less</span><i></i><i></i><i></i><i></i><span>More</span></div></div>
+            <div class="heatmap-wrap">
+              <div class="heatmap-inner">
+                <div class="heatmap-months" id="heatmap-months" aria-hidden="true"></div>
+                <div class="heatmap-days" aria-hidden="true"><span style="grid-row:2">Mon</span><span style="grid-row:4">Wed</span><span style="grid-row:6">Fri</span></div>
+                <div class="heatmap" id="heatmap" role="img" aria-label="Solve activity heatmap"></div>
+              </div>
+            </div>
           </section>
           <div class="analytics-grid">
             <section class="panel analytics-card"><div class="eyebrow">Pattern coverage</div><h2>What you practice</h2><div class="bar-list" id="pattern-breakdown"></div></section>
@@ -96,14 +102,14 @@
             <aside class="panel study-queue-panel" aria-label="Review queue">
               <div class="study-queue-header"><div><div class="eyebrow">Review queue</div><h2>Your next problems</h2></div><span class="queue-total" id="study-queue-total">0</span></div>
               <div class="study-tabs" role="tablist" aria-label="Review timing">
-                <button class="study-tab active" role="tab" aria-selected="true" data-study-tab="due">Due <span id="study-due-tab-count">0</span></button>
-                <button class="study-tab" role="tab" aria-selected="false" data-study-tab="upcoming">Upcoming <span id="study-upcoming-tab-count">0</span></button>
+                <button class="study-tab active" role="tab" aria-selected="true" aria-controls="study-queue" data-study-tab="due">Due <span id="study-due-tab-count">0</span></button>
+                <button class="study-tab" role="tab" aria-selected="false" aria-controls="study-queue" data-study-tab="upcoming">Upcoming <span id="study-upcoming-tab-count">0</span></button>
               </div>
               <div class="study-filters">
                 <label><span>Pattern</span><select id="study-pattern-filter"><option value="All">All patterns</option></select></label>
                 <label><span>Difficulty</span><select id="study-difficulty-filter"><option value="All">All levels</option><option>Easy</option><option>Medium</option><option>Hard</option></select></label>
               </div>
-              <div class="study-queue" id="study-queue"></div>
+              <div class="study-queue" id="study-queue" role="listbox" aria-label="Review queue"></div>
             </aside>
             <section class="panel study-session" id="study-session" aria-live="polite"></section>
           </div>
@@ -116,7 +122,7 @@
       </main>
     </div>
     <canvas id="share-canvas" width="1200" height="630" hidden></canvas>
-    <div class="toast" id="toast" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
     <script type="module" src="dashboard.js"></script>
   </body>
 </html>

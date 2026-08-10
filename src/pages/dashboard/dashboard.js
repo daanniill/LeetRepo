@@ -12,7 +12,10 @@ let studyPattern = "All";
 let studyDifficulty = "All";
 let selectedStudyId = null;
 let studyRevealed = false;
+let studyEntries = [];
 let toastTimer;
+let toastHideTimer;
+const DAY_MS = 86400000;
 
 async function load() {
   state = await send("GET_STATE");
@@ -52,7 +55,7 @@ function render() {
   document.querySelector("#profile-title").textContent = state.settings.connected ? `${state.settings.owner} / ${state.settings.repo}` : "leetcode-solutions";
   document.querySelector("#total-stat").textContent = items.length;
   document.querySelector("#streak-stat").textContent = calculateStreak(items);
-  document.querySelector("#difficulty-stat").textContent = counts.join(" / ");
+  document.querySelector("#difficulty-stat").innerHTML = counts.map((count) => `<b>${count}</b>`).join("<i>/</i>");
   document.querySelector("#reviewed-stat").textContent = items.filter((item) => item.review).length;
   document.querySelector("#profile-badges").innerHTML = [
     `${items.length} solved`,
@@ -66,23 +69,45 @@ function render() {
   renderStudy();
 }
 
+function dayKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function renderHeatmap(items) {
   const dayCounts = new Map();
   items.forEach((item) => {
     if (!item.syncedAt) return;
-    const key = new Date(item.syncedAt).toISOString().slice(0, 10);
+    const key = dayKey(item.syncedAt);
     dayCounts.set(key, (dayCounts.get(key) || 0) + 1);
   });
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(start.getDate() - 363);
+  start.setDate(start.getDate() - start.getDay());
+  const totalDays = Math.round((today - start) / DAY_MS) + 1;
   const cells = [];
-  for (let offset = 139; offset >= 0; offset -= 1) {
-    const day = new Date(today);
-    day.setDate(today.getDate() - offset);
-    const key = day.toISOString().slice(0, 10);
-    const count = dayCounts.get(key) || 0;
-    cells.push(`<span class="heat-cell ${count ? `l${Math.min(count, 3)}` : ""}" title="${key}: ${count} synced"></span>`);
+  const months = [];
+  let lastMonth = -1;
+  let synced = 0;
+  for (let offset = 0; offset < totalDays; offset += 1) {
+    const day = new Date(start);
+    day.setDate(start.getDate() + offset);
+    const count = dayCounts.get(dayKey(day)) || 0;
+    synced += count;
+    const label = day.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    cells.push(`<span class="heat-cell ${count ? `l${Math.min(count, 3)}` : ""}" title="${escapeHtml(label)} — ${count} synced"></span>`);
+    if (day.getDay() === 0 && day.getMonth() !== lastMonth) {
+      lastMonth = day.getMonth();
+      months.push(`<span style="grid-column:${Math.floor(offset / 7) + 1}">${day.toLocaleDateString(undefined, { month: "short" })}</span>`);
+    }
   }
-  document.querySelector("#heatmap").innerHTML = cells.join("");
+  for (let index = cells.length % 7; index && index < 7; index += 1) cells.push('<span class="heat-cell blank"></span>');
+  const heatmap = document.querySelector("#heatmap");
+  heatmap.innerHTML = cells.join("");
+  heatmap.setAttribute("aria-label", `Solve activity heatmap: ${synced} solutions synced in the last 12 months`);
+  document.querySelector("#heatmap-months").innerHTML = months.join("");
 }
 
 function renderList() {
@@ -96,7 +121,7 @@ function renderList() {
   }
   if (!items.some((item) => item.id === selectedId)) selectedId = items[0].id;
   list.innerHTML = items.map((item) => `
-    <button class="problem-row ${item.id === selectedId ? "active" : ""}" data-id="${escapeHtml(item.id)}">
+    <button class="problem-row ${item.id === selectedId ? "active" : ""}" role="option" aria-selected="${item.id === selectedId}" tabindex="${item.id === selectedId ? 0 : -1}" data-id="${escapeHtml(item.id)}">
       <span class="problem-name"><small>${String(item.number).padStart(4, "0")}</small><strong>${escapeHtml(item.title)}</strong></span>
       <span><span class="badge ${difficultyClass(item.difficulty)}">${escapeHtml(item.difficulty)}</span></span>
       <span class="language">${escapeHtml(item.language)}</span>
@@ -246,6 +271,7 @@ function renderStudyQueue(queue, enabled) {
   const list = document.querySelector("#study-queue");
   const source = studyTab === "due" ? queue.due : queue.upcoming;
   const entries = filteredStudyEntries(source);
+  studyEntries = [];
   document.querySelector("#study-queue-total").textContent = entries.length;
   document.querySelectorAll("[data-study-tab]").forEach((button) => {
     const active = button.dataset.studyTab === studyTab;
@@ -276,9 +302,10 @@ function renderStudyQueue(queue, enabled) {
     selectedStudyId = entries[0].item.id;
     studyRevealed = false;
   }
+  studyEntries = entries;
   list.innerHTML = entries.map(({ item, dueAt }) => {
     const patterns = studyPatternsFor(item);
-    return `<button class="study-queue-item ${item.id === selectedStudyId ? "active" : ""}" data-study-id="${escapeHtml(item.id)}">
+    return `<button class="study-queue-item ${item.id === selectedStudyId ? "active" : ""}" role="option" aria-selected="${item.id === selectedStudyId}" tabindex="${item.id === selectedStudyId ? 0 : -1}" data-study-id="${escapeHtml(item.id)}">
       <span class="study-queue-title"><small>${String(item.number).padStart(4, "0")}</small><strong>${escapeHtml(item.title)}</strong></span>
       <span class="study-queue-meta"><span class="badge ${difficultyClass(item.difficulty)}">${escapeHtml(item.difficulty)}</span><span>${escapeHtml(patterns[0] || "Review")}</span></span>
       <span class="study-queue-due">${escapeHtml(studyDueLabel(dueAt))}</span>
@@ -431,7 +458,19 @@ function renderStudy() {
 
 function showView(view) {
   document.querySelectorAll("[data-view-panel]").forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== view; });
-  document.querySelectorAll(".nav-item[data-view]").forEach((item) => item.classList.toggle("active", item.dataset.view === view));
+  document.querySelectorAll(".nav-item[data-view]").forEach((item) => {
+    const active = item.dataset.view === view;
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
+}
+
+function nextIndex(key, index, length) {
+  if (key === "Home") return 0;
+  if (key === "End") return length - 1;
+  if (key === "ArrowDown") return Math.min(index + 1, length - 1);
+  return Math.max(index - 1, 0);
 }
 
 function drawShareCard() {
@@ -485,11 +524,34 @@ function showToast(message) {
   const toast = document.querySelector("#toast");
   toast.textContent = message;
   toast.hidden = false;
+  toast.classList.remove("leaving");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.hidden = true; }, 3200);
+  clearTimeout(toastHideTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.add("leaving");
+    toastHideTimer = setTimeout(() => { toast.hidden = true; toast.classList.remove("leaving"); }, 200);
+  }, 3200);
 }
 
 document.querySelector("#search").addEventListener("input", renderList);
+document.querySelector("#problem-list").addEventListener("keydown", (event) => {
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+  const items = filteredItems();
+  if (!items.length) return;
+  event.preventDefault();
+  selectedId = items[nextIndex(event.key, items.findIndex((item) => item.id === selectedId), items.length)].id;
+  renderList();
+  document.querySelector("#problem-list .problem-row.active")?.focus();
+});
+document.querySelector("#study-queue").addEventListener("keydown", (event) => {
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+  if (!studyEntries.length || !event.target.closest(".study-queue-item")) return;
+  event.preventDefault();
+  selectedStudyId = studyEntries[nextIndex(event.key, studyEntries.findIndex(({ item }) => item.id === selectedStudyId), studyEntries.length)].item.id;
+  studyRevealed = false;
+  renderStudy();
+  document.querySelector("#study-queue .study-queue-item.active")?.focus();
+});
 document.querySelectorAll("[data-filter]").forEach((button) => button.addEventListener("click", () => {
   activeFilter = button.dataset.filter;
   document.querySelectorAll("[data-filter]").forEach((item) => {
