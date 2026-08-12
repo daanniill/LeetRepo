@@ -4,7 +4,7 @@ import {
   DEFAULT_GROQ_MODEL,
   addTokenUsage,
   generateExplanation,
-  normalizeDailyLimit,
+  normalizeLlmBaseUrl,
   reserveUsage,
   usageForToday
 } from "../src/core/llm.js";
@@ -88,28 +88,45 @@ test("generateExplanation rejects incomplete model output", async () => {
   );
 });
 
-test("daily usage is reserved before a request and rejects requests beyond the cap", () => {
-  const now = new Date("2026-08-07T12:00:00.000Z");
-  const first = reserveUsage(null, 2, now);
-  const second = reserveUsage(first, 2, now);
-  assert.equal(second.requests, 2);
-  assert.throws(() => reserveUsage(second, 2, now), (error) => error.code === "LLM_DAILY_LIMIT");
+test("generateExplanation supports a custom OpenAI-compatible endpoint and model", async () => {
+  let call;
+  const fetchImpl = async (url, init) => {
+    call = { url, body: JSON.parse(init.body) };
+    return new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({
+        summary: "Use a hash map to find complements in one pass.",
+        patterns: ["Arrays & Hashing"],
+        approach: ["Create a map.", "Check each complement."],
+        complexity: { time: "O(n)", space: "O(n)" }
+      }) } }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const result = await generateExplanation({
+    apiKey: "custom-key",
+    provider: "custom",
+    baseUrl: "https://llm.example.test/v1/chat/completions",
+    model: "team/interview-model",
+    submission,
+    fetchImpl
+  });
+  assert.equal(call.url, "https://llm.example.test/v1/chat/completions");
+  assert.equal(call.body.model, "team/interview-model");
+  assert.equal(call.body.response_format, undefined);
+  assert.equal(result.review.generatedBy, "Custom OpenAI-compatible");
 });
 
-test("usage resets on a new UTC day and accumulates API token counts", () => {
-  const old = { date: "2026-08-06", requests: 8, inputTokens: 200, outputTokens: 100 };
-  const now = new Date("2026-08-07T00:00:01.000Z");
-  assert.deepEqual(usageForToday(old, now), { date: "2026-08-07", requests: 0, inputTokens: 0, outputTokens: 0 });
-
-  const reserved = reserveUsage(old, 20, now);
-  const updated = addTokenUsage(reserved, { prompt_tokens: 35, completion_tokens: 15 }, DEFAULT_GROQ_MODEL, now);
-  assert.equal(updated.requests, 1);
-  assert.equal(updated.inputTokens, 35);
-  assert.equal(updated.outputTokens, 15);
+test("custom endpoints require HTTPS except on localhost", () => {
+  assert.equal(normalizeLlmBaseUrl("http://localhost:11434/v1/chat/completions", "custom"), "http://localhost:11434/v1/chat/completions");
+  assert.throws(() => normalizeLlmBaseUrl("http://llm.example.test/v1/chat/completions", "custom"), /must use HTTPS/);
 });
 
-test("daily limit is clamped to a safe per-install range", () => {
-  assert.equal(normalizeDailyLimit(0), 1);
-  assert.equal(normalizeDailyLimit(500), 100);
-  assert.equal(normalizeDailyLimit("not-a-number"), 20);
+test("local AI usage reserves attempts, accumulates tokens, and resets daily", () => {
+  const now = new Date("2026-08-11T12:00:00.000Z");
+  const reserved = reserveUsage(null, 2, now);
+  assert.equal(reserved.requests, 1);
+  const used = addTokenUsage(reserved, { prompt_tokens: 12, completion_tokens: 7 }, "test-model", now);
+  assert.equal(used.inputTokens, 12);
+  assert.equal(used.outputTokens, 7);
+  assert.throws(() => reserveUsage({ ...used, requests: 2 }, 2, now), /Daily AI limit reached/);
+  assert.equal(usageForToday(used, new Date("2026-08-12T00:00:00.000Z")).requests, 0);
 });

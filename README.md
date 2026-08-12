@@ -2,140 +2,149 @@
 
 <p align="center">
   <strong>Solve it. Keep it.</strong><br>
-  Turn every Accepted LeetCode submission into a clean GitHub archive and a study system built from your own solutions.
+  Turn every Accepted LeetCode submission into an organized GitHub archive and a study system built from your own solutions.
 </p>
 
-![LeetRepo Lite turns an accepted solution into an organized repository and review system](assets/marketing/final/hero-1600x900.png)
+![Every accepted LeetCode solution documented and pushed to GitHub](.github/readme-assets/hero.png)
 
-LeetRepo Lite is the dependency-free, local-run edition of LeetRepo: a Chrome/Chromium Manifest V3 extension with no account and no backend. It captures the path to Accepted, commits the final solution to GitHub, generates a problem README, and keeps the result ready for interview review — everything runs on your device, and LeetRepo Lite does not collect or store your user info anywhere but your own browser.
+LeetRepo Lite is a local-first Chrome/Chromium extension that saves Accepted LeetCode solutions to GitHub, adds optional AI-generated interview notes using your own provider key, and turns your solve history into a searchable dashboard and study queue. It has no LeetRepo account, database, or hosted backend.
 
-**Automatic GitHub commits · Clean problem READMEs · Attempt history · Pattern analytics · Spaced repetition**
+**Automatic GitHub commits · Multi-language solutions · Attempt history · Pattern analytics · Spaced repetition**
 
-## Why LeetRepo Lite
+## What is included
 
-LeetRepo Lite turns accepted solutions into a GitHub-backed library you can learn from and revisit, entirely from your own browser.
-
-- **Save automatically.** Skip the copy-paste after every solve.
-- **Stay organized.** Keep solutions and problem notes together.
-- **Learn from attempts.** Preserve the path to the final answer.
-- **Review smarter.** Track patterns, study gaps, and spaced repetition.
-
-![LeetRepo Lite extension popup and solution dashboard](assets/marketing/final/store-promo-1400x560.png)
+- **Safe GitHub sync.** Push manually or automatically without copying and pasting code. Every update is verified before the repository branch moves.
+- **Organized solution history.** Keep multiple languages under one problem folder while preserving the original solved time.
+- **Richer READMEs.** Include problem context, examples, solve metadata, notes, and an optional AI walkthrough.
+- **Search and analytics.** Filter by problem, language, difficulty, pattern, or notes and inspect attempts, streaks, and activity.
+- **Adaptive review.** Work through a due/upcoming study queue and choose a review interval in days, weeks, or months.
+- **Bring your own AI.** Use Groq, OpenAI, OpenRouter, or a custom OpenAI-compatible chat-completions endpoint.
 
 ## How it works
 
-1. **Solve on LeetCode.** LeetRepo Lite reads the current problem, editor language, code, submission result, and available performance metrics.
-2. **Confirm the solution.** Push from the in-page panel or toolbar popup, or let a newly Accepted submission trigger auto-push.
-3. **Commit atomically.** LeetRepo Lite creates or updates the problem folder and advances the repository branch in one multi-file commit.
-4. **Review later.** The local dashboard turns synced solutions into a searchable library, activity view, and study queue.
+1. LeetRepo Lite detects the current LeetCode problem, language, code, result, and available performance metrics.
+2. A fresh Accepted result can be pushed from the page panel or toolbar popup, or synced automatically.
+3. The extension commits the solution and README directly to the selected GitHub repository with your token.
+4. Local history powers the Problems, Activity, and Study views without a LeetRepo server.
 
-A synced problem follows this shape:
+A synced problem looks like this:
 
 ```text
 0001-two-sum/
 ├── README.md
-└── python/
-    └── solution.py
+├── python/
+│   └── solution.py
+└── cpp/
+    └── solution.cpp
 ```
 
-The generated README can include solve metadata, the captured problem context, complexity, personal notes, interview prompts, and a replay of the approach. Pushing another language updates the same problem folder without resetting the original solved time.
+## Dashboard
 
-## Built for the next interview
-
-![LeetRepo Lite activity dashboard showing solve history and pattern coverage](assets/marketing/final/feature-library-1200x900.png)
-
-The dashboard separates three jobs that usually get mixed together:
+![LeetRepo Lite solution library with synced problems and AI overviews](.github/readme-assets/solution-library.png)
 
 ### Problems
 
-Search and filter the solution library, inspect a problem's interview overview, and jump back to LeetCode or the GitHub commit.
+Search and filter the solution library, inspect every language variant, edit local notes, and jump back to LeetCode or GitHub.
 
 ### Activity
 
-See repository growth, solve activity, pattern coverage, language breakdown, and the full sequence of failed and accepted attempts.
+Track repository growth, solve activity, pattern coverage, language usage, and failed and Accepted attempts. Progress cards are rendered and shared locally.
+
+![LeetRepo Lite solve activity, pattern coverage, and language breakdown](.github/readme-assets/activity.png)
 
 ### Study
 
-Surface solutions 30 days after they are synced or reviewed, snooze a review for three days, find missing patterns, and create shareable progress cards locally.
+Review due and upcoming problems, recall a solution before revealing its refresher, and rate each review so difficult problems return sooner.
+
+![LeetRepo Lite spaced-repetition study queue](.github/readme-assets/study.png)
 
 ## Install locally
 
-LeetRepo Lite has no build step, no runtime dependencies, and no backend — it runs entirely on your machine.
+Prerequisites:
 
-1. Configure GitHub sign-in using the instructions below.
-2. Open `chrome://extensions` in Chrome or Chromium.
+- Chrome or another Chromium-based browser
+- A GitHub account and a repository for solutions
+- A GitHub personal access token
+- Optional: an API key for an OpenAI-compatible AI provider
+
+Installation:
+
+1. Clone or download this repository.
+2. Open `chrome://extensions`.
 3. Enable **Developer mode**.
-4. Choose **Load unpacked** and select this repository.
-5. Open LeetRepo Lite and complete onboarding.
+4. Choose **Load unpacked** and select the repository root.
+5. Open LeetRepo Lite and complete the three-step onboarding.
 
-## Configure GitHub sign-in
+There is no build step and no local server to start.
 
-LeetRepo Lite uses GitHub's OAuth device flow, so users sign in with GitHub instead of creating and pasting a personal access token. There is no LeetRepo Lite account and no LeetRepo Lite server in this flow — the extension talks to GitHub directly.
+## GitHub token setup
 
-1. Create a GitHub OAuth app under **Settings → Developer settings → OAuth Apps**. Use the project's URL for the homepage and callback fields; device flow does not use the callback.
-2. Open the OAuth app's settings and enable **Device Flow**.
-3. Copy its public client ID into `GITHUB_OAUTH_CLIENT_ID` in [`src/config.js`](src/config.js). Do not add the client secret to the extension.
-4. Reload LeetRepo Lite from `chrome://extensions`.
+The onboarding page accepts either:
 
-During onboarding, LeetRepo Lite displays a one-time code and links to GitHub's device authorization page. The resulting OAuth access token is stored in `chrome.storage.local`, is not synced, and is sent only to GitHub.
+- a fine-grained personal access token with access to the destination repositories, **Metadata: read**, and **Contents: read and write**; or
+- a classic personal access token with the `repo` scope when private-repository access is needed.
 
-LeetRepo Lite requests the `repo` scope because it supports public and private repositories. GitHub defines that scope as full repository access. A production deployment that requires repository-by-repository authorization should use a GitHub App and a backend token exchange instead.
+Create a fine-grained token from [GitHub → Settings → Developer settings → Personal access tokens](https://github.com/settings/personal-access-tokens/new). LeetRepo Lite verifies the token with GitHub, lists only repositories it can access, and stores it in `chrome.storage.local`. The token is not placed in source files or synced through Chrome.
 
-## Optional AI explanations
+Use the narrowest repository selection and shortest practical expiration. If the token is revoked or expires, paste a replacement in Settings.
 
-LeetRepo Lite always has local rule-based interview and Mermaid replay templates. AI explanations are optional, use the user's own Groq key, and are disabled by default.
+## Optional AI setup
 
-To enable them, open **Settings → AI explanations**, add a [Groq API key](https://console.groq.com/keys), choose a production model, and set a daily request limit.
+AI-generated READMEs are disabled by default. Onboarding and Settings support:
 
-When enabled:
+- Groq;
+- OpenAI;
+- OpenRouter; and
+- a custom HTTPS or localhost OpenAI-compatible `/chat/completions` endpoint and model ID.
 
-- The key is stored in `chrome.storage.local`, is excluded from synced settings, and is never returned to extension pages after it is saved.
-- Each request contains the problem title, difficulty, language, first detected description paragraph and example input/output, and up to 24,000 characters of solution code.
-- Requests use Groq's OpenAI-compatible Chat Completions API with JSON output, a bounded completion size, and a 25-second timeout.
-- The default cap is 20 attempted requests per UTC day, configurable from 1 to 100. Failed attempts count toward the limit.
-- If Groq is unavailable, rejects the key, returns invalid output, or reaches the limit, the GitHub push continues with local templates.
-- AI-generated READMEs include a reminder to verify the analysis.
+When AI is enabled, LeetRepo Lite sends the problem title, difficulty, language, detected problem context and example, and up to 24,000 characters of solution code directly to the configured endpoint. The provider key is stored only in `chrome.storage.local` and is never returned to extension pages after saving.
 
-The request cap is a per-install guardrail, not an access-control or billing boundary. A future shared service key would require an authenticated server-side proxy with durable rate limits, payload limits, abuse monitoring, and provider-level spend caps. A shared provider key should never be bundled in the extension.
+The per-install daily request limit is configurable from 1 to 100. Failed attempts count toward the limit. Provider failures never block GitHub sync; the extension falls back to the local review template. AI output is marked for verification.
 
-## Data handling and safety
+Custom remote endpoints request an additional Chrome host permission when saved. This permission is limited to the selected endpoint origin and can be removed from the browser's extension settings.
 
-LeetRepo Lite is local-run: there is no LeetRepo-owned backend, no account, and no server that stores your user info. Everything below happens in your browser unless a step explicitly sends data to GitHub or Groq.
+## Privacy and safety
 
-- GitHub and Groq credentials stay in local extension storage and are not synced.
-- Shareable stats are rendered locally and copied or shared only after an explicit click.
+- GitHub and AI credentials stay in local extension storage and are sent only to the configured services.
+- Submission history, notes, settings, and study schedules stay in the browser profile.
 - Repository-profile generation is opt-in because it replaces the destination repository's root `README.md`.
-- Before moving a GitHub branch, LeetRepo Lite reads the proposed tree back and aborts unless every existing repository file is still present and unchanged.
-- Existing LeetRepo-style folders can be imported from the selected repository to rebuild the local dashboard index.
+- Before moving a branch, LeetRepo Lite reads the proposed tree back and stops unless existing files are preserved.
+- Repository backfill is read-only and rebuilds the local dashboard from matching solution folders.
+- **Clear all local data** removes credentials, preferences, history, notes, and review state without changing GitHub repositories.
 
-## Privacy, terms, and license
-
-- **Privacy:** Read the [LeetRepo Lite Privacy Notice](PRIVACY.md) before installing. It explains what data stays on your device, what is sent to GitHub or Groq, how credentials are stored, and how to remove saved data.
-- **Terms:** Use of LeetRepo Lite is subject to the [Terms and Conditions](TERMS.md), including user responsibilities, third-party service terms, and warranty limitations.
-- **License:** LeetRepo Lite's source code is available under the [MIT License](LICENSE).
+Read the [Privacy Notice](PRIVACY.md), [Terms and Conditions](TERMS.md), and [Security Policy](SECURITY.md) for more detail.
 
 ## Development
 
-Run the test suite:
+Run the tests:
 
 ```bash
 npm test
 ```
 
-The extraction code intentionally uses several fallback selectors because LeetCode changes its DOM regularly.
+Create and verify a Chrome Web Store package:
+
+```bash
+npm run release:check
+```
+
+The archive is written to `dist/`. LeetCode changes its DOM regularly, so the extraction code intentionally uses several fallback selectors.
 
 ### Repository structure
 
 ```text
-assets/
-  marketing/             Campaign artboards, product captures, and final PNGs
-  icon.svg               Extension icon source
+assets/                  Extension icons
+scripts/                 Release packaging and verification helpers
 src/
   background/            Manifest V3 service worker
   content/               LeetCode page integration
-  core/                  Submission, GitHub, and explanation logic
-  pages/                 Popup, options, onboarding, and dashboard UIs
+  core/                  Submission, GitHub, AI, and study logic
+  pages/                 Popup, settings, onboarding, legal, and dashboard UIs
   shared/                Shared UI helpers and styles
-tests/                   Node unit tests
+tests/                   Node.js tests
 manifest.json            Extension entry point and permissions
 ```
+
+## License
+
+LeetRepo Lite is available under the [MIT License](LICENSE).

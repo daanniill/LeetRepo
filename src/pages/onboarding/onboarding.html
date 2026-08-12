@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Set up LeetRepo Lite</title>
     <link rel="stylesheet" href="../../shared/common.css">
-    <link rel="stylesheet" href="onboarding.css">
+    <link rel="stylesheet" href="onboarding.css?v=2.0.0">
   </head>
   <body>
     <main class="onboarding-shell">
@@ -17,58 +17,63 @@
           <p>One folder per problem, documented and ready to review — automatically, the moment your submission is Accepted.</p>
         </div>
         <ol class="steps" aria-label="Setup progress">
-          <li class="active" data-step-marker="1"><span>1</span><div><strong>Connect GitHub</strong><small>Sign in and authorize LeetRepo Lite</small></div></li>
+          <li class="active" data-step-marker="1"><span>1</span><div><strong>Add your tokens</strong><small>Connect GitHub and optional AI</small></div></li>
           <li data-step-marker="2"><span>2</span><div><strong>Choose your repo</strong><small>Configure how solutions land</small></div></li>
           <li data-step-marker="3"><span>3</span><div><strong>Start solving</strong><small>Push manually or automatically</small></div></li>
         </ol>
-        <div class="privacy-note">LeetRepo Lite reads submissions from the page. Your GitHub authorization stays in local extension storage — there is no LeetRepo Lite account and no server storing your info.</div>
+        <div class="privacy-note">LeetRepo Lite stores tokens and solution history only in this browser profile. It has no account or hosted backend. <a href="../legal/legal.html?document=privacy" target="_blank" rel="noreferrer">Privacy Notice</a> · <a href="../legal/legal.html?document=terms" target="_blank" rel="noreferrer">Terms</a></div>
       </section>
 
       <section class="setup-wrap">
         <div class="setup-panel panel">
           <div class="setup-head">
-            <div><div class="eyebrow" id="step-eyebrow">Step 1 of 3</div><h2 id="step-title">Connect GitHub</h2></div>
+            <div><div class="eyebrow" id="step-eyebrow">Step 1 of 3</div><h2 id="step-title">Connect your services</h2></div>
             <span class="step-count" id="step-count">01 / 03</span>
           </div>
           <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
 
           <form id="connect-step" class="step-pane stack gap-16">
             <div class="github-signin-copy">
-              <h3>Authorize with your GitHub account</h3>
-              <p>GitHub will show exactly what LeetRepo Lite can access. You will never need to create or paste a personal access token.</p>
+              <h3>GitHub personal access token</h3>
+              <p>LeetRepo Lite uses your token directly from this browser to list repositories and commit solutions. The token is never sent to a LeetRepo server.</p>
             </div>
-            <button class="button full" type="submit" id="connect-button">Sign in with GitHub</button>
-            <p class="field-help">LeetRepo Lite requests GitHub’s <strong>repo</strong> scope so it can list repositories, create your destination repository, and commit solutions to public or private repositories.</p>
-            <div class="device-flow card" id="device-flow" hidden>
-              <div>
-                <span class="eyebrow">Your one-time code</span>
-                <output class="device-code mono" id="device-code">----</output>
-              </div>
-              <p>Copy this code, open GitHub, and approve LeetRepo Lite. This page will continue automatically.</p>
-              <div class="device-actions row">
-                <button class="button secondary grow" id="copy-device-code" type="button">Copy code</button>
-                <a class="button grow" id="open-github-device" target="_blank" rel="noreferrer">Open GitHub ↗</a>
-              </div>
-              <small class="device-status" id="device-status">Waiting for approval on GitHub…</small>
+            <div class="field">
+              <label for="github-token">GitHub token</label>
+              <input class="input mono" id="github-token" type="password" autocomplete="new-password" spellcheck="false" placeholder="github_pat_… or ghp_…" required>
+              <small>Use a fine-grained token with Metadata read and Contents read/write for the repositories you want to sync, or a classic token with <code>repo</code>.</small>
             </div>
+            <a class="button secondary full" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">Create a fine-grained GitHub token ↗</a>
+
+            <div class="credential-divider"><span>Optional AI setup</span></div>
+            <div class="setting-line" id="setup-ai-row"><div><strong>AI-generated README</strong><small id="setup-ai-copy">Use your own provider key for walkthroughs and diagrams. Off keeps local feedback available.</small></div><label class="switch"><input id="setup-ai-readme" type="checkbox" aria-label="Enable AI-generated README"><span></span></label></div>
+            <div class="ai-setup-fields" id="ai-setup-fields" hidden>
+              <div class="field">
+                <label for="setup-ai-provider">Provider</label>
+                <select class="select" id="setup-ai-provider"></select>
+              </div>
+              <div class="field">
+                <label for="setup-ai-model">Model ID</label>
+                <input class="input mono" id="setup-ai-model" spellcheck="false">
+              </div>
+              <div class="field ai-endpoint-field">
+                <label for="setup-ai-base-url">Chat completions URL</label>
+                <input class="input mono" id="setup-ai-base-url" type="url" spellcheck="false">
+              </div>
+              <div class="field ai-key-field">
+                <label for="setup-ai-key">Provider API key</label>
+                <input class="input mono" id="setup-ai-key" type="password" autocomplete="new-password" spellcheck="false" placeholder="Stored only in this browser">
+              </div>
+            </div>
+            <div class="data-disclosure" aria-label="Data use summary"><strong>Stored locally</strong><ul><li>GitHub and AI keys stay in local extension storage and are not synced.</li><li>Solution code goes only to GitHub when you push and to your chosen AI endpoint when AI is enabled.</li></ul></div>
+            <button class="button full" type="submit" id="connect-button">Verify tokens and continue</button>
           </form>
 
           <form id="configure-step" class="step-pane stack gap-16" hidden>
             <div class="connected-user row"><span class="avatar" id="avatar">GH</span><div><strong id="github-login">Connected</strong><small>GitHub account connected</small></div><span class="badge accepted">Verified</span></div>
-            <div class="field">
-              <label>Target repository</label>
-              <div class="repo-mode" role="radiogroup" aria-label="Repository choice">
-                <label><input type="radio" name="repo-mode" value="existing" checked><span>Use existing</span></label>
-                <label><input type="radio" name="repo-mode" value="new"><span>Create new</span></label>
-              </div>
-            </div>
             <div class="field" id="existing-repo-field">
-              <label for="repo">Repository</label>
+              <label for="repo">Target repository</label>
               <select class="select" id="repo"></select>
-            </div>
-            <div class="new-repo-grid" id="new-repo-fields" hidden>
-              <div class="field"><label for="new-repo-name">Repository name</label><input class="input" id="new-repo-name" value="leetcode-solutions"></div>
-              <div class="field"><label for="new-repo-visibility">Visibility</label><select class="select" id="new-repo-visibility"><option value="private">Private</option><option value="public">Public</option></select></div>
+              <small>Only repositories your token can access appear here.</small>
             </div>
             <div class="field">
               <label for="commit-template">Commit message format</label>
@@ -84,8 +89,7 @@
                 <label><input id="setup-readme" type="checkbox" checked><span>README</span></label>
                 <label><input id="setup-stats" type="checkbox" checked><span>Runtime &amp; memory</span></label>
                 <label><input id="setup-link" type="checkbox" checked><span>LeetCode link</span></label>
-                <label><input id="setup-notes" type="checkbox" checked><span>Personal notes</span></label>
-                <label><input id="setup-review" type="checkbox" checked><span>Interview overview</span></label>
+                <label><input id="setup-notes" type="checkbox" checked><span>Notes with AI</span></label>
               </div>
             </div>
             <div class="setting-line"><div><strong>Auto-push on Accepted</strong><small>Also push manually anytime from the popup</small></div><label class="switch"><input id="setup-auto-push" type="checkbox" checked><span></span></label></div>

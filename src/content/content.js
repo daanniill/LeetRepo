@@ -5,6 +5,7 @@
   let checkTimer = null;
   let pushing = false;
   let reviewing = false;
+  let ai = { limitReached: false };
   let notes = {};
   let syncedSubmissions = [];
   let pendingSubmission = null;
@@ -182,9 +183,9 @@
         <div class="lr-head">
           <span class="lr-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>
           <span class="lr-brand">LeetRepo Lite</span>
-          <button class="lr-minimize" title="Minimize LeetRepo Lite" aria-label="Minimize LeetRepo Lite">−</button>
+          <button class="lr-minimize" title="Minimize LeetRepo Lite" aria-label="Minimize LeetRepo Lite" aria-expanded="true">−</button>
         </div>
-        <div class="lr-body">
+        <div class="lr-body"><div class="lr-body-inner">
           <div class="lr-title">Reading this problem…</div>
           <div class="lr-meta"></div>
           <div class="lr-status">Waiting for an Accepted submission</div>
@@ -193,15 +194,20 @@
           <div class="lr-feedback" hidden></div>
           <label class="lr-notes-label" for="lr-personal-notes">Personal notes</label>
           <textarea class="lr-notes" id="lr-personal-notes" rows="2" maxlength="4000" placeholder="What should future-you remember?"></textarea>
-          <div class="lr-auto"><span>Auto-push on Accepted</span><label class="lr-switch"><input type="checkbox"><span></span></label></div>
+          <div class="lr-auto"><span>Auto-push on Accepted</span><label class="lr-switch"><input class="lr-auto-push" type="checkbox"><span></span></label></div>
+          <div class="lr-auto lr-ai-option"><span class="lr-ai-copy">AI-generated README<small>Sends solution code to AI</small></span><label class="lr-switch"><input class="lr-ai-readme" type="checkbox" aria-label="Use AI-generated README"><span></span></label></div>
           <button class="lr-link lr-dashboard">Open dashboard →</button>
           <div class="lr-notice" hidden></div>
-        </div>
+        </div></div>
       </div>`;
     document.body.appendChild(panel);
     panel.querySelector(".lr-minimize").addEventListener("click", () => {
-      panel.classList.toggle("lr-collapsed");
-      panel.querySelector(".lr-minimize").textContent = panel.classList.contains("lr-collapsed") ? "+" : "−";
+      const collapsed = panel.classList.toggle("lr-collapsed");
+      const minimize = panel.querySelector(".lr-minimize");
+      minimize.textContent = collapsed ? "+" : "−";
+      minimize.setAttribute("aria-expanded", String(!collapsed));
+      minimize.setAttribute("aria-label", collapsed ? "Expand LeetRepo Lite" : "Minimize LeetRepo Lite");
+      minimize.title = collapsed ? "Expand LeetRepo Lite" : "Minimize LeetRepo Lite";
     });
     panel.querySelector(".lr-button:not(.secondary)").addEventListener("click", () => push(false));
     panel.querySelector(".lr-review").addEventListener("click", review);
@@ -212,9 +218,25 @@
       notes[`${latest.number}-${latest.slug}`] = event.target.value;
       await chrome.runtime.sendMessage({ type: "SAVE_NOTES", submission: latest, notes: event.target.value });
     });
-    panel.querySelector(".lr-switch input").addEventListener("change", async (event) => {
+    panel.querySelector(".lr-auto-push").addEventListener("change", async (event) => {
       settings = { ...settings, autoPush: event.target.checked };
       await chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", settings: { autoPush: event.target.checked } });
+    });
+    panel.querySelector(".lr-ai-readme").addEventListener("change", async (event) => {
+      const previous = settings?.aiEnabled === true;
+      const enabled = event.target.checked;
+      settings = { ...settings, aiEnabled: enabled, aiConsent: enabled };
+      render();
+      try {
+        const response = await chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", settings: { aiEnabled: enabled, aiConsent: enabled } });
+        if (!response?.ok) throw new Error(response?.error || "Could not update the AI README setting.");
+        settings = response.settings;
+        showNotice(enabled ? "AI README enabled. Solution code will be sent directly to your configured provider." : "Basic stats-only README enabled.");
+      } catch (error) {
+        settings = { ...settings, aiEnabled: previous, aiConsent: previous };
+        showNotice(error.message, true);
+      }
+      render();
     });
   }
 
@@ -245,21 +267,31 @@
         ? "Solution already synced"
         : settings?.connected ? (latest.code ? existingSolution ? "Update on GitHub" : "Push to GitHub" : "Open the code editor") : "Connect GitHub in Settings";
     const reviewButton = panel.querySelector(".lr-review");
-    reviewButton.disabled = reviewing || !latest.code;
-    reviewButton.textContent = reviewing ? "Reviewing solution…" : "Get AI feedback";
-    panel.querySelector(".lr-switch input").checked = settings?.autoPush !== false;
+    const aiEnabled = settings?.aiEnabled === true;
+    const aiBlocked = aiEnabled && ai.limitReached === true;
+    reviewButton.disabled = reviewing || !latest.code || aiBlocked;
+    reviewButton.textContent = reviewing ? "Reviewing solution…" : aiBlocked ? "Daily AI limit reached" : aiEnabled ? "Get AI feedback" : "Get local feedback";
+    panel.querySelector(".lr-auto-push").checked = settings?.autoPush !== false;
+    const aiToggle = panel.querySelector(".lr-ai-readme");
+    aiToggle.checked = aiEnabled;
+    aiToggle.disabled = ai.limitReached === true && !aiEnabled;
+    panel.querySelector(".lr-ai-option").classList.toggle("limited", ai.limitReached === true);
+    panel.querySelector(".lr-ai-copy small").textContent = ai.limitReached === true
+      ? aiEnabled ? "Limit reached — turn off for local mode" : "Limit reached — local mode active"
+      : "Sends solution code to AI";
     const notesInput = panel.querySelector(".lr-notes");
     if (document.activeElement !== notesInput && notesInput.value !== (latest.notes || "")) notesInput.value = latest.notes || "";
   }
 
   async function review() {
-    if (reviewing || !latest?.code) return;
+    if (reviewing || !latest?.code || (settings?.aiEnabled === true && ai.limitReached === true)) return;
     reviewing = true;
     render();
     showNotice("");
     try {
       const response = await chrome.runtime.sendMessage({ type: "GENERATE_FEEDBACK", submission: latest });
       if (!response?.ok) throw new Error(response?.error || "Feedback failed.");
+      ai = { ...ai, ...response.ai };
       const feedback = document.querySelector(`#${PANEL_ID} .lr-feedback`);
       const complexity = response.review.complexity?.time && response.review.complexity?.space
         ? `<div class="lr-complexity"><span>Time · ${escapeHtml(response.review.complexity.time)}</span><span>Space · ${escapeHtml(response.review.complexity.space)}</span></div>`
@@ -291,6 +323,7 @@
     try {
       const response = await chrome.runtime.sendMessage({ type: "PUSH_SUBMISSION", submission: submissionForPush() });
       if (!response?.ok) throw new Error(response?.error || "Push failed.");
+      ai = { ...ai, ...response.ai };
       syncedSubmissions = [response.submission, ...syncedSubmissions.filter((item) => String(item.number) !== String(response.submission.number))];
       acceptedSubmissionKey = "";
       const success = response.result?.updated
@@ -314,12 +347,17 @@
   }
 
   function scheduleRefresh() {
+    if (!settings?.connected) return;
     clearTimeout(checkTimer);
     checkTimer = setTimeout(refresh, 700);
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === "GET_SUBMISSION") {
+      if (settings?.connected === false) {
+        sendResponse({ submission: null });
+        return;
+      }
       latest = extractSubmission();
       sendResponse({ submission: submissionForPush(latest) });
     }
@@ -328,8 +366,17 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes.settings) {
       settings = changes.settings.newValue;
+      if (!settings?.connected) {
+        document.getElementById(PANEL_ID)?.remove();
+        clearTimeout(checkTimer);
+        latest = null;
+        pendingSubmission = null;
+        acceptedSubmissionKey = "";
+        return;
+      }
+      mount();
       applyTheme();
-      render();
+      refresh();
     }
     if (area === "local" && changes.submissions) {
       syncedSubmissions = changes.submissions.newValue || [];
@@ -338,16 +385,18 @@
     }
   });
 
-  mount();
   chrome.runtime.sendMessage({ type: "GET_STATE" }).then((response) => {
     settings = response?.settings || {};
+    ai = response?.ai || ai;
     notes = response?.notes || {};
     syncedSubmissions = response?.submissions || [];
+    if (!settings.connected) return;
+    mount();
     applyTheme();
     refresh();
   });
   document.addEventListener("click", (event) => {
-    if (!isLeetCodeSubmitButton(event.target)) return;
+    if (!settings?.connected || !isLeetCodeSubmitButton(event.target)) return;
     const submission = extractSubmission();
     if (!submission.code) return;
     acceptedSubmissionKey = "";
@@ -357,6 +406,7 @@
     render();
   }, true);
   new MutationObserver((mutations) => {
+    if (!settings?.connected) return;
     const resultStatus = pendingSubmission && Date.now() - pendingSubmission.startedAt >= 250
       ? resultStatusFromMutations(mutations)
       : null;

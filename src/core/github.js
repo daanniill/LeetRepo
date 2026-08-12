@@ -1,81 +1,35 @@
 import { buildProfileReadme, buildReadme, folderFor, formatCommit, languageFolderFor, normalizeSubmission, sameProblem } from "./submissions.js";
 
 const API = "https://api.github.com";
-const OAUTH = "https://github.com/login";
 const MAX_BRANCH_UPDATE_ATTEMPTS = 3;
-
-function oauthError(data, fallback) {
-  const messages = {
-    access_denied: "GitHub sign-in was cancelled.",
-    device_flow_disabled: "Device flow is not enabled for this GitHub OAuth app.",
-    expired_token: "The GitHub sign-in code expired. Start again to get a new code.",
-    incorrect_client_credentials: "The configured GitHub OAuth client ID is invalid.",
-    incorrect_device_code: "The GitHub sign-in code is no longer valid.",
-    token_expired: "The GitHub sign-in code expired. Start again to get a new code.",
-    unsupported_grant_type: "GitHub rejected the device authorization request."
-  };
-  return new Error(messages[data?.error] || data?.error_description || fallback);
-}
-
-async function oauthRequest(path, params) {
-  const response = await fetch(`${OAUTH}${path}`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams(params).toString()
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw oauthError(data, `GitHub sign-in failed (${response.status}).`);
-  return data;
-}
-
-export async function startDeviceAuthorization(clientId, scope = "repo") {
-  const data = await oauthRequest("/device/code", { client_id: clientId, scope });
-  if (data.error) throw oauthError(data, "GitHub could not start sign-in.");
-  if (!data.device_code || !data.user_code || !data.verification_uri) {
-    throw new Error("GitHub returned an incomplete sign-in response.");
-  }
-  return {
-    deviceCode: data.device_code,
-    userCode: data.user_code,
-    verificationUri: data.verification_uri,
-    expiresIn: Number(data.expires_in) || 900,
-    interval: Math.max(1, Number(data.interval) || 5)
-  };
-}
-
-export async function pollDeviceAuthorization(clientId, deviceCode) {
-  const data = await oauthRequest("/oauth/access_token", {
-    client_id: clientId,
-    device_code: deviceCode,
-    grant_type: "urn:ietf:params:oauth:grant-type:device_code"
-  });
-  if (data.access_token) {
-    return {
-      status: "authorized",
-      accessToken: data.access_token,
-      scope: data.scope || "",
-      tokenType: data.token_type || "bearer"
-    };
-  }
-  if (data.error === "authorization_pending") return { status: "pending" };
-  if (data.error === "slow_down") return { status: "pending", slowDown: true };
-  throw oauthError(data, "GitHub could not complete sign-in.");
-}
+const GITHUB_API_VERSION = "2026-03-10";
+const GITHUB_TIMEOUT_MS = 20_000;
 
 function headers(token) {
   return {
     Accept: "application/vnd.github+json",
     Authorization: `Bearer ${token}`,
-    "X-GitHub-Api-Version": "2022-11-28",
+    "X-GitHub-Api-Version": GITHUB_API_VERSION,
     "Content-Type": "application/json"
   };
 }
 
 async function request(token, path, init = {}) {
-  const response = await fetch(`${API}${path}`, { ...init, headers: { ...headers(token), ...init.headers } });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GITHUB_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(`${API}${path}`, {
+      ...init,
+      headers: { ...headers(token), ...init.headers },
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("GitHub took too long to respond. Try again shortly.");
+    throw new Error("GitHub could not be reached. Check your connection and try again.");
+  } finally {
+    clearTimeout(timer);
+  }
   const data = response.status === 204 ? null : await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(data?.message || `GitHub request failed (${response.status})`);
@@ -85,12 +39,12 @@ async function request(token, path, init = {}) {
   return data;
 }
 
-export async function verifyToken(token) {
-  return request(token, "/user");
-}
-
 export async function listRepos(token) {
   return request(token, "/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member");
+}
+
+export async function verifyToken(token) {
+  return request(token, "/user");
 }
 
 export async function createRepo(token, { name, description = "LeetCode solutions synced by LeetRepo Lite", visibility = "private" }) {
@@ -116,8 +70,13 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
   const selectedBranch = branch || info.default_branch || "main";
   const tree = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(selectedBranch)}?recursive=1`);
   if (tree.truncated) throw new Error("This repository is too large to backfill safely in one request.");
-  const languages = { py: "Python3", cpp: "C++", java: "Java", js: "JavaScript", ts: "TypeScript", go: "Go", rs: "Rust", cs: "C#", kt: "Kotlin", swift: "Swift", rb: "Ruby", php: "PHP" };
-  return (tree.tree || []).flatMap((entry) => {
+  const languages = {
+    bash: "Bash", sh: "Bash", c: "C", cpp: "C++", csharp: "C#", cs: "C#", dart: "Dart", elixir: "Elixir", ex: "Elixir",
+    erlang: "Erlang", erl: "Erlang", go: "Go", java: "Java", javascript: "JavaScript", js: "JavaScript", kotlin: "Kotlin", kt: "Kotlin",
+    mysql: "MySQL", sql: "SQL", php: "PHP", python: "Python3", python3: "Python3", py: "Python3", racket: "Racket", rkt: "Racket",
+    ruby: "Ruby", rb: "Ruby", rust: "Rust", rs: "Rust", scala: "Scala", swift: "Swift", typescript: "TypeScript", ts: "TypeScript"
+  };
+  const solutions = (tree.tree || []).flatMap((entry) => {
     const match = entry.type === "blob" && entry.path.match(/^(\d{4,})-([^/]+)\/(?:(?:([^/]+)\/)?solution\.([A-Za-z0-9]+))$/);
     if (!match) return [];
     const [, number, slug, languageFolder, extension] = match;
@@ -126,11 +85,34 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
       title: slug.split("-").map((part) => part ? part[0].toUpperCase() + part.slice(1) : "").join(" "),
       slug,
       difficulty: "Unknown",
-      language: languages[extension.toLowerCase()] || extension.toUpperCase(),
-      extension,
+      language: languages[languageFolder?.toLowerCase()] || languages[extension.toLowerCase()] || extension.toUpperCase(),
+      extension: extension.toLowerCase(),
+      path: entry.path,
       status: "Accepted",
       commitUrl: `https://github.com/${owner}/${repo}/tree/${encodeURIComponent(selectedBranch)}/${number}-${slug}${languageFolder ? `/${encodeURIComponent(languageFolder)}` : ""}`
     }];
+  });
+  const grouped = new Map();
+  for (const solution of solutions) {
+    const key = solution.number;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(solution);
+  }
+  for (let index = 0; index < solutions.length; index += 10) {
+    await Promise.all(solutions.slice(index, index + 10).map(async (solution) => {
+      const commits = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?sha=${encodeURIComponent(selectedBranch)}&path=${encodeURIComponent(solution.path)}&per_page=1`);
+      const latest = commits[0];
+      solution.syncedAt = latest?.commit?.committer?.date || latest?.commit?.author?.date || null;
+      solution.commitSha = latest?.sha || "";
+    }));
+  }
+  return [...grouped.values()].map((items) => {
+    const variants = items.slice().sort((left, right) => {
+      const dateDifference = (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0);
+      return dateDifference || left.path.localeCompare(right.path);
+    });
+    const latest = variants[0];
+    return { ...latest, solutions: variants };
   });
 }
 

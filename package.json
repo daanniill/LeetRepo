@@ -1,9 +1,15 @@
 {
   "name": "leetrepo-extension",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
+    "package:extension": "node scripts/package-extension.js",
+    "verify:release": "node scripts/verify-release.js",
+    "release:check": "npm test && npm run package:extension && npm run verify:release",
     "test": "node --test tests/*.test.js"
   }
 }

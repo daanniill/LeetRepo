@@ -1,3 +1,5 @@
+export { dueForReview, reviewDueAt } from "./study.js";
+
 export const DEFAULT_SETTINGS = {
   connected: false,
   owner: "",
@@ -8,11 +10,15 @@ export const DEFAULT_SETTINGS = {
   includeStats: true,
   includeLink: true,
   includeNotes: true,
-  includeReview: true,
   includeProfile: false,
   spacedRepetition: true,
+  studyIntervalValue: 30,
+  studyIntervalUnit: "days",
   aiEnabled: false,
-  aiModel: "llama-3.3-70b-versatile",
+  aiConsent: false,
+  aiProvider: "groq",
+  aiBaseUrl: "https://api.groq.com/openai/v1/chat/completions",
+  aiModel: "openai/gpt-oss-120b",
   aiDailyLimit: 20,
   commitTemplate: "solve: {number}. {title} ({difficulty})",
   theme: "system"
@@ -64,7 +70,7 @@ export function normalizeSubmission(input = {}) {
   const number = String(input.number || "0").replace(/\D/g, "") || "0";
   const title = String(input.title || "Untitled problem").trim();
   const language = String(input.language || "text").trim();
-  return {
+  const item = {
     id: `${number}-${slugify(title)}`,
     number,
     title,
@@ -72,6 +78,7 @@ export function normalizeSubmission(input = {}) {
     difficulty: ["Easy", "Medium", "Hard"].includes(input.difficulty) ? input.difficulty : "Unknown",
     language,
     extension: LANGUAGE_EXTENSIONS[language.toLowerCase()] || "txt",
+    path: String(input.path || "").trim(),
     code: String(input.code || "").trimEnd(),
     runtime: String(input.runtime || "—"),
     memory: String(input.memory || "—"),
@@ -87,7 +94,107 @@ export function normalizeSubmission(input = {}) {
     notes: String(input.notes || "").trim().slice(0, 4_000),
     review: input.review && typeof input.review === "object" ? input.review : null,
     reviewDueAt: input.reviewDueAt || null,
-    lastReviewedAt: input.lastReviewedAt || null
+    lastReviewedAt: input.lastReviewedAt || null,
+    reviewIntervalDays: Number.isFinite(Number(input.reviewIntervalDays)) && Number(input.reviewIntervalDays) > 0 ? Math.floor(Number(input.reviewIntervalDays)) : null,
+    reviewCount: Number.isFinite(Number(input.reviewCount)) && Number(input.reviewCount) >= 0 ? Math.floor(Number(input.reviewCount)) : 0,
+    reviewLapses: Number.isFinite(Number(input.reviewLapses)) && Number(input.reviewLapses) >= 0 ? Math.floor(Number(input.reviewLapses)) : 0,
+    lastReviewRating: ["again", "hard", "good"].includes(input.lastReviewRating) ? input.lastReviewRating : null
+  };
+  item.solutions = Array.isArray(input.solutions)
+    ? input.solutions.map((solution) => normalizeSolution(solution, item))
+    : [];
+  return item;
+}
+
+function normalizeSolution(input = {}, fallback = {}) {
+  const language = String(input.language || fallback.language || "text").trim();
+  const extension = String(input.extension || LANGUAGE_EXTENSIONS[language.toLowerCase()] || fallback.extension || "txt").toLowerCase();
+  const path = String(input.path || "").trim();
+  return {
+    key: String(input.key || `${language.toLowerCase()}:${extension}`),
+    path,
+    language,
+    extension,
+    code: String(input.code || "").trimEnd(),
+    runtime: String(input.runtime || "—"),
+    memory: String(input.memory || "—"),
+    status: input.status || "Accepted",
+    solvedAt: input.solvedAt || input.syncedAt || null,
+    syncedAt: input.syncedAt || null,
+    commitUrl: input.commitUrl || "",
+    commitSha: input.commitSha || "",
+    review: input.review && typeof input.review === "object" ? input.review : null
+  };
+}
+
+function mergeSolution(left, right) {
+  const next = { ...left };
+  for (const [key, value] of Object.entries(right)) {
+    if (value !== "" && value !== null && value !== "—") next[key] = value;
+  }
+  return next;
+}
+
+export function submissionSolutions(input = {}) {
+  const item = normalizeSubmission(input);
+  const variants = new Map(item.solutions.map((solution) => [solution.key, solution]));
+  const current = normalizeSolution(item);
+  variants.set(current.key, variants.has(current.key) ? mergeSolution(variants.get(current.key), current) : current);
+  return [...variants.values()].sort((left, right) => {
+    const dateDifference = (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0);
+    return dateDifference || left.key.localeCompare(right.key);
+  });
+}
+
+export function mergeSubmissionSolutions(existing = {}, incoming = {}) {
+  const hasPrevious = Object.keys(existing).length > 0;
+  const previous = normalizeSubmission(existing);
+  const update = normalizeSubmission(incoming);
+  const variants = new Map();
+  const previousSolutions = hasPrevious ? submissionSolutions(previous) : [];
+  for (const solution of [...previousSolutions, ...submissionSolutions(update)]) {
+    variants.set(solution.key, variants.has(solution.key) ? mergeSolution(variants.get(solution.key), solution) : solution);
+  }
+  const solutions = [...variants.values()].sort((left, right) => {
+    const dateDifference = (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0);
+    return dateDifference || left.key.localeCompare(right.key);
+  });
+  const latest = solutions[0];
+  const difficulty = update.difficulty === "Unknown" ? previous.difficulty : update.difficulty;
+  const merged = normalizeSubmission({
+    ...previous,
+    ...update,
+    title: hasPrevious ? previous.title : update.title,
+    slug: hasPrevious ? previous.slug : update.slug,
+    difficulty,
+    url: update.url || previous.url,
+    problemContext: update.problemContext || previous.problemContext,
+    exampleInput: update.exampleInput || previous.exampleInput,
+    exampleOutput: update.exampleOutput || previous.exampleOutput,
+    notes: update.notes || previous.notes,
+    solvedAt: previous.solvedAt || update.solvedAt,
+    reviewDueAt: update.reviewDueAt || previous.reviewDueAt,
+    lastReviewedAt: update.lastReviewedAt || previous.lastReviewedAt,
+    reviewIntervalDays: update.reviewIntervalDays || previous.reviewIntervalDays,
+    reviewCount: Math.max(update.reviewCount, previous.reviewCount),
+    reviewLapses: Math.max(update.reviewLapses, previous.reviewLapses),
+    lastReviewRating: update.lastReviewRating || previous.lastReviewRating,
+    solutions
+  });
+  return {
+    ...merged,
+    language: latest.language,
+    extension: latest.extension,
+    path: latest.path,
+    code: latest.code,
+    runtime: latest.runtime,
+    memory: latest.memory,
+    status: latest.status,
+    syncedAt: latest.syncedAt,
+    commitUrl: latest.commitUrl,
+    commitSha: latest.commitSha,
+    review: latest.review,
+    solutions
   };
 }
 
@@ -289,14 +396,15 @@ export function buildReview(submission) {
 
 export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedReview) {
   const item = normalizeSubmission(submission);
-  const review = suppliedReview || buildReview(item);
   const lines = [`# ${item.number}. ${item.title}`, ""];
   if (settings.includeLink !== false && item.url) lines.push(`[View problem on LeetCode](${item.url})`, "");
   lines.push(`- **Difficulty:** ${item.difficulty}`, `- **Language:** ${item.language}`);
   const solvedAt = formatSolvedAt(item.solvedAt);
   if (solvedAt) lines.push(`- **Solved:** ${solvedAt}`);
   if (settings.includeStats !== false) lines.push(`- **Runtime:** ${item.runtime}`, `- **Memory:** ${item.memory}`);
-  if (settings.includeReview !== false) {
+  if (item.problemContext) lines.push("", "## Problem description", "", item.problemContext);
+  if (settings.aiEnabled === true && suppliedReview) {
+    const review = suppliedReview;
     lines.push("", "## Interview overview", "", `**Patterns:** ${review.patterns.join(", ")}`, "");
     if (review.summary) lines.push(review.summary, "");
     lines.push("### Solution replay", "", "```mermaid", buildMermaidDiagram(item, review), "```", "");
@@ -316,10 +424,20 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
       review.edgeCases.forEach((edgeCase) => lines.push(`- ${edgeCase}`));
     }
     if (review.generatedBy) lines.push("", `_AI-generated with ${review.generatedBy}; verify the analysis before relying on it._`);
+    if (settings.includeNotes !== false && item.notes) lines.push("", "## Personal notes", "", item.notes);
   }
-  if (settings.includeNotes !== false && item.notes) lines.push("", "## Personal notes", "", item.notes);
-  lines.push("", "---", "_Synced by [LeetRepo Lite](https://github.com/)_");
+  if (settings.includeNotes !== false && item.notes && !(settings.aiEnabled === true && suppliedReview)) {
+    lines.push("", "## Personal notes", "", item.notes);
+  }
+  lines.push("", "---", "_Synced by LeetRepo Lite_");
   return lines.join("\n");
+}
+
+function submissionPatterns(item) {
+  return [...new Set(submissionSolutions(item).flatMap((solution) => {
+    const review = solution.review || buildReview({ ...item, ...solution });
+    return review.patterns || [];
+  }))];
 }
 
 export function historyInsights(items = []) {
@@ -327,12 +445,19 @@ export function historyInsights(items = []) {
   const languages = new Map();
   for (const input of items) {
     const item = normalizeSubmission(input);
-    languages.set(item.language, (languages.get(item.language) || 0) + 1);
-    const review = item.review || buildReview(item);
-    for (const pattern of review.patterns || []) patterns.set(pattern, (patterns.get(pattern) || 0) + 1);
+    for (const solution of submissionSolutions(item)) {
+      languages.set(solution.language, (languages.get(solution.language) || 0) + 1);
+    }
+    for (const pattern of submissionPatterns(item)) patterns.set(pattern, (patterns.get(pattern) || 0) + 1);
   }
   const sortCounts = (entries) => [...entries].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return { patterns: sortCounts(patterns), languages: sortCounts(languages) };
+}
+
+export function submissionSearchText(input = {}) {
+  const item = normalizeSubmission(input);
+  const languages = submissionSolutions(item).map((solution) => solution.language);
+  return [item.number, item.title, item.difficulty, item.notes, ...languages, ...submissionPatterns(item)].join(" ").toLowerCase();
 }
 
 export function buildProfileReadme(items = [], settings = {}) {
@@ -368,24 +493,6 @@ export function buildProfileReadme(items = [], settings = {}) {
   return lines.join("\n");
 }
 
-export function reviewDueAt(item, intervalDays = 30) {
-  if (item.reviewDueAt) return new Date(item.reviewDueAt);
-  const base = item.lastReviewedAt || item.syncedAt;
-  if (!base) return null;
-  const due = new Date(base);
-  due.setUTCDate(due.getUTCDate() + intervalDays);
-  return due;
-}
-
-export function dueForReview(items = [], now = new Date()) {
-  return items
-    .filter((item) => {
-      const due = reviewDueAt(item);
-      return due && due <= now;
-    })
-    .sort((a, b) => reviewDueAt(a) - reviewDueAt(b));
-}
-
 export function relativeTime(value, now = Date.now()) {
   if (!value) return "not yet";
   const seconds = Math.max(0, Math.round((now - new Date(value).getTime()) / 1000));
@@ -396,8 +503,12 @@ export function relativeTime(value, now = Date.now()) {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
+export function solveTimestamp(item = {}) {
+  return item.solvedAt || item.syncedAt || null;
+}
+
 export function calculateStreak(items = [], now = new Date()) {
-  const days = new Set(items.filter((x) => x.syncedAt).map((x) => new Date(x.syncedAt).toISOString().slice(0, 10)));
+  const days = new Set(items.map(solveTimestamp).filter(Boolean).map((value) => new Date(value).toISOString().slice(0, 10)));
   let cursor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const today = cursor.toISOString().slice(0, 10);
   if (!days.has(today)) cursor.setUTCDate(cursor.getUTCDate() - 1);

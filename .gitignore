@@ -1,4 +1,6 @@
-.DS_Store
 node_modules/
-coverage/
-*.log
+dist/
+.env
+.DS_Store
+assets/marketing/
+deployment/

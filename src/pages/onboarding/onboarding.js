@@ -1,103 +1,81 @@
+import { LLM_PROVIDERS } from "../../core/llm.js";
 import { DEFAULT_SETTINGS } from "../../core/submissions.js";
-import { logo, send, setBusy, showNotice } from "../../shared/client.js";
+import { ensureProviderPermission, logo, send, setBusy, showNotice } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
 const notice = document.querySelector("#notice");
 const panes = [document.querySelector("#connect-step"), document.querySelector("#configure-step"), document.querySelector("#finish-step")];
+const providerSelect = document.querySelector("#setup-ai-provider");
 let repos = [];
-let user = null;
-let signInGeneration = 0;
 
-function repoMode() {
-  return document.querySelector('input[name="repo-mode"]:checked').value;
-}
+providerSelect.replaceChildren(...Object.entries(LLM_PROVIDERS).map(([id, provider]) => new Option(provider.label, id)));
 
-function renderRepoMode() {
-  const creating = repoMode() === "new";
-  document.querySelector("#existing-repo-field").hidden = creating;
-  document.querySelector("#new-repo-fields").hidden = !creating;
+function syncProviderFields({ reset = false } = {}) {
+  const provider = LLM_PROVIDERS[providerSelect.value] || LLM_PROVIDERS.groq;
+  const baseUrl = document.querySelector("#setup-ai-base-url");
+  const model = document.querySelector("#setup-ai-model");
+  if (reset || !baseUrl.value) baseUrl.value = provider.baseUrl;
+  if (reset || !model.value) model.value = provider.model;
+  baseUrl.readOnly = providerSelect.value !== "custom";
+  document.querySelector("#ai-setup-fields").hidden = !document.querySelector("#setup-ai-readme").checked;
 }
 
 function showStep(index) {
-  panes.forEach((pane, i) => pane.hidden = i !== index);
+  panes.forEach((pane, paneIndex) => pane.hidden = paneIndex !== index);
   document.querySelector("#step-eyebrow").textContent = `Step ${index + 1} of 3`;
   document.querySelector("#step-count").textContent = `0${index + 1} / 03`;
-  document.querySelector("#step-title").textContent = ["Connect GitHub", "Configure your repo", "Setup complete"][index];
-  document.querySelectorAll("[data-step-marker]").forEach((item, i) => item.classList.toggle("active", i === index));
+  document.querySelector("#step-title").textContent = ["Connect your services", "Configure your repo", "Setup complete"][index];
+  document.querySelectorAll("[data-step-marker]").forEach((item, markerIndex) => {
+    item.classList.toggle("active", markerIndex === index);
+    item.classList.toggle("done", markerIndex < index);
+  });
   showNotice(notice, "");
 }
 
-function finishGitHubSignIn(result) {
-  repos = result.repos;
-  user = result.user;
+function finishGitHubConnection(result) {
+  repos = result.repos || [];
+  const user = result.user;
+  if (!repos.length) throw new Error("This token cannot access any repositories. Grant it access to a repository, then try again.");
+  document.querySelector("#github-token").value = "";
+  document.querySelector("#setup-ai-key").value = "";
   document.querySelector("#github-login").textContent = `@${user.login}`;
   document.querySelector("#avatar").textContent = user.login.slice(0, 2).toUpperCase();
   const select = document.querySelector("#repo");
-  select.innerHTML = repos.map((repo) => `<option value="${repo.full_name}" data-branch="${repo.default_branch}">${repo.full_name}</option>`).join("");
-  if (!repos.length) {
-    document.querySelector('input[name="repo-mode"][value="new"]').checked = true;
-    renderRepoMode();
-  }
+  select.replaceChildren(...repos.map((repo) => {
+    const option = new Option(repo.full_name, repo.full_name);
+    option.dataset.branch = repo.default_branch;
+    return option;
+  }));
   showStep(1);
 }
 
-function failGitHubSignIn(error, generation) {
-  if (generation !== signInGeneration) return;
-  signInGeneration += 1;
-  document.querySelector("#device-flow").hidden = true;
-  document.querySelector("#connect-button").hidden = false;
-  showNotice(notice, error.message, true);
-}
-
-function pollGitHubSignIn(interval, expiresAt, generation) {
-  window.setTimeout(async () => {
-    if (generation !== signInGeneration) return;
-    if (Date.now() >= expiresAt) {
-      failGitHubSignIn(new Error("The GitHub sign-in code expired. Start again to get a new code."), generation);
-      return;
-    }
-    try {
-      const result = await send("POLL_GITHUB_SIGN_IN");
-      if (result.status === "connected") {
-        signInGeneration += 1;
-        finishGitHubSignIn(result);
-        return;
-      }
-      document.querySelector("#device-status").textContent = "Waiting for approval on GitHub…";
-      pollGitHubSignIn(result.interval || interval, expiresAt, generation);
-    } catch (error) {
-      failGitHubSignIn(error, generation);
-    }
-  }, interval * 1000);
-}
+document.querySelector("#setup-ai-readme").addEventListener("change", () => syncProviderFields());
+providerSelect.addEventListener("change", () => syncProviderFields({ reset: true }));
 
 document.querySelector("#connect-step").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = document.querySelector("#connect-button");
-  setBusy(button, true, "Starting GitHub…");
-  const generation = ++signInGeneration;
+  const aiEnabled = document.querySelector("#setup-ai-readme").checked;
+  const aiBaseUrl = document.querySelector("#setup-ai-base-url").value.trim();
+  setBusy(button, true, "Verifying…");
   try {
-    const result = await send("START_GITHUB_SIGN_IN");
-    document.querySelector("#device-code").textContent = result.userCode;
-    document.querySelector("#open-github-device").href = result.verificationUri;
-    document.querySelector("#device-flow").hidden = false;
-    button.hidden = true;
-    pollGitHubSignIn(result.interval, result.expiresAt, generation);
+    if (aiEnabled) await ensureProviderPermission(aiBaseUrl);
+    const result = await send("CONNECT_GITHUB_TOKEN", { token: document.querySelector("#github-token").value });
+    await send("SAVE_SETTINGS", {
+      settings: {
+        aiEnabled,
+        aiConsent: aiEnabled,
+        aiProvider: providerSelect.value,
+        aiBaseUrl,
+        aiModel: document.querySelector("#setup-ai-model").value.trim()
+      },
+      aiApiKey: document.querySelector("#setup-ai-key").value
+    });
+    finishGitHubConnection(result);
   } catch (error) {
-    failGitHubSignIn(error, generation);
+    showNotice(notice, error.message, true);
   } finally {
     setBusy(button, false);
-  }
-});
-
-document.querySelector("#copy-device-code").addEventListener("click", async () => {
-  const button = document.querySelector("#copy-device-code");
-  try {
-    await navigator.clipboard.writeText(document.querySelector("#device-code").textContent);
-    button.textContent = "Copied";
-    window.setTimeout(() => button.textContent = "Copy code", 1500);
-  } catch {
-    showNotice(notice, "Could not copy the code. Select it and copy it manually.", true);
   }
 });
 
@@ -106,23 +84,10 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
   const button = document.querySelector("#configure-button");
   setBusy(button, true, "Saving…");
   try {
-    let owner;
-    let repo;
-    let branch;
-    if (repoMode() === "new") {
-      const created = await send("CREATE_REPO", { repo: {
-        name: document.querySelector("#new-repo-name").value,
-        visibility: document.querySelector("#new-repo-visibility").value
-      }});
-      owner = created.repo.owner?.login || user.login;
-      repo = created.repo.name;
-      branch = created.repo.default_branch || "main";
-    } else {
-      const selected = document.querySelector("#repo");
-      if (!selected.value) throw new Error("Choose a repository or create a new one.");
-      [owner, repo] = selected.value.split("/");
-      branch = selected.selectedOptions[0]?.dataset.branch || "main";
-    }
+    const selected = document.querySelector("#repo");
+    if (!selected.value) throw new Error("Choose a repository.");
+    const [owner, repo] = selected.value.split("/");
+    const branch = selected.selectedOptions[0]?.dataset.branch || "main";
     await send("SAVE_SETTINGS", { settings: {
       connected: true,
       owner,
@@ -133,15 +98,14 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
       includeStats: document.querySelector("#setup-stats").checked,
       includeLink: document.querySelector("#setup-link").checked,
       includeNotes: document.querySelector("#setup-notes").checked,
-      includeReview: document.querySelector("#setup-review").checked,
       includeProfile: document.querySelector("#setup-profile").checked,
       spacedRepetition: document.querySelector("#setup-repetition").checked,
       commitTemplate: document.querySelector("#commit-template").value.trim() || DEFAULT_SETTINGS.commitTemplate
     }});
-    if (document.querySelector("#setup-backfill").checked && repoMode() === "existing") {
+    if (document.querySelector("#setup-backfill").checked) {
       const imported = await send("IMPORT_REPOSITORY");
-      document.querySelector("#finish-step p").textContent = imported.imported
-        ? `Imported ${imported.imported} existing solution folders. Open any LeetCode problem to keep syncing.`
+      document.querySelector("#finish-step p").textContent = imported.imported || imported.updated
+        ? `Imported ${imported.imported} new problem${imported.imported === 1 ? "" : "s"} and updated ${imported.updated} existing problem${imported.updated === 1 ? "" : "s"}. Open any LeetCode problem to keep syncing.`
         : "No LeetRepo-style solution folders were found. Open any LeetCode problem to start syncing.";
     }
     showStep(2);
@@ -153,9 +117,8 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
 });
 
 document.querySelector("#finish-dashboard").addEventListener("click", () => send("OPEN_DASHBOARD"));
-document.querySelectorAll('input[name="repo-mode"]').forEach((input) => input.addEventListener("change", renderRepoMode));
-renderRepoMode();
 
+syncProviderFields({ reset: true });
 send("GET_STATE").then((state) => {
   if (state.settings.connected) showStep(2);
 }).catch(() => {});

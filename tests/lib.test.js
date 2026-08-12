@@ -11,10 +11,13 @@ import {
   historyInsights,
   isSubmissionPushReady,
   languageFolderFor,
+  mergeSubmissionSolutions,
   normalizeSubmission,
   normalizeTheme,
   relativeTime,
   sameProblem,
+  submissionSearchText,
+  submissionSolutions,
   slugify
 } from "../src/core/submissions.js";
 
@@ -53,6 +56,44 @@ test("problem identity is stable when a title or slug changes", () => {
   assert.equal(sameProblem(submission, { ...submission, number: 43 }), false);
 });
 
+test("problem records retain language variants and default to the latest solution", () => {
+  const merged = mergeSubmissionSolutions(
+    { ...submission, language: "Python3", code: "return 1", syncedAt: "2026-08-01T10:00:00.000Z", reviewIntervalDays: 14, reviewCount: 2, reviewLapses: 1, lastReviewRating: "hard" },
+    { ...submission, language: "C++", code: "return 2;", syncedAt: "2026-08-07T10:00:00.000Z" }
+  );
+  assert.equal(merged.language, "C++");
+  assert.equal(merged.code, "return 2;");
+  assert.equal(merged.reviewIntervalDays, 14);
+  assert.equal(merged.reviewCount, 2);
+  assert.equal(merged.reviewLapses, 1);
+  assert.equal(merged.lastReviewRating, "hard");
+  assert.deepEqual(submissionSolutions(merged).map((solution) => solution.language), ["C++", "Python3"]);
+  assert.deepEqual(historyInsights([merged]).languages, [["C++", 1], ["Python3", 1]]);
+  const searchable = { ...merged, notes: "Re-check equal heights.", review: { patterns: ["Two Pointers"] } };
+  assert.match(submissionSearchText(searchable), /two pointers/);
+  assert.match(submissionSearchText(searchable), /re-check equal heights/);
+});
+
+test("repository backfill enriches an existing language without duplicating it", () => {
+  const merged = mergeSubmissionSolutions(
+    { ...submission, title: "Trapping Rain Water", language: "C++", code: "return 1;", syncedAt: "2026-08-07T10:00:00.000Z" },
+    {
+      number: 42,
+      title: "Trapping Rain Water From Folder",
+      slug: "trapping-rain-water",
+      language: "C++",
+      extension: "cpp",
+      path: "0042-trapping-rain-water/cpp/solution.cpp",
+      commitUrl: "https://github.com/alex-c/solutions/tree/main/0042-trapping-rain-water/cpp",
+      syncedAt: "2026-08-07T10:00:00.000Z"
+    }
+  );
+  assert.equal(merged.title, "Trapping Rain Water");
+  assert.equal(merged.code, "return 1;");
+  assert.equal(submissionSolutions(merged).length, 1);
+  assert.equal(submissionSolutions(merged)[0].path, "0042-trapping-rain-water/cpp/solution.cpp");
+});
+
 test("push readiness requires code from a freshly accepted LeetCode submission", () => {
   assert.equal(isSubmissionPushReady({ code: "return 1", status: "Accepted", pushReady: true }), true);
   assert.equal(isSubmissionPushReady({ code: "return 1", status: "Accepted" }), false);
@@ -67,21 +108,24 @@ test("folder and commit formatting follow the configured convention", () => {
   assert.equal(formatCommit("solve: {number}. {title} [{language}]", submission), "solve: 42. Trapping Rain Water [C++]");
 });
 
-test("README includes metadata and interview prompts", () => {
+test("README defaults to basic LeetCode stats without a diagram", () => {
   const readme = buildReadme(submission);
   assert.match(readme, /# 42\. Trapping Rain Water/);
   assert.match(readme, /\*\*Runtime:\*\* 52 ms/);
-  assert.match(readme, /## Interview overview/);
-  assert.match(readme, /### Solution replay/);
-  assert.match(readme, /```mermaid\nflowchart TD/);
-  assert.match(readme, /Goal<br\/>Given an elevation map/);
-  assert.match(readme, /Sample input/);
-  assert.match(readme, /Sample output/);
+  assert.match(readme, /## Problem description/);
+  assert.match(readme, /Given an elevation map, compute how much rain water it can trap\./);
   assert.match(readme, /View problem on LeetCode/);
+  assert.doesNotMatch(readme, /Interview overview/);
+  assert.doesNotMatch(readme, /```mermaid/);
+});
+
+test("README omits an empty problem description", () => {
+  const readme = buildReadme({ ...submission, problemContext: "" });
+  assert.doesNotMatch(readme, /## Problem description/);
 });
 
 test("README respects disabled optional sections", () => {
-  const readme = buildReadme(submission, { includeLink: false, includeStats: false, includeReview: false });
+  const readme = buildReadme(submission, { includeLink: false, includeStats: false });
   assert.doesNotMatch(readme, /Runtime/);
   assert.doesNotMatch(readme, /Interview overview/);
   assert.doesNotMatch(readme, /Solution replay/);
@@ -90,8 +134,10 @@ test("README respects disabled optional sections", () => {
 
 test("README includes personal notes only when enabled", () => {
   const withNotes = { ...submission, notes: "Re-check the decreasing-height case." };
+  const review = { patterns: ["Stack"], approach: ["Scan the bars."] };
+  assert.match(buildReadme(withNotes, { aiEnabled: true }, review), /## Personal notes/);
+  assert.doesNotMatch(buildReadme(withNotes, { aiEnabled: true, includeNotes: false }, review), /Personal notes/);
   assert.match(buildReadme(withNotes), /## Personal notes/);
-  assert.doesNotMatch(buildReadme(withNotes, { includeNotes: false }), /Personal notes/);
 });
 
 test("README shows the original solved timestamp", () => {
@@ -122,7 +168,7 @@ test("review queue respects generated and snoozed due dates", () => {
 });
 
 test("README renders a validated AI explanation with a verification note", () => {
-  const readme = buildReadme(submission, undefined, {
+  const readme = buildReadme(submission, { aiEnabled: true }, {
     summary: "A monotonic structure tracks useful candidates.",
     patterns: ["Monotonic Stack"],
     approach: ["Scan the input.", "Remove dominated candidates.", "Compute the answer."],
@@ -144,6 +190,17 @@ test("README renders a validated AI explanation with a verification note", () =>
   assert.match(readme, /heights=\[0,1,0,2\]/);
   assert.match(readme, /Step 2: Find boundary<br\/>pop the lower bar/);
   assert.match(readme, /AI-generated with Groq/);
+});
+
+test("README ignores a supplied AI review when the user has opted out", () => {
+  const readme = buildReadme(submission, { aiEnabled: false }, {
+    summary: "This content must not be included.",
+    patterns: ["Two Pointers"],
+    approach: ["Build a diagram."],
+    generatedBy: "Groq"
+  });
+  assert.doesNotMatch(readme, /This content must not be included/);
+  assert.doesNotMatch(readme, /mermaid|AI-generated/);
 });
 
 test("Mermaid replay falls back by pattern and escapes untrusted labels", () => {
@@ -181,6 +238,14 @@ test("calculateStreak counts consecutive UTC solve days", () => {
 test("streak may start yesterday when today has no push", () => {
   const history = ["2026-08-06", "2026-08-05"].map((date) => ({ syncedAt: `${date}T12:00:00.000Z` }));
   assert.equal(calculateStreak(history, new Date("2026-08-07T20:00:00.000Z")), 2);
+});
+
+test("streak retains original solve days when solutions are re-synced", () => {
+  const history = ["2026-08-09", "2026-08-08"].map((date) => ({
+    solvedAt: `${date}T12:00:00.000Z`,
+    syncedAt: "2026-08-10T12:00:00.000Z"
+  }));
+  assert.equal(calculateStreak(history, new Date("2026-08-10T20:00:00.000Z")), 2);
 });
 
 test("relativeTime uses compact labels", () => {

@@ -1,31 +1,51 @@
 # LeetRepo Lite Privacy Notice
 
-Last updated: August 7, 2026
+Last updated: August 11, 2026
 
-LeetRepo Lite is the lite, local-run edition of LeetRepo: a browser extension that reads accepted LeetCode submissions and commits files to a GitHub repository selected by the user. It has no account and no LeetRepo-owned backend, does not store user info on any server, and does not send analytics or advertising data.
+LeetRepo Lite is a local-first browser extension that reads LeetCode submission details, commits user-selected content to GitHub, and optionally requests AI study explanations. It has no LeetRepo account, hosted backend, analytics service, or advertising system.
 
-## Data stored by the extension
+## Data stored on your device
 
-- A one-time GitHub device code is stored temporarily during sign-in. The resulting GitHub OAuth access token is stored in local extension storage and is not synced. LeetRepo Lite requests the `repo` scope to support commits to public and private repositories.
-- An optional Groq API key is stored in local extension storage and is not synced.
-- Submission and attempt history, including problem metadata, the first detected description paragraph and example input/output, solution code, result status, personal notes, review schedule, and resulting commit details, is stored locally to power the dashboard.
-- Non-secret preferences, including the selected repository and AI configuration, may be stored through Chrome's synced extension storage when browser sync is enabled.
+LeetRepo Lite stores the following in your browser profile:
 
-Local extension storage is protected by the browser profile but is not separately encrypted by LeetRepo Lite. Users should protect access to their device and browser profile. LeetRepo Lite has no server of its own, so none of this data is stored anywhere except your local browser profile (and, if Chrome sync is enabled, your own browser-sync account).
+- a GitHub personal access token and basic GitHub profile details;
+- an optional AI provider API key;
+- the selected AI provider, endpoint, model, and local request counter;
+- repository and extension preferences; and
+- submission and attempt history, including problem metadata, detected context and examples, solution code, result status, personal notes, review schedule, and commit details.
 
-## Data sent to third parties
+Credentials use `chrome.storage.local` and are not synced. Non-secret settings may use Chrome's synced extension storage when browser sync is enabled. Browser extension storage is protected by the browser profile but is not separately encrypted by LeetRepo Lite.
 
-- When signing in, LeetRepo Lite exchanges a one-time device code directly with GitHub. When syncing a solution, it sends the selected repository details, solution code, generated README, and Git commit data to GitHub using the resulting OAuth access token. GitHub's privacy terms apply.
-- If repository-profile generation is enabled, LeetRepo Lite also sends a generated root README containing aggregate solution statistics and recent problem metadata to GitHub. This setting is disabled by default.
-- When the user backfills an existing repository, LeetRepo Lite reads its Git tree from GitHub and stores matching solution-folder metadata locally. The backfill action does not change the repository.
-- When AI explanations are enabled, LeetRepo Lite sends the problem title, difficulty, programming language, first detected description paragraph and example input/output, and solution code to Groq using the user's key. Groq's privacy and data-processing terms apply.
-- LeetCode page content is read locally by the extension. LeetRepo Lite does not send it elsewhere unless required for the user-enabled GitHub sync or Groq explanation described above.
-- Shareable stats images are rendered locally and are copied or handed to the browser share interface only after the user clicks the corresponding action.
+## Data sent to GitHub
 
-## User choices and deletion
+When connecting, LeetRepo Lite sends the supplied token to GitHub's API to verify the account and list accessible repositories. When syncing, it sends the selected repository details, solution code, generated README, and Git commit data directly to GitHub.
 
-AI explanations are disabled by default. Users can disable them or remove the saved Groq key from Settings at any time. Disconnecting GitHub removes the locally saved GitHub authorization but preserves local submission history. Uninstalling the extension removes its local extension storage according to the browser's behavior; synced preferences may remain in the user's browser-sync account.
+If repository-profile generation is enabled, the extension may update the selected repository's root `README.md`. Repository backfill reads the selected repository tree and recent commit metadata but does not change the repository. GitHub's terms and privacy policy apply.
 
-## Changes
+## Optional AI processing
 
-Material changes to this notice should be reflected by updating the date above and the published extension listing. A production listing should link to a publicly hosted copy of this notice. If a future non-lite edition of LeetRepo adds an account or a backend, that edition will be covered by its own privacy notice.
+AI processing is disabled by default. When enabled, LeetRepo Lite sends the problem title, difficulty, language, detected problem context and example, and up to 24,000 characters of solution code directly to the AI chat-completions endpoint selected by the user. The selected provider's terms, privacy policy, retention rules, and charges apply.
+
+LeetRepo Lite does not proxy, retain, or inspect these requests on a LeetRepo server. A local daily counter helps prevent accidental use but is not an access-control or billing boundary. Generated content may be inaccurate and should be reviewed.
+
+## LeetCode and local sharing
+
+LeetCode page content is read locally. It is sent elsewhere only when required for a user-initiated or configured GitHub sync or optional AI request. Shareable progress images are rendered locally and are copied or handed to the browser share interface only after an explicit action.
+
+## Permissions
+
+LeetRepo Lite requests storage and clipboard access, access to LeetCode problem pages, and host access to GitHub and the built-in AI provider endpoints. A custom remote AI endpoint requires an additional origin-specific permission approved by the user. These permissions are used only for the extension features described above.
+
+## Retention and deletion
+
+Local data remains until the user removes it, clears browser data, removes the extension, or selects **Clear all local data** in Settings. Clearing local data removes saved tokens, settings, history, notes, and study state but does not delete or modify existing GitHub repositories or provider-side records.
+
+Users can revoke tokens independently through GitHub or their AI provider. Removing an optional endpoint permission prevents future requests to that origin but does not remove the saved provider configuration.
+
+## Limited-use disclosure
+
+LeetRepo Lite uses data obtained through extension permissions only to provide its GitHub sync, local dashboard, study, and optional AI features. It does not sell data, use it for advertising, determine creditworthiness, or transfer it to data brokers. No LeetRepo operator receives solution code or credentials through a LeetRepo service.
+
+## Changes and contact
+
+Material changes will update the date above. Questions or security reports may be submitted through the [LeetRepo issue tracker](https://github.com/daanniill/LeetRepo/issues). Never include access tokens, API keys, private solution code, or other secrets in a public issue.

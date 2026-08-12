@@ -16,6 +16,7 @@
           <button class="nav-item" data-view="activity">Activity</button>
           <button class="nav-item" data-view="study">Study</button>
           <button class="nav-item" id="settings-link">Settings</button>
+          <button class="nav-item sign-out" id="sign-out">Sign out</button>
         </nav>
         <a class="repo-link truncate" id="repo-name" target="_blank" rel="noreferrer">Not connected</a>
       </header>
@@ -24,32 +25,32 @@
         <section data-view-panel="problems">
           <header class="dashboard-header">
             <div><h1>Synced problems</h1></div>
-            <div class="header-actions"><label class="search"><span>⌕</span><input id="search" type="search" placeholder="Search problems…"></label><button class="button secondary" id="refresh">Refresh</button></div>
+            <div class="header-actions"><label class="search"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="search" type="search" aria-label="Search synced problems" placeholder="Search title, pattern, language…"></label><button class="button secondary" id="refresh">Refresh</button></div>
           </header>
 
           <section class="stats-row">
             <div class="stat"><div class="stat-value" id="total-stat">0</div><div class="stat-label">problems synced</div></div>
             <div class="stat"><div class="stat-value accent" id="streak-stat">0</div><div class="stat-label">day streak</div></div>
-            <div class="stat"><div class="stat-value difficulty-counts" id="difficulty-stat">0 / 0 / 0</div><div class="stat-label">easy / medium / hard</div></div>
+            <div class="stat"><div class="stat-value difficulty-counts" id="difficulty-stat"><b>0</b><i>/</i><b>0</b><i>/</i><b>0</b></div><div class="stat-label">easy / medium / hard</div></div>
             <div class="stat"><div class="stat-value" id="reviewed-stat">0</div><div class="stat-label">interview overviews</div></div>
           </section>
 
           <section class="library-panel panel">
             <div class="library-toolbar">
               <div class="filters" role="group" aria-label="Filter by difficulty">
-                <button class="filter active" data-filter="All">All</button>
-                <button class="filter" data-filter="Easy">Easy</button>
-                <button class="filter" data-filter="Medium">Medium</button>
-                <button class="filter" data-filter="Hard">Hard</button>
+                <button class="filter active" data-filter="All" aria-pressed="true">All</button>
+                <button class="filter" data-filter="Easy" aria-pressed="false">Easy</button>
+                <button class="filter" data-filter="Medium" aria-pressed="false">Medium</button>
+                <button class="filter" data-filter="Hard" aria-pressed="false">Hard</button>
               </div>
               <span class="muted" id="result-count">0 results</span>
             </div>
             <div class="library-grid">
               <div class="table-wrap">
                 <div class="table-head"><span>Problem</span><span>Diff</span><span>Lang</span><span>Synced</span></div>
-                <div id="problem-list"></div>
+                <div id="problem-list" role="listbox" aria-label="Synced problems"></div>
               </div>
-              <aside class="detail-panel" id="detail-panel"><div class="empty"><strong>Select a problem</strong>Its interview overview will appear here.</div></aside>
+              <aside class="detail-panel" id="detail-panel" aria-live="polite"><div class="empty"><strong>Select a problem</strong>Its interview overview will appear here.</div></aside>
             </div>
           </section>
         </section>
@@ -64,13 +65,23 @@
             <a class="button secondary" id="view-repository" target="_blank" rel="noreferrer">View repository ↗</a>
           </section>
           <section class="activity-card panel">
-            <div class="row spread"><div><h2>Solve activity</h2><p>Accepted submissions synced in the last 20 weeks</p></div><div class="activity-legend"><span>Less</span><i></i><i></i><i></i><i></i><span>More</span></div></div>
-            <div class="heatmap" id="heatmap" aria-label="Solve activity heatmap"></div>
+            <div class="row spread"><div><h2>Solve activity</h2><p>Problems solved and synced in the last 12 months</p></div><div class="activity-legend"><span>Less</span><i></i><i></i><i></i><i></i><span>More</span></div></div>
+            <div class="heatmap-wrap">
+              <div class="heatmap-inner">
+                <div class="heatmap-months" id="heatmap-months" aria-hidden="true"></div>
+                <div class="heatmap-days" aria-hidden="true"><span style="grid-row:2">Mon</span><span style="grid-row:4">Wed</span><span style="grid-row:6">Fri</span></div>
+                <div class="heatmap" id="heatmap" role="img" aria-label="Solve activity heatmap"></div>
+              </div>
+            </div>
           </section>
           <div class="analytics-grid">
             <section class="panel analytics-card"><div class="eyebrow">Pattern coverage</div><h2>What you practice</h2><div class="bar-list" id="pattern-breakdown"></div></section>
             <section class="panel analytics-card"><div class="eyebrow">Language breakdown</div><h2>How you solve</h2><div class="bar-list" id="language-breakdown"></div></section>
           </div>
+          <section class="panel progress-share-panel">
+            <div class="progress-share-copy"><div class="eyebrow">Share progress</div><h2>A snapshot of your repository</h2><p>Generate a local image of your solve count, streak, reviews, and languages.</p><div class="row"><button class="button" id="copy-stats">Copy image</button><button class="button secondary" id="share-stats">Share</button></div></div>
+            <div class="share-card" id="share-card"><div class="share-brand">LeetRepo Lite</div><div class="share-total" id="share-total">0</div><div>problems solved &amp; committed</div><div class="share-meta" id="share-meta"></div></div>
+          </section>
           <section class="panel attempts-card">
             <div class="section-heading"><div><div class="eyebrow">The full path</div><h2>Attempt history</h2></div><span class="muted" id="attempt-count">0 captured</span></div>
             <div id="attempt-list"></div>
@@ -79,17 +90,31 @@
 
         <section data-view-panel="study" hidden>
           <header class="dashboard-header">
-            <div><h1>Study guide</h1><p>Thirty-second refreshers, pattern gaps, and spaced repetition from your own solutions.</p></div>
+            <div><h1>Study guide</h1><p>Recall the approach, reveal the refresher, and schedule the next repetition from your own solutions.</p></div>
           </header>
-          <div class="study-grid">
-            <section class="panel review-card" id="review-card"></section>
-            <section class="panel share-panel">
-              <div class="share-card" id="share-card"><div class="share-brand">LeetRepo Lite</div><div class="share-total" id="share-total">0</div><div>problems solved &amp; committed</div><div class="share-meta" id="share-meta"></div></div>
-              <div class="row"><button class="button grow" id="copy-stats">Copy image</button><button class="button secondary grow" id="share-stats">Share</button></div>
-            </section>
+          <section class="study-stats" aria-label="Study summary">
+            <div class="stat"><div class="stat-value accent" id="study-due-stat">0</div><div class="stat-label">due now</div></div>
+            <div class="stat"><div class="stat-value" id="study-upcoming-stat">0</div><div class="stat-label">upcoming this week</div></div>
+            <div class="stat"><div class="stat-value" id="study-reviewed-stat">0</div><div class="stat-label">reviews completed</div></div>
+            <div class="stat"><div class="stat-value" id="study-pattern-stat">0</div><div class="stat-label">patterns in rotation</div></div>
+          </section>
+          <div class="study-workspace">
+            <aside class="panel study-queue-panel" aria-label="Review queue">
+              <div class="study-queue-header"><div><div class="eyebrow">Review queue</div><h2>Your next problems</h2></div><span class="queue-total" id="study-queue-total">0</span></div>
+              <div class="study-tabs" role="tablist" aria-label="Review timing">
+                <button class="study-tab active" role="tab" aria-selected="true" aria-controls="study-queue" data-study-tab="due">Due <span id="study-due-tab-count">0</span></button>
+                <button class="study-tab" role="tab" aria-selected="false" aria-controls="study-queue" data-study-tab="upcoming">Upcoming <span id="study-upcoming-tab-count">0</span></button>
+              </div>
+              <div class="study-filters">
+                <label><span>Pattern</span><select id="study-pattern-filter"><option value="All">All patterns</option></select></label>
+                <label><span>Difficulty</span><select id="study-difficulty-filter"><option value="All">All levels</option><option>Easy</option><option>Medium</option><option>Hard</option></select></label>
+              </div>
+              <div class="study-queue" id="study-queue" role="listbox" aria-label="Review queue"></div>
+            </aside>
+            <section class="panel study-session" id="study-session" aria-live="polite"></section>
           </div>
           <section class="panel coverage-card">
-            <div class="section-heading"><div><div class="eyebrow">Study-gap map</div><h2>Where you’re strong — and where you’re not</h2></div></div>
+            <div class="section-heading"><div><div class="eyebrow">Pattern coverage</div><h2>Choose what to bring back into rotation</h2><p>Coverage reflects your synced solutions and review queue—not a claim of mastery.</p></div><div class="coverage-legend"><span><i class="due"></i>Due</span><span><i class="rotation"></i>In rotation</span><span><i class="practiced"></i>Practiced</span><span><i class="unseen"></i>Unseen</span></div></div>
             <div class="pattern-cloud" id="pattern-cloud"></div>
             <div class="gap-callout" id="gap-callout"></div>
           </section>
@@ -97,7 +122,7 @@
       </main>
     </div>
     <canvas id="share-canvas" width="1200" height="630" hidden></canvas>
-    <div class="toast" id="toast" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
     <script type="module" src="dashboard.js"></script>
   </body>
 </html>

@@ -1,10 +1,20 @@
 {
   "manifest_version": 3,
   "name": "LeetRepo Lite",
-  "version": "1.2.0",
-  "description": "Lite, local-run edition of LeetRepo: commit accepted LeetCode solutions to GitHub with clean READMEs and study metadata. No account, no backend, no stored user info.",
-  "permissions": ["storage", "tabs", "clipboardWrite"],
-  "host_permissions": ["https://api.github.com/*", "https://github.com/login/*", "https://api.groq.com/*"],
+  "version": "2.0.0",
+  "description": "Local-first LeetCode solution sync, analytics, and study tools with user-supplied GitHub and AI tokens.",
+  "permissions": ["storage", "clipboardWrite"],
+  "host_permissions": [
+    "https://api.github.com/*",
+    "https://api.groq.com/*",
+    "https://api.openai.com/*",
+    "https://openrouter.ai/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
   "background": {
     "service_worker": "src/background/service-worker.js",
     "type": "module"
@@ -30,12 +40,6 @@
       "js": ["src/content/language.js", "src/content/problem.js", "src/content/content.js"],
       "css": ["src/content/content.css"],
       "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["src/pages/dashboard/dashboard.html"],
-      "matches": ["https://leetcode.com/*", "https://www.leetcode.com/*"]
     }
   ]
 }

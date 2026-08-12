@@ -1,78 +1,62 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRepo, listSolutionFolders, pollDeviceAuthorization, pushSubmission, startDeviceAuthorization } from "../src/core/github.js";
+import { listRepos, listSolutionFolders, pushSubmission, verifyToken } from "../src/core/github.js";
 
-test("startDeviceAuthorization requests a GitHub device code with repo access", async (t) => {
-  let call;
+test("listRepos returns repositories accessible to the supplied token", async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(url);
+    return new Response(JSON.stringify([
+      { id: 1, full_name: "alex-c/leetcode-solutions" },
+      { id: 2, full_name: "alex-c/private-solutions" }
+    ]), { status: 200, headers: { "content-type": "application/json" } });
+  });
+  const repos = await listRepos("user-access-token");
+  assert.deepEqual(repos.map((repo) => repo.full_name), ["alex-c/leetcode-solutions", "alex-c/private-solutions"]);
+  assert.match(calls[0], /\/user\/repos\?sort=updated&per_page=100/);
+});
+
+test("verifyToken returns the GitHub identity for onboarding", async (t) => {
   t.mock.method(globalThis, "fetch", async (url, init) => {
-    call = { url, init, body: new URLSearchParams(init.body) };
-    return new Response(JSON.stringify({
-      device_code: "device-secret",
-      user_code: "ABCD-EFGH",
-      verification_uri: "https://github.com/login/device",
-      expires_in: 900,
-      interval: 5
-    }), { status: 200, headers: { "content-type": "application/json" } });
+    assert.equal(url, "https://api.github.com/user");
+    assert.equal(init.headers.Authorization, "Bearer github_pat_test");
+    return new Response(JSON.stringify({ id: 42, login: "alex-c" }), { status: 200, headers: { "content-type": "application/json" } });
   });
-
-  const result = await startDeviceAuthorization("client-id");
-
-  assert.equal(call.url, "https://github.com/login/device/code");
-  assert.equal(call.init.method, "POST");
-  assert.equal(call.body.get("client_id"), "client-id");
-  assert.equal(call.body.get("scope"), "repo");
-  assert.equal(result.userCode, "ABCD-EFGH");
-  assert.equal(result.interval, 5);
+  assert.equal((await verifyToken("github_pat_test")).login, "alex-c");
 });
 
-test("pollDeviceAuthorization distinguishes pending and authorized responses", async (t) => {
-  const replies = [
-    { error: "authorization_pending" },
-    { access_token: "oauth-token", token_type: "bearer", scope: "repo" }
-  ];
-  let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(replies[calls++]), { status: 200, headers: { "content-type": "application/json" } }));
-
-  assert.deepEqual(await pollDeviceAuthorization("client-id", "device-secret"), { status: "pending" });
-  assert.deepEqual(await pollDeviceAuthorization("client-id", "device-secret"), {
-    status: "authorized",
-    accessToken: "oauth-token",
-    scope: "repo",
-    tokenType: "bearer"
-  });
-});
-
-test("createRepo sends the selected visibility without auto-initializing", async (t) => {
-  let call;
-  t.mock.method(globalThis, "fetch", async (url, init) => {
-    call = { url, init, body: JSON.parse(init.body) };
-    return new Response(JSON.stringify({ name: "leetcode-solutions", default_branch: "main" }), { status: 201, headers: { "content-type": "application/json" } });
-  });
-  await createRepo("secret", { name: "leetcode-solutions", visibility: "public" });
-  assert.equal(call.url, "https://api.github.com/user/repos");
-  assert.equal(call.init.method, "POST");
-  assert.equal(call.body.private, false);
-  assert.equal(call.body.auto_init, false);
-});
-
-test("listSolutionFolders imports legacy and language-folder solution paths", async (t) => {
+test("listSolutionFolders imports every solution with its latest commit metadata", async (t) => {
   const replies = [
     { default_branch: "main" },
     { tree: [
       { type: "blob", path: "0001-two-sum/solution.py" },
       { type: "blob", path: "0001-two-sum/README.md" },
       { type: "blob", path: "0001-two-sum/cpp/solution.cpp" },
+      { type: "blob", path: "0002-add-two-numbers/python/solution.py" },
       { type: "blob", path: "notes.txt" }
-    ] }
+    ] },
+    [{ sha: "python-commit", commit: { committer: { date: "2026-08-01T10:00:00.000Z" } } }],
+    [{ sha: "cpp-commit", commit: { committer: { date: "2026-08-07T10:00:00.000Z" } } }],
+    [{ sha: "add-two-numbers-commit", commit: { author: { date: "2026-08-05T10:00:00.000Z" } } }]
   ];
-  let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(replies[calls++]), { status: 200, headers: { "content-type": "application/json" } }));
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    calls.push(url);
+    return new Response(JSON.stringify(replies[calls.length - 1]), { status: 200, headers: { "content-type": "application/json" } });
+  });
   const items = await listSolutionFolders("secret", "alex-c", "solutions");
   assert.equal(items.length, 2);
   assert.equal(items[0].title, "Two Sum");
-  assert.equal(items[0].language, "Python3");
-  assert.equal(items[1].language, "C++");
-  assert.equal(items[1].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum/cpp");
+  assert.equal(items[0].language, "C++");
+  assert.equal(items[0].syncedAt, "2026-08-07T10:00:00.000Z");
+  assert.deepEqual(items[0].solutions.map((solution) => solution.language), ["C++", "Python3"]);
+  assert.equal(items[0].solutions[0].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum/cpp");
+  assert.equal(items[1].title, "Add Two Numbers");
+  assert.equal(items[1].syncedAt, "2026-08-05T10:00:00.000Z");
+  assert.equal(items[1].commitSha, "add-two-numbers-commit");
+  assert.match(calls[2], /path=0001-two-sum%2Fsolution.py/);
+  assert.match(calls[3], /path=0001-two-sum%2Fcpp%2Fsolution.cpp/);
+  assert.match(calls[4], /path=0002-add-two-numbers%2Fpython%2Fsolution.py/);
 });
 
 test("pushSubmission builds one tree and advances one branch ref", async (t) => {
