@@ -1,6 +1,9 @@
 node_modules
 dist
+deployment
+assets/marketing
+coverage
+.github
 .env
 .git
 .DS_Store
-

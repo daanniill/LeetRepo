@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createApi } from "../server/api.js";
-import { decryptSecret, encryptSecret } from "../server/crypto.js";
+import { decryptSecret, encryptSecret, hashToken } from "../server/crypto.js";
 
 function config() {
   return {
@@ -13,7 +13,7 @@ function config() {
     allowedExtensionOrigins: new Set(["chrome-extension://extension-id"]),
     tokenEncryptionKey: Buffer.alloc(32, 7),
     groqApiKey: "gsk_server_secret",
-    groqModel: "llama-3.3-70b-versatile",
+    groqModel: "openai/gpt-oss-120b",
     freeAiDailyLimit: 3,
     freeAiMonthlyLimit: 30,
     globalAiRequestsPerMinute: 25,
@@ -30,7 +30,10 @@ function baseStore(overrides = {}) {
     async createAuthExchange() {},
     async exchangeAuthCode() { return null; },
     async getSession() { return null; },
-    async updateCredentials() {},
+    async withLockedCredentials(_githubUserId, action) {
+      const outcome = await action(await this.getSession());
+      return outcome.value;
+    },
     async deleteSession() {},
     async deleteAccountForSession() { return false; },
     async reserveAiRequest() {},
@@ -55,6 +58,9 @@ test("OAuth start accepts only configured extension redirects and stores hashed 
   assert.equal(authorizationUrl.searchParams.get("client_id"), "client-id");
   assert.equal(authorizationUrl.searchParams.get("redirect_uri"), "https://api.leetrepo.app/v1/auth/github/callback");
   assert.ok(authorizationUrl.searchParams.get("state"));
+  assert.equal(authorizationUrl.searchParams.get("code_challenge_method"), "S256");
+  assert.equal(authorizationUrl.searchParams.get("code_challenge"), hashToken(flow.codeVerifier));
+  assert.match(flow.codeVerifier, /^[A-Za-z0-9_-]{43}$/);
   assert.equal(flow.extensionRedirectUri, "https://extension-id.chromiumapp.org/github");
   assert.doesNotMatch(body.authorizationUrl, new RegExp(flow.stateHash.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
@@ -64,12 +70,14 @@ test("OAuth start accepts only configured extension redirects and stores hashed 
 
 test("OAuth callback sends first-time users to GitHub App installation", async () => {
   const createdFlows = [];
+  let codeVerifier = "";
   const store = baseStore({
-    async consumeOAuthFlow() { return { extension_redirect_uri: "https://extension-id.chromiumapp.org/github" }; },
+    async consumeOAuthFlow() { return { extension_redirect_uri: "https://extension-id.chromiumapp.org/github", code_verifier: "pkce-verifier" }; },
     async createOAuthFlow(value) { createdFlows.push(value); }
   });
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, init = {}) => {
     if (url.endsWith("/login/oauth/access_token")) {
+      codeVerifier = new URLSearchParams(init.body).get("code_verifier");
       return new Response(JSON.stringify({ access_token: "ghu_access", refresh_token: "ghr_refresh", expires_in: 28800, refresh_token_expires_in: 15897600 }), { status: 200 });
     }
     if (url.endsWith("/user")) return new Response(JSON.stringify({ id: 42, login: "alex-c" }), { status: 200 });
@@ -82,18 +90,22 @@ test("OAuth callback sends first-time users to GitHub App installation", async (
   assert.equal(response.status, 302);
   assert.equal(location.pathname, "/apps/leetrepo/installations/new");
   assert.ok(location.searchParams.get("state"));
+  assert.equal(codeVerifier, "pkce-verifier");
   assert.equal(createdFlows.length, 1);
   assert.equal(createdFlows[0].extensionRedirectUri, "https://extension-id.chromiumapp.org/github");
+  assert.equal(createdFlows[0].codeVerifier, "");
 });
 
 test("OAuth callback verifies the installation through the user token and creates a one-time exchange", async () => {
   let exchange;
+  let codeVerifier = "";
   const store = baseStore({
-    async consumeOAuthFlow() { return { extension_redirect_uri: "https://extension-id.chromiumapp.org/github" }; },
+    async consumeOAuthFlow() { return { extension_redirect_uri: "https://extension-id.chromiumapp.org/github", code_verifier: "pkce-verifier" }; },
     async createAuthExchange(value) { exchange = value; }
   });
-  const fetchImpl = async (url) => {
+  const fetchImpl = async (url, init = {}) => {
     if (url.endsWith("/login/oauth/access_token")) {
+      codeVerifier = new URLSearchParams(init.body).get("code_verifier");
       return new Response(JSON.stringify({ access_token: "ghu_access", refresh_token: "ghr_refresh", expires_in: 28800, refresh_token_expires_in: 15897600 }), { status: 200 });
     }
     if (url.endsWith("/user")) return new Response(JSON.stringify({ id: 42, login: "alex-c", avatar_url: "https://example.com/avatar" }), { status: 200 });
@@ -108,8 +120,60 @@ test("OAuth callback verifies the installation through the user token and create
   assert.equal(response.status, 302);
   assert.match(response.headers.get("location"), /^https:\/\/extension-id\.chromiumapp\.org\/github\?code=/);
   assert.equal(exchange.githubUserId, "42");
+  assert.equal(codeVerifier, "pkce-verifier");
   assert.equal(exchange.repositories[0].full_name, "alex-c/solutions");
   assert.equal(decryptSecret(exchange.accessTokenCipher, config().tokenEncryptionKey), "ghu_access");
+});
+
+test("liveness does not depend on PostgreSQL while readiness does", async () => {
+  let pings = 0;
+  const api = createApi({
+    config: config(),
+    store: baseStore({ async ping() { pings += 1; } })
+  });
+  const live = await api(new Request("https://api.leetrepo.app/livez"));
+  const ready = await api(new Request("https://api.leetrepo.app/readyz"));
+  assert.equal(live.status, 200);
+  assert.equal(ready.status, 200);
+  assert.equal(pings, 1);
+});
+
+test("token refresh rechecks credentials under the database lock", async () => {
+  const key = config().tokenEncryptionKey;
+  const newerExpiresAt = new Date(Date.now() + 3_600_000);
+  const store = baseStore({
+    async getSession() {
+      return {
+        github_user_id: "42",
+        access_token_cipher: encryptSecret("stale-token", key),
+        refresh_token_cipher: encryptSecret("stale-refresh", key),
+        access_expires_at: new Date(Date.now() - 60_000),
+        refresh_expires_at: new Date(Date.now() + 86_400_000)
+      };
+    },
+    async withLockedCredentials(_githubUserId, action) {
+      const outcome = await action({
+        access_token_cipher: encryptSecret("newer-token", key),
+        refresh_token_cipher: encryptSecret("newer-refresh", key),
+        access_expires_at: newerExpiresAt,
+        refresh_expires_at: new Date(Date.now() + 86_400_000)
+      });
+      return outcome.value;
+    }
+  });
+  const api = createApi({
+    config: config(),
+    store,
+    fetchImpl: async () => { throw new Error("GitHub should not be called for a token refreshed by another request."); }
+  });
+  const response = await api(new Request("https://api.leetrepo.app/v1/auth/github/token", {
+    method: "POST",
+    headers: { Authorization: "Bearer session-token" }
+  }));
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.githubAccessToken, "newer-token");
+  assert.equal(body.githubAccessTokenExpiresAt, newerExpiresAt.toISOString());
 });
 
 test("AI endpoint authenticates, reserves server quota, and keeps the provider key server-side", async () => {
@@ -135,7 +199,7 @@ test("AI endpoint authenticates, reserves server quota, and keeps the provider k
   const fetchImpl = async (url, init) => {
     calls.push({ url, init, body: JSON.parse(init.body) });
     return new Response(JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       choices: [{ message: { content: JSON.stringify({
         summary: "Track values already seen and look up each complement.",
         patterns: ["Hashing"],
@@ -159,7 +223,7 @@ test("AI endpoint authenticates, reserves server quota, and keeps the provider k
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(calls[0].init.headers.Authorization, "Bearer gsk_server_secret");
-  assert.equal(calls[0].body.model, "llama-3.3-70b-versatile");
+  assert.equal(calls[0].body.model, "openai/gpt-oss-120b");
   assert.equal(reserved.dailyLimit, 3);
   assert.equal(body.usage.daily.requests, 1);
 });

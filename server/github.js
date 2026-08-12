@@ -4,6 +4,23 @@ import { assertSafeGitHubAppPermissions } from "../src/core/github-permissions.j
 
 const GITHUB_API = "https://api.github.com";
 const GITHUB_LOGIN = "https://github.com/login";
+const GITHUB_API_VERSION = "2026-03-10";
+const GITHUB_TIMEOUT_MS = 15_000;
+
+async function githubFetch(fetchImpl, url, init = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GITHUB_TIMEOUT_MS);
+  try {
+    return await fetchImpl(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new HttpError(504, "GITHUB_TIMEOUT", "GitHub took too long to respond. Try again shortly.");
+    }
+    throw new HttpError(502, "GITHUB_UNAVAILABLE", "GitHub could not be reached. Try again shortly.");
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function jsonResponse(response, fallback) {
   const data = await response.json().catch(() => ({}));
@@ -15,19 +32,20 @@ function apiHeaders(token) {
   return {
     Accept: "application/vnd.github+json",
     Authorization: `Bearer ${token}`,
-    "X-GitHub-Api-Version": "2022-11-28"
+    "X-GitHub-Api-Version": GITHUB_API_VERSION
   };
 }
 
 async function githubApi(path, token, fetchImpl) {
-  const response = await fetchImpl(`${GITHUB_API}${path}`, { headers: apiHeaders(token) });
+  const response = await githubFetch(fetchImpl, `${GITHUB_API}${path}`, { headers: apiHeaders(token) });
   return jsonResponse(response, `GitHub request failed (${response.status}).`);
 }
 
-export async function exchangeAuthorizationCode({ code, clientId, clientSecret, redirectUri = "", fetchImpl = fetch }) {
+export async function exchangeAuthorizationCode({ code, codeVerifier = "", clientId, clientSecret, redirectUri = "", fetchImpl = fetch }) {
   const values = { client_id: clientId, client_secret: clientSecret, code };
   if (redirectUri) values.redirect_uri = redirectUri;
-  const response = await fetchImpl(`${GITHUB_LOGIN}/oauth/access_token`, {
+  if (codeVerifier) values.code_verifier = codeVerifier;
+  const response = await githubFetch(fetchImpl, `${GITHUB_LOGIN}/oauth/access_token`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(values).toString()
@@ -39,7 +57,7 @@ export async function exchangeAuthorizationCode({ code, clientId, clientSecret, 
 }
 
 export async function refreshUserAccessToken({ refreshToken, clientId, clientSecret, fetchImpl = fetch }) {
-  const response = await fetchImpl(`${GITHUB_LOGIN}/oauth/access_token`, {
+  const response = await githubFetch(fetchImpl, `${GITHUB_LOGIN}/oauth/access_token`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -84,13 +102,13 @@ export async function listInstalledRepositories(accessToken, fetchImpl = fetch) 
 }
 
 export async function revokeGitHubAppAuthorization({ accessToken, clientId, clientSecret, fetchImpl = fetch }) {
-  const response = await fetchImpl(`${GITHUB_API}/applications/${encodeURIComponent(clientId)}/grant`, {
+  const response = await githubFetch(fetchImpl, `${GITHUB_API}/applications/${encodeURIComponent(clientId)}/grant`, {
     method: "DELETE",
     headers: {
       Accept: "application/vnd.github+json",
       Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
       "Content-Type": "application/json",
-      "X-GitHub-Api-Version": "2022-11-28"
+      "X-GitHub-Api-Version": GITHUB_API_VERSION
     },
     body: JSON.stringify({ access_token: accessToken })
   });

@@ -3,7 +3,7 @@
   "name": "LeetRepo",
   "version": "2.0.0",
   "description": "Commit accepted LeetCode solutions to GitHub with clean READMEs and study metadata.",
-  "permissions": ["storage", "activeTab", "clipboardWrite", "identity"],
+  "permissions": ["storage", "clipboardWrite", "identity"],
   "host_permissions": ["https://api.github.com/*", "https://leetrepo.onrender.com/*"],
   "background": {
     "service_worker": "src/background/service-worker.js",
@@ -30,12 +30,6 @@
       "js": ["src/content/language.js", "src/content/problem.js", "src/content/content.js"],
       "css": ["src/content/content.css"],
       "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["src/pages/dashboard/dashboard.html"],
-      "matches": ["https://leetcode.com/*", "https://www.leetcode.com/*"]
     }
   ]
 }

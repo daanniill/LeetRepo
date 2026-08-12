@@ -1,11 +1,10 @@
 import { normalizeSolutionVisual, normalizeSubmission } from "./submissions.js";
 
 export const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
+export const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
 export const GROQ_MODELS = [
-  { id: DEFAULT_GROQ_MODEL, label: "Llama 3.3 70B (best quality)" },
-  { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B (fastest / lowest cost)" },
-  { id: "openai/gpt-oss-20b", label: "GPT-OSS 20B (balanced)" }
+  { id: DEFAULT_GROQ_MODEL, label: "GPT-OSS 120B (best quality)" },
+  { id: "openai/gpt-oss-20b", label: "GPT-OSS 20B (fastest / lowest cost)" }
 ];
 export const MAX_CODE_CHARACTERS = 24_000;
 

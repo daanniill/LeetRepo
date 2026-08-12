@@ -109,7 +109,7 @@ function demoResponse(type, payload) {
 export async function currentSubmission() {
   if (!isExtension) return DEMO_SUBMISSION;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id || !/^https:\/\/(www\.)?leetcode\.com\/problems\//.test(tab.url || "")) return null;
+  if (!tab?.id) return null;
   try {
     const response = await chrome.tabs.sendMessage(tab.id, { type: "GET_SUBMISSION" });
     return response?.submission || null;

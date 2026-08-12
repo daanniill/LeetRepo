@@ -23,8 +23,10 @@ export function createPool(config) {
   return new Pool({
     connectionString: config.databaseUrl,
     ssl: config.databaseSsl ? { rejectUnauthorized: true } : false,
-    max: 10,
-    idleTimeoutMillis: 30_000
+    max: config.databasePoolMax || 10,
+    connectionTimeoutMillis: config.databaseConnectionTimeoutMs || 5_000,
+    idleTimeoutMillis: config.databaseIdleTimeoutMs || 30_000,
+    statement_timeout: config.databaseStatementTimeoutMs || 10_000
   });
 }
 
@@ -57,11 +59,11 @@ export class DataStore {
     );
   }
 
-  async createOAuthFlow({ stateHash, extensionRedirectUri, expiresAt }) {
+  async createOAuthFlow({ stateHash, extensionRedirectUri, codeVerifier = "", expiresAt }) {
     await this.pool.query(
-      `INSERT INTO oauth_flows (state_hash, extension_redirect_uri, expires_at)
-       VALUES ($1, $2, $3)`,
-      [stateHash, extensionRedirectUri, expiresAt]
+      `INSERT INTO oauth_flows (state_hash, extension_redirect_uri, code_verifier, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [stateHash, extensionRedirectUri, codeVerifier, expiresAt]
     );
   }
 
@@ -69,7 +71,7 @@ export class DataStore {
     const result = await this.pool.query(
       `DELETE FROM oauth_flows
        WHERE state_hash = $1 AND expires_at > NOW()
-       RETURNING extension_redirect_uri`,
+       RETURNING extension_redirect_uri, code_verifier`,
       [stateHash]
     );
     return result.rows[0] || null;
@@ -145,6 +147,16 @@ export class DataStore {
          VALUES ($1, $2, $3)`,
         [sessionHash, auth.github_user_id, sessionExpiresAt]
       );
+      await client.query(
+        `DELETE FROM sessions
+         WHERE token_hash IN (
+           SELECT token_hash FROM sessions
+           WHERE github_user_id = $1
+           ORDER BY created_at DESC, token_hash DESC
+           OFFSET 10
+         )`,
+        [auth.github_user_id]
+      );
       await client.query("COMMIT");
       return {
         githubUserId: String(auth.github_user_id),
@@ -177,17 +189,46 @@ export class DataStore {
     return result.rows[0] || null;
   }
 
-  async updateCredentials(githubUserId, value) {
-    await this.pool.query(
-      `UPDATE github_credentials SET
-         access_token_cipher = $2,
-         refresh_token_cipher = $3,
-         access_expires_at = $4,
-         refresh_expires_at = $5,
-         updated_at = NOW()
-       WHERE github_user_id = $1`,
-      [githubUserId, value.accessTokenCipher, value.refreshTokenCipher, value.accessExpiresAt, value.refreshExpiresAt]
-    );
+  async withLockedCredentials(githubUserId, action) {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query(
+        `SELECT access_token_cipher, refresh_token_cipher, access_expires_at, refresh_expires_at
+         FROM github_credentials
+         WHERE github_user_id = $1
+         FOR UPDATE`,
+        [githubUserId]
+      );
+      const current = result.rows[0];
+      if (!current) throw new HttpError(401, "SESSION_EXPIRED", "Your session expired. Reconnect GitHub.");
+      const outcome = await action(current);
+      if (outcome.credentials) {
+        await client.query(
+          `UPDATE github_credentials SET
+             access_token_cipher = $2,
+             refresh_token_cipher = $3,
+             access_expires_at = $4,
+             refresh_expires_at = $5,
+             updated_at = NOW()
+           WHERE github_user_id = $1`,
+          [
+            githubUserId,
+            outcome.credentials.accessTokenCipher,
+            outcome.credentials.refreshTokenCipher,
+            outcome.credentials.accessExpiresAt,
+            outcome.credentials.refreshExpiresAt
+          ]
+        );
+      }
+      await client.query("COMMIT");
+      return outcome.value;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async deleteSession(sessionHash) {

@@ -91,7 +91,7 @@ npm run db:migrate
 npm start
 ```
 
-Provide the environment variables described in [`.env.example`](.env.example). In production, terminate TLS at the hosting platform, use a managed PostgreSQL database with verified TLS, keep `TOKEN_ENCRYPTION_KEY` and provider keys in its secret manager, and run `npm run db:migrate` before starting a new release.
+Provide the environment variables described in [`.env.example`](.env.example). In production, terminate public TLS at the hosting platform, connect to managed PostgreSQL over a private network or verified TLS, keep `TOKEN_ENCRYPTION_KEY` and provider keys in its secret manager, and run `npm run db:migrate` before starting a new release.
 
 The API provides:
 
@@ -133,6 +133,8 @@ When enabled:
 - **License:** LeetRepo's source code is available under the [MIT License](LICENSE).
 
 ## Development
+
+For the production API, public GitHub App, Chrome Web Store submission, scaling thresholds, monitoring, and rollback sequence, follow [the deployment checklist](DEPLOYMENT.md).
 
 Run the test suite:
 

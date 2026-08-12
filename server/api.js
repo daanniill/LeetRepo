@@ -68,27 +68,37 @@ async function authenticatedSession(request, store) {
 }
 
 async function githubAccessTokenForDeletion(session, config, store, fetchImpl) {
-  const storedAccessToken = decryptSecret(session.access_token_cipher, config.tokenEncryptionKey);
-  if (new Date(session.access_expires_at).getTime() > Date.now() + 60_000) return storedAccessToken;
-  if (new Date(session.refresh_expires_at).getTime() <= Date.now()) return storedAccessToken;
-  try {
-    const refreshed = await refreshUserAccessToken({
-      refreshToken: decryptSecret(session.refresh_token_cipher, config.tokenEncryptionKey),
-      clientId: config.githubClientId,
-      clientSecret: config.githubClientSecret,
-      fetchImpl
-    });
-    await store.updateCredentials(session.github_user_id, {
-      accessTokenCipher: encryptSecret(refreshed.access_token, config.tokenEncryptionKey),
-      refreshTokenCipher: encryptSecret(refreshed.refresh_token, config.tokenEncryptionKey),
-      accessExpiresAt: tokenExpiration(refreshed.expires_in),
-      refreshExpiresAt: tokenExpiration(refreshed.refresh_token_expires_in || 15_897_600)
-    });
-    return refreshed.access_token;
-  } catch (error) {
-    if (error instanceof HttpError && error.code === "GITHUB_RECONNECT_REQUIRED") return storedAccessToken;
-    throw error;
-  }
+  return store.withLockedCredentials(session.github_user_id, async (credentials) => {
+    const storedAccessToken = decryptSecret(credentials.access_token_cipher, config.tokenEncryptionKey);
+    if (new Date(credentials.access_expires_at).getTime() > Date.now() + 60_000) {
+      return { value: storedAccessToken };
+    }
+    if (new Date(credentials.refresh_expires_at).getTime() <= Date.now()) {
+      return { value: storedAccessToken };
+    }
+    try {
+      const refreshed = await refreshUserAccessToken({
+        refreshToken: decryptSecret(credentials.refresh_token_cipher, config.tokenEncryptionKey),
+        clientId: config.githubClientId,
+        clientSecret: config.githubClientSecret,
+        fetchImpl
+      });
+      return {
+        value: refreshed.access_token,
+        credentials: {
+          accessTokenCipher: encryptSecret(refreshed.access_token, config.tokenEncryptionKey),
+          refreshTokenCipher: encryptSecret(refreshed.refresh_token, config.tokenEncryptionKey),
+          accessExpiresAt: tokenExpiration(refreshed.expires_in),
+          refreshExpiresAt: tokenExpiration(refreshed.refresh_token_expires_in || 15_897_600)
+        }
+      };
+    } catch (error) {
+      if (error instanceof HttpError && error.code === "GITHUB_RECONNECT_REQUIRED") {
+        return { value: storedAccessToken };
+      }
+      throw error;
+    }
+  });
 }
 
 function redirectWithParams(redirectUri, values) {
@@ -111,14 +121,16 @@ function githubCallbackUrl(config) {
   return new URL("/v1/auth/github/callback", config.publicBaseUrl).toString();
 }
 
-async function createOAuthFlow(store, extensionRedirectUri) {
+async function createOAuthFlow(store, extensionRedirectUri, { usePkce = true } = {}) {
   const state = randomToken();
+  const codeVerifier = usePkce ? randomToken() : "";
   await store.createOAuthFlow({
     stateHash: hashToken(state),
     extensionRedirectUri,
+    codeVerifier,
     expiresAt: new Date(Date.now() + 10 * 60 * 1000)
   });
-  return state;
+  return { state, codeChallenge: codeVerifier ? hashToken(codeVerifier) : "" };
 }
 
 function clientRepository(repository) {
@@ -170,7 +182,11 @@ export function createApi({ config, store, fetchImpl = fetch }) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const url = new URL(request.url);
     try {
-      if (request.method === "GET" && url.pathname === "/healthz") {
+      if (request.method === "GET" && url.pathname === "/livez") {
+        return json({ ok: true }, 200, cors);
+      }
+
+      if (request.method === "GET" && ["/healthz", "/readyz"].includes(url.pathname)) {
         await store.ping();
         return json({ ok: true }, 200, cors);
       }
@@ -180,11 +196,13 @@ export function createApi({ config, store, fetchImpl = fetch }) {
         if (!config.extensionRedirectUris.has(redirectUri)) {
           throw new HttpError(400, "INVALID_REDIRECT", "This extension redirect URL is not allowed.");
         }
-        const state = await createOAuthFlow(store, redirectUri);
+        const { state, codeChallenge } = await createOAuthFlow(store, redirectUri);
         const authorizationUrl = new URL("https://github.com/login/oauth/authorize");
         authorizationUrl.searchParams.set("client_id", config.githubClientId);
         authorizationUrl.searchParams.set("redirect_uri", githubCallbackUrl(config));
         authorizationUrl.searchParams.set("state", state);
+        authorizationUrl.searchParams.set("code_challenge", codeChallenge);
+        authorizationUrl.searchParams.set("code_challenge_method", "S256");
         return json({ authorizationUrl: authorizationUrl.toString() }, 200, cors);
       }
 
@@ -200,6 +218,7 @@ export function createApi({ config, store, fetchImpl = fetch }) {
         try {
           const token = await exchangeAuthorizationCode({
             code,
+            codeVerifier: flow.code_verifier || "",
             clientId: config.githubClientId,
             clientSecret: config.githubClientSecret,
             redirectUri: githubCallbackUrl(config),
@@ -213,7 +232,7 @@ export function createApi({ config, store, fetchImpl = fetch }) {
             listInstalledRepositories(token.access_token, fetchImpl)
           ]);
           if (!repositories.length) {
-            const installState = await createOAuthFlow(store, flow.extension_redirect_uri);
+            const { state: installState } = await createOAuthFlow(store, flow.extension_redirect_uri, { usePkce: false });
             const installationUrl = new URL(`https://github.com/apps/${config.githubAppSlug}/installations/new`);
             installationUrl.searchParams.set("state", installState);
             return redirect(installationUrl.toString());
@@ -263,33 +282,40 @@ export function createApi({ config, store, fetchImpl = fetch }) {
 
       if (request.method === "POST" && url.pathname === "/v1/auth/github/token") {
         const { session } = await authenticatedSession(request, store);
-        const expiresAt = new Date(session.access_expires_at);
-        if (expiresAt.getTime() > Date.now() + 5 * 60 * 1000) {
-          return json({
-            githubAccessToken: decryptSecret(session.access_token_cipher, config.tokenEncryptionKey),
-            githubAccessTokenExpiresAt: expiresAt.toISOString()
-          }, 200, { ...cors, "Cache-Control": "no-store" });
-        }
-        if (new Date(session.refresh_expires_at).getTime() <= Date.now()) {
-          throw new HttpError(401, "GITHUB_RECONNECT_REQUIRED", "Reconnect GitHub to continue.");
-        }
-        const refreshed = await refreshUserAccessToken({
-          refreshToken: decryptSecret(session.refresh_token_cipher, config.tokenEncryptionKey),
-          clientId: config.githubClientId,
-          clientSecret: config.githubClientSecret,
-          fetchImpl
+        const token = await store.withLockedCredentials(session.github_user_id, async (current) => {
+          const expiresAt = new Date(current.access_expires_at);
+          if (expiresAt.getTime() > Date.now() + 5 * 60 * 1000) {
+            return {
+              value: {
+                githubAccessToken: decryptSecret(current.access_token_cipher, config.tokenEncryptionKey),
+                githubAccessTokenExpiresAt: expiresAt.toISOString()
+              }
+            };
+          }
+          if (new Date(current.refresh_expires_at).getTime() <= Date.now()) {
+            throw new HttpError(401, "GITHUB_RECONNECT_REQUIRED", "Reconnect GitHub to continue.");
+          }
+          const refreshed = await refreshUserAccessToken({
+            refreshToken: decryptSecret(current.refresh_token_cipher, config.tokenEncryptionKey),
+            clientId: config.githubClientId,
+            clientSecret: config.githubClientSecret,
+            fetchImpl
+          });
+          const credentials = {
+            accessTokenCipher: encryptSecret(refreshed.access_token, config.tokenEncryptionKey),
+            refreshTokenCipher: encryptSecret(refreshed.refresh_token, config.tokenEncryptionKey),
+            accessExpiresAt: tokenExpiration(refreshed.expires_in),
+            refreshExpiresAt: tokenExpiration(refreshed.refresh_token_expires_in || 15_897_600)
+          };
+          return {
+            value: {
+              githubAccessToken: refreshed.access_token,
+              githubAccessTokenExpiresAt: credentials.accessExpiresAt.toISOString()
+            },
+            credentials
+          };
         });
-        const credentials = {
-          accessTokenCipher: encryptSecret(refreshed.access_token, config.tokenEncryptionKey),
-          refreshTokenCipher: encryptSecret(refreshed.refresh_token, config.tokenEncryptionKey),
-          accessExpiresAt: tokenExpiration(refreshed.expires_in),
-          refreshExpiresAt: tokenExpiration(refreshed.refresh_token_expires_in || 15_897_600)
-        };
-        await store.updateCredentials(session.github_user_id, credentials);
-        return json({
-          githubAccessToken: refreshed.access_token,
-          githubAccessTokenExpiresAt: credentials.accessExpiresAt.toISOString()
-        }, 200, { ...cors, "Cache-Control": "no-store" });
+        return json(token, 200, { ...cors, "Cache-Control": "no-store" });
       }
 
       if (request.method === "DELETE" && url.pathname === "/v1/account") {

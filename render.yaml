@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+
+services:
+  - type: web
+    name: leetrepo
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    preDeployCommand: npm run db:migrate
+    healthCheckPath: /readyz
+    maxShutdownDelaySeconds: 30
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUBLIC_BASE_URL
+        fromService:
+          type: web
+          name: leetrepo
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: DATABASE_URL
+        fromDatabase:
+          name: leetrepo-db
+          property: connectionPoolString
+      - key: DATABASE_SSL
+        value: "false"
+      - key: DATABASE_POOL_MAX
+        value: "10"
+      - key: DATABASE_CONNECTION_TIMEOUT_MS
+        value: "5000"
+      - key: DATABASE_IDLE_TIMEOUT_MS
+        value: "30000"
+      - key: DATABASE_STATEMENT_TIMEOUT_MS
+        value: "10000"
+      - key: GITHUB_APP_SLUG
+        sync: false
+      - key: GITHUB_APP_CLIENT_ID
+        sync: false
+      - key: GITHUB_APP_CLIENT_SECRET
+        sync: false
+      - key: EXTENSION_REDIRECT_URIS
+        sync: false
+      - key: ALLOWED_EXTENSION_ORIGINS
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: FREE_AI_DAILY_LIMIT
+        value: "3"
+      - key: FREE_AI_MONTHLY_LIMIT
+        value: "30"
+      - key: GLOBAL_AI_REQUESTS_PER_MINUTE
+        value: "25"
+      - key: SESSION_TTL_DAYS
+        value: "30"
+      - key: MAX_REQUEST_BYTES
+        value: "65536"
+
+databases:
+  - name: leetrepo-db
+    plan: basic-256mb
+    region: oregon
+    postgresMajorVersion: "18"
+    databaseName: leetrepo
+    user: leetrepo
+    connectionPool: pgbouncer
+    ipAllowList: []

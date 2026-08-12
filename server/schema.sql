@@ -1,9 +1,12 @@
 CREATE TABLE IF NOT EXISTS oauth_flows (
   state_hash TEXT PRIMARY KEY,
   extension_redirect_uri TEXT NOT NULL,
+  code_verifier TEXT NOT NULL DEFAULT '',
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE oauth_flows ADD COLUMN IF NOT EXISTS code_verifier TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS auth_exchanges (
   code_hash TEXT PRIMARY KEY,
@@ -82,4 +85,3 @@ CREATE INDEX IF NOT EXISTS oauth_flows_expires_at_idx ON oauth_flows(expires_at)
 CREATE INDEX IF NOT EXISTS auth_exchanges_expires_at_idx ON auth_exchanges(expires_at);
 CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS ai_requests_created_at_idx ON ai_requests(created_at);
-

@@ -3,18 +3,34 @@ import { assertSafeGitHubAppPermissions } from "./github-permissions.js";
 
 const API = "https://api.github.com";
 const MAX_BRANCH_UPDATE_ATTEMPTS = 3;
+const GITHUB_API_VERSION = "2026-03-10";
+const GITHUB_TIMEOUT_MS = 20_000;
 
 function headers(token) {
   return {
     Accept: "application/vnd.github+json",
     Authorization: `Bearer ${token}`,
-    "X-GitHub-Api-Version": "2022-11-28",
+    "X-GitHub-Api-Version": GITHUB_API_VERSION,
     "Content-Type": "application/json"
   };
 }
 
 async function request(token, path, init = {}) {
-  const response = await fetch(`${API}${path}`, { ...init, headers: { ...headers(token), ...init.headers } });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GITHUB_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(`${API}${path}`, {
+      ...init,
+      headers: { ...headers(token), ...init.headers },
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("GitHub took too long to respond. Try again shortly.");
+    throw new Error("GitHub could not be reached. Check your connection and try again.");
+  } finally {
+    clearTimeout(timer);
+  }
   const data = response.status === 204 ? null : await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(data?.message || `GitHub request failed (${response.status})`);
