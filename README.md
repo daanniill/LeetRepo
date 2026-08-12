@@ -5,6 +5,8 @@
   Turn every Accepted LeetCode submission into a clean GitHub archive and a study system built from your own solutions.
 </p>
 
+![Every accepted LeetCode solution documented and pushed to GitHub](.github/readme-assets/hero.png)
+
 LeetRepo is a dependency-free Chrome/Chromium Manifest V3 extension. It captures the path to Accepted, commits the final solution to GitHub, generates a problem README, and keeps the result ready for interview review.
 
 **Automatic GitHub commits · Clean problem READMEs · Attempt history · Pattern analytics · Spaced repetition**
@@ -24,6 +26,8 @@ LeetRepo turns accepted solutions into a GitHub-backed library you can learn fro
 2. **Confirm the solution.** Push from the in-page panel or toolbar popup, or let a newly Accepted submission trigger auto-push.
 3. **Commit atomically.** LeetRepo creates or updates the problem folder and advances the repository branch in one multi-file commit.
 4. **Review later.** The local dashboard turns synced solutions into a searchable library, activity view, and study queue.
+
+![LeetRepo solution library with synced problems and AI overviews](.github/readme-assets/solution-library.png)
 
 A synced problem follows this shape:
 
@@ -48,9 +52,13 @@ Search and filter the solution library, inspect a problem's interview overview, 
 
 See repository growth, solve activity, pattern coverage, language breakdown, the full sequence of failed and accepted attempts, and create a shareable progress image locally.
 
+![LeetRepo solve activity, pattern coverage, and language breakdown](.github/readme-assets/activity.png)
+
 ### Study
 
 Work through a due and upcoming review queue, recall each solution before revealing its refresher, and filter coverage by pattern or difficulty. Choose a resurface interval in days, weeks, or months; successful recalls use that interval while harder reviews return sooner.
+
+![LeetRepo spaced-repetition study queue](.github/readme-assets/study.png)
 
 ## Install locally
 
@@ -68,6 +76,8 @@ The extension has no build step. Hosted authentication and AI use the Node/Postg
 ## Configure GitHub sign-in
 
 LeetRepo uses a public GitHub App and a hosted OAuth callback. Users click one sign-in button, select the repositories the app may access, and never create or paste a personal access token.
+
+![LeetRepo appearance and repository settings](.github/readme-assets/settings.png)
 
 Create a GitHub App under an organization you control with these settings:
 
