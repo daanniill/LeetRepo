@@ -5,8 +5,6 @@
   Turn every Accepted LeetCode submission into a clean GitHub archive and a study system built from your own solutions.
 </p>
 
-![LeetRepo turns an accepted solution into an organized repository and review system](assets/marketing/final/hero-1600x900.png)
-
 LeetRepo is a dependency-free Chrome/Chromium Manifest V3 extension. It captures the path to Accepted, commits the final solution to GitHub, generates a problem README, and keeps the result ready for interview review.
 
 **Automatic GitHub commits · Clean problem READMEs · Attempt history · Pattern analytics · Spaced repetition**
@@ -19,8 +17,6 @@ LeetRepo turns accepted solutions into a GitHub-backed library you can learn fro
 - **Stay organized.** Keep solutions and problem notes together.
 - **Learn from attempts.** Preserve the path to the final answer.
 - **Review smarter.** Track patterns, study gaps, and spaced repetition.
-
-![LeetRepo extension popup and solution dashboard](assets/marketing/final/store-promo-1400x560.png)
 
 ## How it works
 
@@ -41,8 +37,6 @@ A synced problem follows this shape:
 The generated README can include solve metadata, the captured problem context, complexity, personal notes, interview prompts, and a replay of the approach. Pushing another language updates the same problem folder without resetting the original solved time.
 
 ## Built for the next interview
-
-![LeetRepo activity dashboard showing solve history and pattern coverage](assets/marketing/final/feature-library-1200x900.png)
 
 The dashboard separates three jobs that usually get mixed together:
 
