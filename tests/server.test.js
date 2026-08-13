@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createApi } from "../server/api.js";
 import { decryptSecret, encryptSecret, hashToken } from "../server/crypto.js";
+import { createPool } from "../server/database.js";
 
 function config() {
   return {
@@ -42,6 +43,23 @@ function baseStore(overrides = {}) {
     ...overrides
   };
 }
+
+test("database timeout is compatible with transaction-pooled PgBouncer connections", async () => {
+  const pool = createPool({
+    databaseUrl: "postgres://postgres:postgres@127.0.0.1:5432/leetrepo_test",
+    databaseSsl: false,
+    databasePoolMax: 1,
+    databaseConnectionTimeoutMs: 5_000,
+    databaseIdleTimeoutMs: 5_000,
+    databaseStatementTimeoutMs: 10_000
+  });
+  try {
+    assert.equal(pool.options.query_timeout, 10_000);
+    assert.equal(pool.options.statement_timeout, undefined);
+  } finally {
+    await pool.end();
+  }
+});
 
 test("OAuth start accepts only configured extension redirects and stores hashed state", async () => {
   let flow;

@@ -26,7 +26,7 @@ export function createPool(config) {
     max: config.databasePoolMax || 10,
     connectionTimeoutMillis: config.databaseConnectionTimeoutMs || 5_000,
     idleTimeoutMillis: config.databaseIdleTimeoutMs || 30_000,
-    statement_timeout: config.databaseStatementTimeoutMs || 10_000
+    query_timeout: config.databaseStatementTimeoutMs || 10_000
   });
 }
 
