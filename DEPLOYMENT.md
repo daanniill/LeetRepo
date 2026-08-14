@@ -28,21 +28,21 @@ Requirements: Node.js 24, npm, and `zip`.
 ```bash
 npm ci
 npm run release:check
-shasum -a 256 dist/leetrepo-extension-2.0.0.zip
+shasum -a 256 dist/leetrepo-extension-1.0.0.zip
 ```
 
-`release:check` runs all tests, builds a deterministic ZIP, verifies the manifest scope and API origin, rejects server/secrets/remote-code patterns from the package, and leaves the upload at `dist/leetrepo-extension-2.0.0.zip`.
+`release:check` runs all tests, builds a deterministic ZIP, verifies the manifest scope and API origin, rejects server/secrets/remote-code patterns from the package, and leaves the upload at `dist/leetrepo-extension-1.0.0.zip`.
 
 - [ ] Run the command twice and confirm the SHA-256 is identical.
 - [ ] Open `dist/extension/manifest.json` and confirm the name, description, version, API host, and LeetCode URL scope.
-- [ ] If version `2.0.0` has ever been uploaded to this Chrome Web Store item, increment `version` in `manifest.json` and `package.json` before packaging. Chrome requires every uploaded version to increase.
+- [ ] If version `1.0.0` has ever been uploaded to this Chrome Web Store item, increment `version` in `manifest.json` and `package.json` before packaging. Chrome requires every uploaded version to increase.
 - [ ] Confirm `git status` contains only intentional release changes.
 - [ ] Push through a pull request and require the `CI / test-and-package` check before merge. The workflow also uploads the reviewed ZIP as a short-lived build artifact.
 
 Optional container smoke check:
 
 ```bash
-docker build -t leetrepo-api:2.0.0 .
+docker build -t leetrepo-api:1.0.0 .
 ```
 
 ## Phase 2: register the public GitHub App
