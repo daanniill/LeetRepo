@@ -57,135 +57,39 @@ Review due and upcoming problems, recall a solution before revealing its refresh
 
 ![LeetRepo spaced-repetition study queue](.github/readme-assets/study.png)
 
-## Run LeetRepo from source
+## Get started
 
-LeetRepo has two parts:
+You will need Chrome or another Chromium-based browser, a GitHub account, and a repository for your solutions.
 
-- a dependency-free Manifest V3 browser extension; and
-- a Node.js/PostgreSQL service for GitHub sign-in, token refresh, and optional AI notes.
+1. **Install and open LeetRepo.** Select LeetRepo from your browser toolbar to begin onboarding.
+2. **Connect GitHub.** Sign in when prompted, then choose which repositories LeetRepo can access.
+3. **Choose your preferences.** Pick the destination repository and decide whether to use automatic pushes, AI notes, and study reminders.
+4. **Solve and sync.** Open a problem on LeetCode, submit your solution, and save it from the LeetRepo panel or toolbar popup. Newly Accepted submissions can also sync automatically.
 
-Running the current source version requires your own GitHub App and hosted service.
-
-### Prerequisites
-
-- Chrome or another Chromium-based browser
-- A GitHub account and a repository for your solutions
-- Node.js 24 or newer
-- PostgreSQL
-- An HTTPS URL for the service during the GitHub and Chrome identity flow
-
-### 1. Install the service dependencies
-
-```bash
-npm install
-cp .env.example .env
-```
-
-Fill in every required value in [`.env.example`](.env.example). Generate the encryption key with:
-
-```bash
-openssl rand -base64 32
-```
-
-### 2. Create a GitHub App
-
-Create a GitHub App under an account or organization you control:
-
-- Make it public and enable **Request user authorization (OAuth) during installation**.
-- Keep expiring user authorization tokens enabled.
-- Set its callback URL to `<PUBLIC_BASE_URL>/v1/auth/github/callback`.
-- Grant only **Repository permissions → Contents: Read and write**. GitHub includes Metadata read access automatically.
-- Disable webhooks and leave Administration permission disabled.
-
-Add the app slug, client ID, and client secret to `.env`. Never put the client secret in extension code.
-
-### 3. Point the extension at your service
-
-1. Set `LEETREPO_API_BASE_URL` in [`src/config.js`](src/config.js) to your service's HTTPS origin.
-2. Replace the API entry in [`manifest.json`](manifest.json) under `host_permissions` with the matching origin pattern, such as `https://api.example.com/*`.
-3. Open `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.
-4. Select this repository.
-5. On the LeetRepo extension card, open the service worker under **Inspect views**. In its console, run `chrome.identity.getRedirectURL("github")`.
-6. Add the exact returned URL to `EXTENSION_REDIRECT_URIS` in `.env`.
-7. Add `chrome-extension://<YOUR_EXTENSION_ID>` to `ALLOWED_EXTENSION_ORIGINS` in `.env`.
-
-The GitHub App callback and Chrome identity redirect are different URLs: the GitHub App uses your service callback, while `EXTENSION_REDIRECT_URIS` uses the `chromiumapp.org` URL returned by Chrome.
-
-### 4. Start the service
-
-```bash
-npm run db:migrate
-npm start
-```
-
-Open LeetRepo from the browser toolbar and complete onboarding. Users choose which repositories the GitHub App may access; they never need to create or paste a personal access token.
+You can change repository access from GitHub and update your LeetRepo preferences at any time.
 
 ![LeetRepo appearance and repository settings](.github/readme-assets/settings.png)
 
-For production deployment, Chrome Web Store packaging, monitoring, and rollback guidance, follow the [deployment checklist](DEPLOYMENT.md).
+## Optional AI notes
 
-## Optional AI-generated READMEs
+AI notes are off by default. You can turn them on during onboarding, in Settings, or from the LeetCode page panel.
 
-AI-generated notes are disabled by default. Users can opt in during onboarding, in Settings, or from the LeetCode page panel. With AI disabled, LeetRepo creates a basic README from captured problem metadata and stats without an interview walkthrough or Mermaid diagram.
+When enabled, AI can add an approach walkthrough, complexity analysis, interview prompts, and a diagram to the problem README. LeetRepo uses the problem details and your solution code to create these notes.
 
-When AI is enabled:
+The free tier includes up to 3 requests per day and 30 per month. If AI notes are unavailable or you reach the limit, your solution still syncs with a standard README. Because generated notes can be inaccurate, review them before relying on them.
 
-- The extension sends the problem title, difficulty, language, detected context and example, and up to 24,000 characters of solution code to the LeetRepo API.
-- The API builds the prompt, calls the configured Groq model, validates the response, and returns the generated review and usage counters.
-- The free tier allows 3 attempted requests per UTC day and 30 per UTC month.
-- Request bodies are not written to the application database or ordinary application logs.
-- A service, provider, validation, or quota failure does not block the GitHub push; LeetRepo falls back to the basic README.
-- AI-generated READMEs remind users to verify the analysis.
-
-Turning AI off keeps GitHub sync, local rule-based feedback, and stats-only READMEs available.
+Turning AI off does not affect solution syncing, local feedback, or the dashboard.
 
 ## Privacy and safety
 
-- GitHub App refresh tokens are encrypted by the service. Short-lived GitHub access tokens and opaque LeetRepo session tokens stay in local extension storage and are not synced.
-- The GitHub App has Contents read/write access but no Repository administration permission, so it cannot delete a GitHub repository.
-- Shareable stats are rendered locally and copied or shared only after an explicit click.
-- Repository-profile generation is opt-in because it replaces the destination repository's root `README.md`.
-- Before moving a GitHub branch, LeetRepo reads the proposed tree back and stops unless every existing repository file is still present and unchanged.
-- Existing LeetRepo-style folders can be imported to rebuild the local dashboard index.
-- Account deletion clears extension storage, revokes GitHub authorization, and deletes hosted data without changing repositories. The GitHub App installation remains until the user removes it in GitHub settings.
+- You choose which repositories LeetRepo can access and can change that access later.
+- LeetRepo can add and update files in selected repositories, but it cannot change repository settings or delete a repository.
+- Syncing verifies that unrelated repository files remain unchanged.
+- Shareable progress images stay on your device until you choose to copy or share them.
+- Updating a repository's main profile README is always optional.
+- Deleting your LeetRepo account removes your LeetRepo data and authorization without changing your repositories.
 
 Read the [Privacy Notice](PRIVACY.md), [Terms and Conditions](TERMS.md), and [Security Policy](SECURITY.md) for complete details.
-
-## Development
-
-Install exact dependencies and run the test suite:
-
-```bash
-npm ci
-npm test
-```
-
-Create and verify the Chrome Web Store package after setting the production API origin:
-
-```bash
-npm run release:check
-```
-
-The archive is written to `dist/` and contains only the extension package, public notices, and assets. Server code, dependencies, and environment files are excluded.
-
-LeetCode changes its DOM regularly, so the extraction code intentionally uses several fallback selectors.
-
-### Repository structure
-
-```text
-assets/                  Extension icons
-server/                  OAuth, token refresh, AI, quotas, and database code
-scripts/                 Release packaging and verification helpers
-src/
-  background/            Manifest V3 service worker
-  content/               LeetCode page integration
-  core/                  Submission, GitHub, and explanation logic
-  pages/                 Popup, settings, onboarding, and dashboard UIs
-  shared/                Shared UI helpers and styles
-tests/                   Node.js tests
-Dockerfile               Production API container
-manifest.json            Extension entry point and permissions
-```
 
 ## License
 
