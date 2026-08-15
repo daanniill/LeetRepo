@@ -50,10 +50,37 @@ export async function beginHostedGitHubSignIn({ redirectUri, launchWebAuthFlow, 
   });
 }
 
+export function launchIdentityWebAuthFlow(chromeApi, url, {
+  setIntervalImpl = globalThis.setInterval,
+  clearIntervalImpl = globalThis.clearInterval
+} = {}) {
+  return new Promise((resolve, reject) => {
+    const keepAlive = setIntervalImpl(() => {
+      chromeApi.runtime.getPlatformInfo(() => {
+        void chromeApi.runtime.lastError;
+      });
+    }, 25_000);
+    const finish = (callback, value) => {
+      clearIntervalImpl(keepAlive);
+      callback(value);
+    };
+
+    try {
+      chromeApi.identity.launchWebAuthFlow({ url, interactive: true }, (redirectUrl) => {
+        const runtimeError = chromeApi.runtime.lastError;
+        if (runtimeError) finish(reject, new Error(runtimeError.message));
+        else if (!redirectUrl) finish(reject, new Error("GitHub sign-in was cancelled."));
+        else finish(resolve, redirectUrl);
+      });
+    } catch (error) {
+      finish(reject, error);
+    }
+  });
+}
+
 export function newRequestId(cryptoImpl = globalThis.crypto) {
   if (typeof cryptoImpl?.randomUUID === "function") return cryptoImpl.randomUUID();
   const bytes = new Uint8Array(18);
   cryptoImpl.getRandomValues(bytes);
   return [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
-

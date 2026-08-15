@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { beginHostedGitHubSignIn, hostedRequest, newRequestId } from "../src/core/service.js";
+import { beginHostedGitHubSignIn, hostedRequest, launchIdentityWebAuthFlow, newRequestId } from "../src/core/service.js";
 
 test("hosted GitHub sign-in exchanges only the one-time callback code", async () => {
   const calls = [];
@@ -27,6 +27,40 @@ test("hosted GitHub sign-in exchanges only the one-time callback code", async ()
   assert.equal(result.sessionToken, "session-token");
   assert.deepEqual(calls[1].body, { code: "one-time-code" });
   assert.equal(calls[1].init.method, "POST");
+});
+
+test("interactive GitHub sign-in keeps the extension worker active until the redirect returns", async () => {
+  let completeAuth;
+  let heartbeat;
+  let cleared;
+  const chromeApi = {
+    identity: {
+      launchWebAuthFlow(_details, callback) {
+        completeAuth = callback;
+      }
+    },
+    runtime: {
+      get lastError() { return undefined; },
+      getPlatformInfo(callback) { callback(); }
+    }
+  };
+
+  const pending = launchIdentityWebAuthFlow(chromeApi, "https://github.com/login/oauth/authorize", {
+    setIntervalImpl(callback, delay) {
+      assert.equal(delay, 25_000);
+      heartbeat = callback;
+      return 17;
+    },
+    clearIntervalImpl(interval) {
+      cleared = interval;
+    }
+  });
+
+  heartbeat();
+  completeAuth("https://extension-id.chromiumapp.org/github?code=one-time-code");
+
+  assert.equal(await pending, "https://extension-id.chromiumapp.org/github?code=one-time-code");
+  assert.equal(cleared, 17);
 });
 
 test("hostedRequest surfaces safe API errors", async () => {

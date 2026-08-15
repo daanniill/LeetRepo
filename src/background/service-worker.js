@@ -1,6 +1,6 @@
 import { aiLimitReached, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, mergeSubmissionSolutions, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
 import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.js";
-import { beginHostedGitHubSignIn, hostedRequest, newRequestId } from "../core/service.js";
+import { beginHostedGitHubSignIn, hostedRequest, launchIdentityWebAuthFlow, newRequestId } from "../core/service.js";
 import { hasCompletedOnboarding } from "../core/auth.js";
 import { clearLeetRepoStorage } from "../core/storage.js";
 import { normalizeStudyInterval, rescheduleFirstReview, reviewDateAfter, scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
@@ -109,14 +109,7 @@ async function explanationFor(settings, submission) {
 }
 
 function launchWebAuthFlow(url) {
-  return new Promise((resolve, reject) => {
-    chrome.identity.launchWebAuthFlow({ url, interactive: true }, (redirectUrl) => {
-      const runtimeError = chrome.runtime.lastError;
-      if (runtimeError) reject(new Error(runtimeError.message));
-      else if (!redirectUrl) reject(new Error("GitHub sign-in was cancelled."));
-      else resolve(redirectUrl);
-    });
-  });
+  return launchIdentityWebAuthFlow(chrome, url);
 }
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
