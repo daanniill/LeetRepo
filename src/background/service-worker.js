@@ -1,7 +1,7 @@
 import { aiLimitReached, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, mergeSubmissionSolutions, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
 import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.js";
 import { beginHostedGitHubSignIn, hostedRequest, launchIdentityWebAuthFlow, newRequestId } from "../core/service.js";
-import { hasCompletedOnboarding } from "../core/auth.js";
+import { clearDeviceAuthentication, hasCompletedOnboarding, settingsForSync } from "../core/auth.js";
 import { clearLeetRepoStorage } from "../core/storage.js";
 import { normalizeStudyInterval, rescheduleFirstReview, reviewDateAfter, scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
 
@@ -114,11 +114,11 @@ function launchWebAuthFlow(url) {
 
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   const [{ settings }, { authSchemaVersion }] = await Promise.all([getSync("settings"), getLocal("authSchemaVersion")]);
-  if (!settings) await setSync({ settings: DEFAULT_SETTINGS });
+  if (!settings) await setSync({ settings: settingsForSync(DEFAULT_SETTINGS) });
+  else if (Object.hasOwn(settings, "connected")) await setSync({ settings: settingsForSync(settings) });
   if (authSchemaVersion !== 2) {
     await chrome.storage.local.remove(["githubAccessToken", "githubDeviceFlow", "githubToken", "githubUser", "groqApiKey", "llmUsage"]);
     await setLocal({ authSchemaVersion: 2 });
-    if (settings) await setSync({ settings: { ...DEFAULT_SETTINGS, ...settings, connected: false, aiEnabled: false, aiConsent: false } });
   }
   if (reason === "install") chrome.tabs.create({ url: chrome.runtime.getURL("src/pages/onboarding/onboarding.html") });
 });
@@ -174,20 +174,7 @@ async function recordPush(submission, result, review, settings) {
 }
 
 async function clearAuthentication() {
-  await chrome.storage.local.remove([
-    "leetrepoSessionToken",
-    "githubAccessToken",
-    "githubAccessTokenExpiresAt",
-    "githubDeviceFlow",
-    "githubToken",
-    "githubUser"
-  ]);
-  const { settings = {} } = await getSync("settings");
-  await setSync({ settings: {
-    ...settings,
-    connected: false,
-    aiEnabled: false
-  } });
+  await clearDeviceAuthentication(chrome.storage);
 }
 
 async function handle(message) {
@@ -203,8 +190,7 @@ async function handle(message) {
       ]);
       const connected = hasCompletedOnboarding(settings, local.leetrepoSessionToken) && usage.authenticationRequired !== true;
       if (usage.authenticationRequired) {
-        await chrome.storage.local.remove(["leetrepoSessionToken", "githubAccessToken", "githubAccessTokenExpiresAt", "githubUser"]);
-        await setSync({ settings: { ...settings, connected: false, aiEnabled: false } });
+        await clearDeviceAuthentication(chrome.storage);
       }
       const { authenticationRequired: _authenticationRequired, ...visibleUsage } = usage;
       return {
@@ -226,14 +212,14 @@ async function handle(message) {
         getLocal("leetrepoSessionToken")
       ]);
       const requested = { ...settings, ...(message.settings || {}) };
-      if (requested.connected === true && !hasCompletedOnboarding(requested, leetrepoSessionToken)) {
+      if (message.settings?.connected === true && !hasCompletedOnboarding(requested, leetrepoSessionToken)) {
         throw new Error("Sign in with GitHub and choose an installed repository before finishing setup.");
       }
       if (requested.aiEnabled === true && requested.aiConsent !== true) {
         throw new Error("Consent to hosted AI processing before enabling AI explanations.");
       }
       const next = normalizeSettings({ ...requested, connected: hasCompletedOnboarding(requested, leetrepoSessionToken) });
-      await setSync({ settings: next });
+      await setSync({ settings: settingsForSync(next) });
       const previousInterval = normalizeStudyInterval(settings.studyIntervalValue, settings.studyIntervalUnit);
       if (previousInterval.value !== next.studyIntervalValue || previousInterval.unit !== next.studyIntervalUnit) {
         await mutateLocal(async () => {
@@ -296,12 +282,13 @@ async function handle(message) {
       });
     }
     case "PUSH_SUBMISSION": {
-      const [accessToken, { submissions = [], submissionNotes = {} }, { settings }] = await Promise.all([
+      const [accessToken, { submissions = [], submissionNotes = {} }, { settings }, { leetrepoSessionToken }] = await Promise.all([
         getGitHubAccessToken(),
         getLocal(["submissions", "submissionNotes"]),
-        getSync("settings")
+        getSync("settings"),
+        getLocal("leetrepoSessionToken")
       ]);
-      if (!accessToken || !settings?.connected) throw new Error("Finish GitHub setup first.");
+      if (!accessToken || !hasCompletedOnboarding(settings, leetrepoSessionToken)) throw new Error("Finish GitHub setup first.");
       if (!isSubmissionPushReady(message.submission)) {
         throw new Error("Submit this code on LeetCode and wait for a fresh Accepted result before pushing.");
       }
