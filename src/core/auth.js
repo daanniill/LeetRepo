@@ -15,9 +15,12 @@ export function hasCompletedOnboarding(settings = {}, sessionToken = "") {
   );
 }
 
-export function settingsForSync(settings = {}) {
-  const { connected: _connected, ...sharedSettings } = settings && typeof settings === "object" ? settings : {};
-  return sharedSettings;
+export function settingsForSync(settings = {}, synchronizedSettings = {}) {
+  const sharedSettings = settings && typeof settings === "object" ? settings : {};
+  return {
+    ...sharedSettings,
+    connected: sharedSettings.connected === true || synchronizedSettings?.connected === true
+  };
 }
 
 export async function clearDeviceAuthentication(storage) {

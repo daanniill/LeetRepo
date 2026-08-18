@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createApi } from "../server/api.js";
 import { decryptSecret, encryptSecret, hashToken } from "../server/crypto.js";
-import { createPool } from "../server/database.js";
+import { createPool, DataStore } from "../server/database.js";
 
 function config() {
   return {
@@ -154,6 +154,67 @@ test("liveness does not depend on PostgreSQL while readiness does", async () => 
   assert.equal(live.status, 200);
   assert.equal(ready.status, 200);
   assert.equal(pings, 1);
+});
+
+test("session exchange replaces only the current device session", async () => {
+  let exchange;
+  const key = config().tokenEncryptionKey;
+  const store = baseStore({
+    async exchangeAuthCode(value) {
+      exchange = value;
+      return {
+        githubUserId: "42",
+        githubLogin: "alex-c",
+        avatarUrl: "",
+        accessTokenCipher: encryptSecret("ghu_access", key),
+        accessExpiresAt: new Date(Date.now() + 3_600_000),
+        repositories: []
+      };
+    }
+  });
+  const api = createApi({ config: config(), store });
+  const response = await api(new Request("https://api.leetrepo.app/v1/auth/session/exchange", {
+    method: "POST",
+    headers: { Authorization: "Bearer previous-session", "Content-Type": "application/json" },
+    body: JSON.stringify({ code: "one-time-code" })
+  }));
+
+  assert.equal(response.status, 200);
+  assert.equal(exchange.replacedSessionHash, hashToken("previous-session"));
+});
+
+test("creating a session never evicts sessions belonging to other devices", async () => {
+  const queries = [];
+  const auth = {
+    github_user_id: "42",
+    github_login: "alex-c",
+    avatar_url: "",
+    access_token_cipher: "encrypted-access",
+    refresh_token_cipher: "encrypted-refresh",
+    access_expires_at: new Date(Date.now() + 3_600_000),
+    refresh_expires_at: new Date(Date.now() + 86_400_000),
+    repositories: []
+  };
+  const client = {
+    async query(sql, values = []) {
+      queries.push({ sql, values });
+      return sql.includes("DELETE FROM auth_exchanges") ? { rows: [auth] } : { rows: [] };
+    },
+    release() {}
+  };
+  const store = new DataStore({ async connect() { return client; } });
+
+  await store.exchangeAuthCode({
+    codeHash: "code-hash",
+    sessionHash: "new-session-hash",
+    replacedSessionHash: "previous-session-hash",
+    sessionExpiresAt: new Date(Date.now() + 86_400_000)
+  });
+
+  const sessionDeletes = queries.filter(({ sql }) => /DELETE FROM sessions/.test(sql));
+  assert.equal(sessionDeletes.length, 1);
+  assert.deepEqual(sessionDeletes[0].values, ["previous-session-hash", "42"]);
+  assert.equal(queries.some(({ sql }) => /OFFSET\s+10/.test(sql)), false);
 });
 
 test("token refresh rechecks credentials under the database lock", async () => {

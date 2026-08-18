@@ -11,11 +11,12 @@ test("onboarding derives connection from this device's session and the configure
   assert.equal(hasCompletedOnboarding({ ...configured, repo: "" }, "session-token"), false);
 });
 
-test("device authentication state is never written to synchronized settings", () => {
+test("a new client keeps older extension versions connected during rollout", () => {
   assert.deepEqual(
     settingsForSync({ connected: true, owner: "alex-c", repo: "leetcode-solutions", autoPush: true }),
-    { owner: "alex-c", repo: "leetcode-solutions", autoPush: true }
+    { connected: true, owner: "alex-c", repo: "leetcode-solutions", autoPush: true }
   );
+  assert.equal(settingsForSync({ connected: false, autoPush: false }, { connected: true }).connected, true);
 });
 
 test("signing out clears authentication only on the current device", async () => {

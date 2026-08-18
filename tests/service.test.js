@@ -18,6 +18,7 @@ test("hosted GitHub sign-in exchanges only the one-time callback code", async ()
   };
   const result = await beginHostedGitHubSignIn({
     redirectUri: "https://extension-id.chromiumapp.org/github",
+    sessionToken: "previous-device-session",
     launchWebAuthFlow: async (url) => {
       assert.match(url, /^https:\/\/github\.com\/login\/oauth\/authorize/);
       return "https://extension-id.chromiumapp.org/github?code=one-time-code";
@@ -27,6 +28,7 @@ test("hosted GitHub sign-in exchanges only the one-time callback code", async ()
   assert.equal(result.sessionToken, "session-token");
   assert.deepEqual(calls[1].body, { code: "one-time-code" });
   assert.equal(calls[1].init.method, "POST");
+  assert.equal(calls[1].init.headers.Authorization, "Bearer previous-device-session");
 });
 
 test("interactive GitHub sign-in keeps the extension worker active until the redirect returns", async () => {

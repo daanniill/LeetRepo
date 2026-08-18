@@ -54,10 +54,15 @@ async function readJson(request, config) {
   }
 }
 
-function bearerToken(request) {
+function optionalBearerToken(request) {
   const match = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i);
-  if (!match) throw new HttpError(401, "AUTH_REQUIRED", "Sign in with GitHub to continue.");
-  return match[1];
+  return match?.[1] || "";
+}
+
+function bearerToken(request) {
+  const token = optionalBearerToken(request);
+  if (!token) throw new HttpError(401, "AUTH_REQUIRED", "Sign in with GitHub to continue.");
+  return token;
 }
 
 async function authenticatedSession(request, store) {
@@ -263,9 +268,11 @@ export function createApi({ config, store, fetchImpl = fetch }) {
         const code = String(body.code || "").trim();
         if (!code) throw new HttpError(400, "AUTH_CODE_REQUIRED", "Authorization code is required.");
         const sessionToken = randomToken();
+        const replacedSessionToken = optionalBearerToken(request);
         const auth = await store.exchangeAuthCode({
           codeHash: hashToken(code),
           sessionHash: hashToken(sessionToken),
+          replacedSessionHash: replacedSessionToken ? hashToken(replacedSessionToken) : "",
           sessionExpiresAt: new Date(Date.now() + config.sessionTtlDays * 86_400_000)
         });
         if (!auth) throw new HttpError(401, "AUTH_CODE_EXPIRED", "This sign-in code expired. Start again.");

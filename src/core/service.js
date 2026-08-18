@@ -35,7 +35,7 @@ export async function hostedRequest(path, {
   return data;
 }
 
-export async function beginHostedGitHubSignIn({ redirectUri, launchWebAuthFlow, fetchImpl = globalThis.fetch }) {
+export async function beginHostedGitHubSignIn({ redirectUri, launchWebAuthFlow, sessionToken = "", fetchImpl = globalThis.fetch }) {
   const start = await hostedRequest(`/v1/auth/github/start?redirect_uri=${encodeURIComponent(redirectUri)}`, { fetchImpl });
   const finalUrl = await launchWebAuthFlow(start.authorizationUrl);
   const result = new URL(finalUrl);
@@ -45,6 +45,7 @@ export async function beginHostedGitHubSignIn({ redirectUri, launchWebAuthFlow, 
   if (!code) throw new Error("GitHub sign-in did not return an authorization code.");
   return hostedRequest("/v1/auth/session/exchange", {
     method: "POST",
+    sessionToken,
     body: { code },
     fetchImpl
   });

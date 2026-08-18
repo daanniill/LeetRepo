@@ -99,7 +99,7 @@ export class DataStore {
     );
   }
 
-  async exchangeAuthCode({ codeHash, sessionHash, sessionExpiresAt }) {
+  async exchangeAuthCode({ codeHash, sessionHash, replacedSessionHash = "", sessionExpiresAt }) {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -147,16 +147,13 @@ export class DataStore {
          VALUES ($1, $2, $3)`,
         [sessionHash, auth.github_user_id, sessionExpiresAt]
       );
-      await client.query(
-        `DELETE FROM sessions
-         WHERE token_hash IN (
-           SELECT token_hash FROM sessions
-           WHERE github_user_id = $1
-           ORDER BY created_at DESC, token_hash DESC
-           OFFSET 10
-         )`,
-        [auth.github_user_id]
-      );
+      if (replacedSessionHash) {
+        await client.query(
+          `DELETE FROM sessions
+           WHERE token_hash = $1 AND github_user_id = $2`,
+          [replacedSessionHash, auth.github_user_id]
+        );
+      }
       await client.query("COMMIT");
       return {
         githubUserId: String(auth.github_user_id),

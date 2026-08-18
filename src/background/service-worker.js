@@ -115,7 +115,6 @@ function launchWebAuthFlow(url) {
 chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   const [{ settings }, { authSchemaVersion }] = await Promise.all([getSync("settings"), getLocal("authSchemaVersion")]);
   if (!settings) await setSync({ settings: settingsForSync(DEFAULT_SETTINGS) });
-  else if (Object.hasOwn(settings, "connected")) await setSync({ settings: settingsForSync(settings) });
   if (authSchemaVersion !== 2) {
     await chrome.storage.local.remove(["githubAccessToken", "githubDeviceFlow", "githubToken", "githubUser", "groqApiKey", "llmUsage"]);
     await setLocal({ authSchemaVersion: 2 });
@@ -219,7 +218,7 @@ async function handle(message) {
         throw new Error("Consent to hosted AI processing before enabling AI explanations.");
       }
       const next = normalizeSettings({ ...requested, connected: hasCompletedOnboarding(requested, leetrepoSessionToken) });
-      await setSync({ settings: settingsForSync(next) });
+      await setSync({ settings: settingsForSync(next, settings) });
       const previousInterval = normalizeStudyInterval(settings.studyIntervalValue, settings.studyIntervalUnit);
       if (previousInterval.value !== next.studyIntervalValue || previousInterval.unit !== next.studyIntervalUnit) {
         await mutateLocal(async () => {
@@ -232,9 +231,11 @@ async function handle(message) {
       return { settings: next, ai: { available: next.connected } };
     }
     case "START_GITHUB_SIGN_IN": {
+      const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
       const result = await beginHostedGitHubSignIn({
         redirectUri: chrome.identity.getRedirectURL("github"),
-        launchWebAuthFlow
+        launchWebAuthFlow,
+        sessionToken: leetrepoSessionToken
       });
       await setLocal({
         leetrepoSessionToken: result.sessionToken,
