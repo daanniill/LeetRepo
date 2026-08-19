@@ -166,6 +166,11 @@ function assertTreePreserved(previousEntries, nextEntries, additions) {
   }
 }
 
+function treeContainsEntries(tree, entries) {
+  const byPath = new Map(tree.filter((entry) => entry.type === "blob").map((entry) => [entry.path, entry.sha]));
+  return entries.every((entry) => byPath.get(entry.path) === entry.sha);
+}
+
 export async function pushSubmission({ token, settings, submission, review, profileItems = [] }) {
   const pushedAt = submission.syncedAt || new Date().toISOString();
   const item = normalizeSubmission({ ...submission, solvedAt: submission.solvedAt || pushedAt, syncedAt: pushedAt });
@@ -206,6 +211,14 @@ export async function pushSubmission({ token, settings, submission, review, prof
   }
   for (let attempt = 1; ; attempt += 1) {
     const updatesExistingSolution = previousTree.some((entry) => entry.type === "blob" && entry.path === solutionPath);
+    if (treeContainsEntries(previousTree, entries)) {
+      return {
+        sha: parentSha,
+        url: `https://github.com/${settings.owner}/${settings.repo}/commit/${parentSha}`,
+        branch,
+        updated: updatesExistingSolution
+      };
+    }
     const tree = await request(token, `/repos/${owner}/${repo}/git/trees`, {
       method: "POST",
       body: JSON.stringify({ base_tree: parentCommit.tree.sha, tree: entries })

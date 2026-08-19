@@ -10,6 +10,7 @@
   let syncedSubmissions = [];
   let pendingSubmission = null;
   let acceptedSubmissionKey = "";
+  let autoPushAttemptedKey = "";
   const themes = new Set(["light", "dark", "teal"]);
   const submissionStatuses = ["Accepted", "Wrong Answer", "Time Limit Exceeded", "Memory Limit Exceeded", "Runtime Error", "Compile Error", "Output Limit Exceeded"];
   const resultSelector = '[data-e2e-locator*="submission-result"], [data-cy*="submission-result"]';
@@ -316,7 +317,9 @@
   }
 
   async function push(automatic) {
-    if (pushing || !hasFreshAcceptance() || !latest?.code) return;
+    const pushKey = acceptedSubmissionKey;
+    if (pushing || !hasFreshAcceptance() || !latest?.code || (automatic && autoPushAttemptedKey === pushKey)) return;
+    if (automatic) autoPushAttemptedKey = pushKey;
     pushing = true;
     render();
     showNotice("");
@@ -372,6 +375,7 @@
         latest = null;
         pendingSubmission = null;
         acceptedSubmissionKey = "";
+        autoPushAttemptedKey = "";
         return;
       }
       mount();
@@ -400,6 +404,7 @@
     const submission = extractSubmission();
     if (!submission.code) return;
     acceptedSubmissionKey = "";
+    autoPushAttemptedKey = "";
     pendingSubmission = { key: submissionKey(submission), startedAt: Date.now() };
     latest = submission;
     showNotice("");

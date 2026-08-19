@@ -309,6 +309,51 @@ test("pushSubmission retries on a non-fast-forward branch update", async (t) => 
   assert.equal(result.sha, "rebased-commit");
 });
 
+test("pushSubmission treats a matching competing branch update as success", async (t) => {
+  const calls = [];
+  const replies = [
+    { status: 200, body: { default_branch: "main" } },
+    { status: 200, body: { object: { sha: "original-parent" } } },
+    { status: 200, body: { tree: { sha: "original-tree" } } },
+    { status: 200, body: { tree: [] } },
+    { status: 200, body: { sha: "solution-blob" } },
+    { status: 200, body: { sha: "readme-blob" } },
+    { status: 200, body: { sha: "first-tree" } },
+    { status: 200, body: { tree: [
+      { type: "blob", path: "0001-two-sum/python/solution.py", sha: "solution-blob" },
+      { type: "blob", path: "0001-two-sum/README.md", sha: "readme-blob" }
+    ] } },
+    { status: 200, body: { sha: "first-commit" } },
+    { status: 422, body: { message: "Update is not a fast forward" } },
+    { status: 200, body: { object: { sha: "landed-commit" } } },
+    { status: 200, body: { tree: { sha: "landed-tree" } } },
+    { status: 200, body: { tree: [
+      { type: "blob", path: "0001-two-sum/python/solution.py", sha: "solution-blob" },
+      { type: "blob", path: "0001-two-sum/README.md", sha: "readme-blob" }
+    ] } }
+  ];
+  t.mock.method(globalThis, "fetch", async (url, init = {}) => {
+    const reply = replies[calls.length];
+    calls.push({ url, init, body: init.body ? JSON.parse(init.body) : null });
+    return new Response(JSON.stringify(reply.body), {
+      status: reply.status,
+      headers: { "content-type": "application/json" }
+    });
+  });
+
+  const result = await pushSubmission({
+    token: "secret",
+    settings: { owner: "alex-c", repo: "solutions", branch: "main", includeReadme: true },
+    submission: { number: 1, title: "Two Sum", language: "Python3", code: "return [0, 1]" }
+  });
+
+  assert.equal(result.sha, "landed-commit");
+  assert.equal(result.url, "https://github.com/alex-c/solutions/commit/landed-commit");
+  assert.equal(calls.filter((call) => call.url.endsWith("/git/commits") && call.init.method === "POST").length, 1);
+  assert.equal(calls.filter((call) => call.url.includes("/git/refs/heads/") && call.init.method === "PATCH").length, 1);
+  assert.equal(calls.length, 13);
+});
+
 test("pushSubmission aborts before moving the branch if the proposed tree loses a file", async (t) => {
   const calls = [];
   const replies = [

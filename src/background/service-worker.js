@@ -11,6 +11,7 @@ const getSync = (keys) => chrome.storage.sync.get(keys);
 const setSync = (value) => chrome.storage.sync.set(value);
 let localMutationQueue = Promise.resolve();
 let accountDeletionInProgress = false;
+const pushesInFlight = new Map();
 
 async function getGitHubAccessToken() {
   const { githubAccessToken, githubAccessTokenExpiresAt, leetrepoSessionToken } = await getLocal([
@@ -295,20 +296,33 @@ async function handle(message) {
       }
       const normalizedSettings = normalizeSettings(settings);
       const submission = normalizeSubmission(message.submission);
-      const existing = submissions.find((item) => sameProblem(item, submission));
-      submission.syncedAt = new Date().toISOString();
-      submission.solvedAt = existing?.solvedAt || existing?.syncedAt || submission.syncedAt;
-      submission.notes = submission.notes || submissionNotes[submission.id] || "";
-      const explanation = await explanationFor(normalizedSettings, submission);
-      const result = await pushSubmission({
-        token: accessToken,
-        settings: normalizedSettings,
-        submission,
-        review: explanation.review,
-        profileItems: submissions
+      const pushKey = JSON.stringify({
+        repository: [normalizedSettings.owner, normalizedSettings.repo, normalizedSettings.branch],
+        submission
       });
-      await recordAttempt(submission);
-      return { result, submission: await recordPush(submission, result, explanation.review, normalizedSettings), ai: explanation.ai };
+      if (pushesInFlight.has(pushKey)) return pushesInFlight.get(pushKey);
+      const task = (async () => {
+        const existing = submissions.find((item) => sameProblem(item, submission));
+        submission.syncedAt = new Date().toISOString();
+        submission.solvedAt = existing?.solvedAt || existing?.syncedAt || submission.syncedAt;
+        submission.notes = submission.notes || submissionNotes[submission.id] || "";
+        const explanation = await explanationFor(normalizedSettings, submission);
+        const result = await pushSubmission({
+          token: accessToken,
+          settings: normalizedSettings,
+          submission,
+          review: explanation.review,
+          profileItems: submissions
+        });
+        await recordAttempt(submission);
+        return { result, submission: await recordPush(submission, result, explanation.review, normalizedSettings), ai: explanation.ai };
+      })();
+      pushesInFlight.set(pushKey, task);
+      try {
+        return await task;
+      } finally {
+        if (pushesInFlight.get(pushKey) === task) pushesInFlight.delete(pushKey);
+      }
     }
     case "GENERATE_FEEDBACK": {
       const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
