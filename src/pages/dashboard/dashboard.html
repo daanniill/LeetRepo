@@ -25,7 +25,7 @@
         <section data-view-panel="problems">
           <header class="dashboard-header">
             <div><h1>Synced problems</h1></div>
-            <div class="header-actions"><label class="search"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="search" type="search" aria-label="Search synced problems" placeholder="Search title, pattern, language…"></label><button class="button secondary" id="refresh">Refresh</button></div>
+            <div class="header-actions"><label class="search"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="search" type="search" aria-label="Search synced problems" placeholder="Search title, topic, language…"></label><button class="button secondary" id="refresh">Refresh</button></div>
           </header>
 
           <section class="stats-row">
@@ -75,7 +75,7 @@
             </div>
           </section>
           <div class="analytics-grid">
-            <section class="panel analytics-card"><div class="eyebrow">Pattern coverage</div><h2>What you practice</h2><div class="bar-list" id="pattern-breakdown"></div></section>
+            <section class="panel analytics-card"><div class="eyebrow">Topic coverage</div><h2>What you practice</h2><div class="bar-list" id="pattern-breakdown"></div></section>
             <section class="panel analytics-card"><div class="eyebrow">Language breakdown</div><h2>How you solve</h2><div class="bar-list" id="language-breakdown"></div></section>
           </div>
           <section class="panel progress-share-panel">
@@ -96,7 +96,7 @@
             <div class="stat"><div class="stat-value accent" id="study-due-stat">0</div><div class="stat-label">due now</div></div>
             <div class="stat"><div class="stat-value" id="study-upcoming-stat">0</div><div class="stat-label">upcoming this week</div></div>
             <div class="stat"><div class="stat-value" id="study-reviewed-stat">0</div><div class="stat-label">reviews completed</div></div>
-            <div class="stat"><div class="stat-value" id="study-pattern-stat">0</div><div class="stat-label">patterns in rotation</div></div>
+            <div class="stat"><div class="stat-value" id="study-pattern-stat">0</div><div class="stat-label">topics in rotation</div></div>
           </section>
           <div class="study-workspace">
             <aside class="panel study-queue-panel" aria-label="Review queue">
@@ -106,7 +106,7 @@
                 <button class="study-tab" role="tab" aria-selected="false" aria-controls="study-queue" data-study-tab="upcoming">Upcoming <span id="study-upcoming-tab-count">0</span></button>
               </div>
               <div class="study-filters">
-                <label><span>Pattern</span><select id="study-pattern-filter"><option value="All">All patterns</option></select></label>
+                <label><span>Topic</span><select id="study-pattern-filter"><option value="All">All topics</option></select></label>
                 <label><span>Difficulty</span><select id="study-difficulty-filter"><option value="All">All levels</option><option>Easy</option><option>Medium</option><option>Hard</option></select></label>
               </div>
               <div class="study-queue" id="study-queue" role="listbox" aria-label="Review queue"></div>
@@ -114,7 +114,7 @@
             <section class="panel study-session" id="study-session" aria-live="polite"></section>
           </div>
           <section class="panel coverage-card">
-            <div class="section-heading"><div><div class="eyebrow">Pattern coverage</div><h2>Choose what to bring back into rotation</h2><p>Coverage reflects your synced solutions and review queue—not a claim of mastery.</p></div><div class="coverage-legend"><span><i class="due"></i>Due</span><span><i class="rotation"></i>In rotation</span><span><i class="practiced"></i>Practiced</span><span><i class="unseen"></i>Unseen</span></div></div>
+            <div class="section-heading"><div><div class="eyebrow">Topic coverage</div><h2>Choose what to bring back into rotation</h2><p>Topics come directly from your synced LeetCode problems.</p></div><div class="coverage-legend"><span><i class="due"></i>Due</span><span><i class="rotation"></i>In rotation</span><span><i class="practiced"></i>Practiced</span></div></div>
             <div class="pattern-cloud" id="pattern-cloud"></div>
             <div class="gap-callout" id="gap-callout"></div>
           </section>

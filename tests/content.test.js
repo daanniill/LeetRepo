@@ -5,7 +5,7 @@ await import("../src/content/language.js");
 await import("../src/content/problem.js");
 
 const { detectLanguage, normalizeLanguage } = globalThis.LeetRepoLanguage;
-const { getProblemIdentity } = globalThis.LeetRepoProblem;
+const { getProblemIdentity, getProblemTags } = globalThis.LeetRepoProblem;
 
 function rootWith({ mode = null, labels = [] } = {}) {
   return {
@@ -57,4 +57,15 @@ test("problem identity retains the legacy title fallback", () => {
     title: "Trapping Rain Water",
     slug: "trapping-rain-water"
   });
+});
+
+test("problem tags come from LeetCode topic links without duplicates", () => {
+  const links = [
+    { textContent: " Array " },
+    { textContent: "Hash   Table" },
+    { textContent: "Array" }
+  ];
+  const root = { querySelectorAll: () => links };
+
+  assert.deepEqual(getProblemTags(root), ["Array", "Hash Table"]);
 });

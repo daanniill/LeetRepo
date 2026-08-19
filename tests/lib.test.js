@@ -26,6 +26,7 @@ const submission = {
   number: 42,
   title: "Trapping Rain Water",
   difficulty: "Hard",
+  tags: ["Array", "Two Pointers", "Dynamic Programming", "Stack", "Monotonic Stack"],
   language: "C++",
   code: "int trap(vector<int>& h) { return 0; }",
   problemContext: "Given an elevation map, compute how much rain water it can trap.",
@@ -57,6 +58,7 @@ test("normalizeSubmission maps languages to extensions", () => {
   assert.equal(normalizeSubmission({ language: "C#" }).extension, "cs");
   assert.equal(normalizeSubmission({ title: "Safe", slug: "../../unsafe/path" }).slug, "unsafe-path");
   assert.equal(normalizeSubmission({ syncedAt: "2026-08-07T12:34:56.000Z" }).solvedAt, "2026-08-07T12:34:56.000Z");
+  assert.deepEqual(normalizeSubmission({ tags: [" Array ", "Hash   Table", "Array", ""] }).tags, ["Array", "Hash Table"]);
 });
 
 test("problem identity is stable when a title or slug changes", () => {
@@ -77,8 +79,9 @@ test("problem records retain language variants and default to the latest solutio
   assert.equal(merged.lastReviewRating, "hard");
   assert.deepEqual(submissionSolutions(merged).map((solution) => solution.language), ["C++", "Python3"]);
   assert.deepEqual(historyInsights([merged]).languages, [["C++", 1], ["Python3", 1]]);
-  const searchable = { ...merged, notes: "Re-check equal heights.", review: { patterns: ["Two Pointers"] } };
+  const searchable = { ...merged, notes: "Re-check equal heights.", review: { patterns: ["Invented AI Tag"] } };
   assert.match(submissionSearchText(searchable), /two pointers/);
+  assert.doesNotMatch(submissionSearchText(searchable), /invented ai tag/);
   assert.match(submissionSearchText(searchable), /re-check equal heights/);
 });
 
@@ -123,6 +126,7 @@ test("README defaults to basic LeetCode stats without a diagram", () => {
   assert.match(readme, /## Problem description/);
   assert.match(readme, /Given an elevation map, compute how much rain water it can trap\./);
   assert.match(readme, /View problem on LeetCode/);
+  assert.match(readme, /\*\*Topics:\*\* Array, Two Pointers, Dynamic Programming, Stack, Monotonic Stack/);
   assert.doesNotMatch(readme, /Interview overview/);
   assert.doesNotMatch(readme, /```mermaid/);
 });
@@ -211,12 +215,13 @@ test("README ignores a supplied AI review when the user has opted out", () => {
   assert.doesNotMatch(readme, /mermaid|AI-generated/);
 });
 
-test("Mermaid replay falls back by pattern and escapes untrusted labels", () => {
+test("Mermaid replay falls back by a LeetCode topic and escapes untrusted labels", () => {
   const diagram = buildMermaidDiagram({
     ...submission,
+    tags: ["Two Pointers"],
     exampleInput: "[1, 2] ` ``` <script>",
     exampleOutput: "2"
-  }, { patterns: ["Two Pointers"] });
+  });
   assert.match(diagram, /^flowchart TD/);
   assert.match(diagram, /Goal<br\/>Given an elevation map/);
   assert.match(diagram, /Everything outside the pointers/);

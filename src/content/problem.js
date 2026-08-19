@@ -21,5 +21,12 @@
     };
   }
 
-  globalThis.LeetRepoProblem = Object.freeze({ getProblemIdentity });
+  function getProblemTags(root = document) {
+    const tags = Array.from(root.querySelectorAll('a[href^="/tag/"], a[href^="https://leetcode.com/tag/"], a[href^="https://www.leetcode.com/tag/"]'))
+      .map((link) => normalizeSpace(link.textContent))
+      .filter(Boolean);
+    return [...new Set(tags)];
+  }
+
+  globalThis.LeetRepoProblem = Object.freeze({ getProblemIdentity, getProblemTags });
 })();

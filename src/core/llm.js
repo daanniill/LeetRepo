@@ -17,7 +17,6 @@ const REVIEW_RESPONSE_FORMAT = {
       type: "object",
       properties: {
         summary: { type: "string" },
-        patterns: { type: "array", items: { type: "string" } },
         approach: { type: "array", items: { type: "string" } },
         complexity: {
           type: "object",
@@ -63,7 +62,7 @@ const REVIEW_RESPONSE_FORMAT = {
           additionalProperties: false
         }
       },
-      required: ["summary", "patterns", "approach", "complexity", "complexityCheck", "edgeCases", "visual"],
+      required: ["summary", "approach", "complexity", "complexityCheck", "edgeCases", "visual"],
       additionalProperties: false
     }
   }
@@ -92,7 +91,6 @@ export function normalizeGeneratedReview(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Groq returned an invalid explanation.");
   const review = {
     summary: cleanText(value.summary, 1_200),
-    patterns: cleanList(value.patterns, { maxItems: 5, maxLength: 80 }),
     approach: cleanList(value.approach, { maxItems: 8, maxLength: 500 }),
     complexity: {
       time: cleanText(value.complexity?.time, 300),
@@ -110,7 +108,6 @@ export function normalizeGeneratedReview(value) {
   if (!review.summary || review.approach.length < 2 || !review.complexity.time || !review.complexity.space) {
     throw new Error("Groq returned an incomplete explanation.");
   }
-  if (!review.patterns.length) review.patterns = ["Problem-specific reasoning"];
   return review;
 }
 
@@ -127,7 +124,6 @@ function promptFor(submission) {
 Return exactly one JSON object with this shape:
 {
   "summary": "2-3 concise sentences explaining the core idea",
-  "patterns": ["1-5 algorithm or data-structure patterns"],
   "approach": ["3-6 ordered implementation steps"],
   "complexity": {
     "time": "Big-O followed by a short justification",

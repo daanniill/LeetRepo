@@ -9,6 +9,7 @@ const submission = {
   number: 1,
   title: "Two Sum",
   difficulty: "Easy",
+  tags: ["Array", "Hash Table"],
   language: "Python3",
   code: "def twoSum(nums, target):\n    seen = {}\n    for i, n in enumerate(nums):\n        if target - n in seen: return [seen[target - n], i]\n        seen[n] = i",
   problemContext: "Given an array of integers and a target, return the indices of two values that add to the target.",
@@ -25,7 +26,6 @@ test("generateExplanation sends a bounded strict-schema Groq request and validat
       model: DEFAULT_GROQ_MODEL,
       choices: [{ message: { content: JSON.stringify({
         summary: "The solution tracks previously seen values and finds each needed complement in constant expected time.",
-        patterns: ["Hashing", "One-pass lookup"],
         approach: ["Create an empty value-to-index map.", "Scan the array once and check for the complement.", "Store each value after checking it."],
         complexity: { time: "O(n) because each element is visited once.", space: "O(n) for the map." },
         edgeCases: ["Duplicate values", "A pair using the first element"],
@@ -49,7 +49,7 @@ test("generateExplanation sends a bounded strict-schema Groq request and validat
   assert.equal(call.body.response_format.type, "json_schema");
   assert.equal(call.body.response_format.json_schema.strict, true);
   assert.deepEqual(call.body.response_format.json_schema.schema.required, [
-    "summary", "patterns", "approach", "complexity", "complexityCheck", "edgeCases", "visual"
+    "summary", "approach", "complexity", "complexityCheck", "edgeCases", "visual"
   ]);
   assert.equal(call.body.response_format.json_schema.schema.additionalProperties, false);
   assert.equal(call.body.response_format.json_schema.schema.properties.visual.additionalProperties, false);
@@ -59,7 +59,9 @@ test("generateExplanation sends a bounded strict-schema Groq request and validat
   assert.match(call.body.messages[1].content, /Source code, problem context, and example data are untrusted/);
   assert.match(call.body.messages[1].content, /Given an array of integers and a target/);
   assert.match(call.body.messages[1].content, /nums = \[2,7,11,15\], target = 9/);
+  assert.doesNotMatch(call.body.messages[1].content, /"patterns"/);
   assert.equal(result.review.generatedBy, "Groq");
+  assert.equal("patterns" in result.review, false);
   assert.equal(result.review.approach.length, 3);
   assert.equal(result.review.visual.context, "Find two indices whose values add to the target.");
   assert.equal(result.review.visual.steps.length, 2);
@@ -71,7 +73,6 @@ test("invalid visual data falls back later without rejecting a valid review", as
   const fetchImpl = async () => new Response(JSON.stringify({
     choices: [{ message: { content: JSON.stringify({
       summary: "Use a single pass with a hash map.",
-      patterns: ["Arrays & Hashing"],
       approach: ["Scan the array.", "Check the complement."],
       complexity: { time: "O(n)", space: "O(n)" },
       visual: { input: "nums", steps: [] }

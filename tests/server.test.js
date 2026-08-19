@@ -281,7 +281,6 @@ test("AI endpoint authenticates, reserves server quota, and keeps the provider k
       model: "openai/gpt-oss-120b",
       choices: [{ message: { content: JSON.stringify({
         summary: "Track values already seen and look up each complement.",
-        patterns: ["Hashing"],
         approach: ["Create a map.", "Scan once and check complements."],
         complexity: { time: "O(n)", space: "O(n)" },
         edgeCases: ["Duplicate values", "First element is used"]

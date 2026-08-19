@@ -83,17 +83,17 @@ test("study queue exposes due, overdue, upcoming, and next-week groups", () => {
   assert.equal(queue.totalReviews, 3);
 });
 
-test("pattern coverage normalizes aliases and distinguishes due, rotation, practiced, and unseen", () => {
+test("topic coverage keeps LeetCode names and distinguishes due, rotation, and practiced", () => {
   const coverage = patternCoverage([
-    { reviewDueAt: "2026-08-07T12:00:00.000Z", review: { patterns: ["BFS"] } },
-    { reviewDueAt: "2026-08-20T12:00:00.000Z", review: { patterns: ["Hash Map"] } },
-    { reviewDueAt: "2026-08-20T12:00:00.000Z", review: { patterns: ["Stack"] } },
-    { reviewDueAt: "2026-08-21T12:00:00.000Z", review: { patterns: ["Stack"] } },
-    { reviewDueAt: "2026-08-22T12:00:00.000Z", review: { patterns: ["Stack"] } }
+    { reviewDueAt: "2026-08-07T12:00:00.000Z", tags: ["Breadth-First Search"] },
+    { reviewDueAt: "2026-08-20T12:00:00.000Z", tags: ["Hash Table"] },
+    { reviewDueAt: "2026-08-20T12:00:00.000Z", tags: ["Stack"] },
+    { reviewDueAt: "2026-08-21T12:00:00.000Z", tags: ["Stack"] },
+    { reviewDueAt: "2026-08-22T12:00:00.000Z", tags: ["Stack"] }
   ], undefined, now);
-  assert.equal(canonicalPattern("bfs"), "Graph Traversal");
-  assert.equal(coverage.find(({ pattern }) => pattern === "Graph Traversal").status, "due");
-  assert.equal(coverage.find(({ pattern }) => pattern === "Arrays & Hashing").status, "rotation");
+  assert.equal(canonicalPattern("  Breadth-First   Search "), "Breadth-First Search");
+  assert.equal(coverage.find(({ pattern }) => pattern === "Breadth-First Search").status, "due");
+  assert.equal(coverage.find(({ pattern }) => pattern === "Hash Table").status, "rotation");
   assert.equal(coverage.find(({ pattern }) => pattern === "Stack").status, "practiced");
-  assert.equal(coverage.find(({ pattern }) => pattern === "Trie").status, "unseen");
+  assert.equal(coverage.some(({ status }) => status === "unseen"), false);
 });

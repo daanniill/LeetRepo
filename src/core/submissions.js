@@ -74,12 +74,16 @@ export function normalizeSubmission(input = {}) {
   const number = String(input.number || "0").replace(/\D/g, "") || "0";
   const title = String(input.title || "Untitled problem").trim();
   const language = String(input.language || "text").trim();
+  const tags = Array.isArray(input.tags)
+    ? [...new Set(input.tags.map((tag) => String(tag || "").replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 20)
+    : [];
   const item = {
     id: `${number}-${slugify(title)}`,
     number,
     title,
     slug: slugify(input.slug || title),
     difficulty: ["Easy", "Medium", "Hard"].includes(input.difficulty) ? input.difficulty : "Unknown",
+    tags,
     language,
     extension: LANGUAGE_EXTENSIONS[language.toLowerCase()] || "txt",
     path: String(input.path || "").trim(),
@@ -171,6 +175,7 @@ export function mergeSubmissionSolutions(existing = {}, incoming = {}) {
     title: hasPrevious ? previous.title : update.title,
     slug: hasPrevious ? previous.slug : update.slug,
     difficulty,
+    tags: update.tags.length ? update.tags : previous.tags,
     url: update.url || previous.url,
     problemContext: update.problemContext || previous.problemContext,
     exampleInput: update.exampleInput || previous.exampleInput,
@@ -270,8 +275,8 @@ const FALLBACK_VISUALS = {
   }
 };
 
-function fallbackSolutionVisual(item, review = {}) {
-  const pattern = (review.patterns || [])[0];
+function fallbackSolutionVisual(item) {
+  const pattern = item.tags[0];
   const template = FALLBACK_VISUALS[pattern] || {
     invariant: "Each step preserves the information needed to compute the final result.",
     steps: [["Initialize", "Create the required working state"], ["Process", "Update state from the current input"], ["Return", "Produce the result from the completed state"]]
@@ -297,7 +302,7 @@ function mermaidText(value) {
 export function buildMermaidDiagram(submission, review = {}) {
   const item = normalizeSubmission(submission);
   const suppliedVisual = normalizeSolutionVisual(review.visual);
-  const visual = suppliedVisual || fallbackSolutionVisual(item, review);
+  const visual = suppliedVisual || fallbackSolutionVisual(item);
   const context = visual.context || item.problemContext || `Solve ${item.number}. ${item.title}.`;
   const nodes = [
     `  n0["Goal<br/>${mermaidText(context)}"]`,
@@ -374,25 +379,14 @@ export function formatCommit(template, submission) {
 
 export function buildReview(submission) {
   const item = normalizeSubmission(submission);
-  const text = item.code.toLowerCase();
-  const patterns = [];
-  if (/left|right|two.?pointer/.test(text)) patterns.push("Two Pointers");
-  if (/while\s*\(?.*(left|right)|window|start.*end/.test(text)) patterns.push("Sliding Window");
-  if (/heap|priorityqueue|priority_queue/.test(text)) patterns.push("Heap");
-  if (/dfs|bfs|queue|visited/.test(text)) patterns.push("Graph Traversal");
-  if (/memo|dp\[|cache/.test(text)) patterns.push("Dynamic Programming");
-  if (/map|dict|set\(|unordered_/.test(text)) patterns.push("Arrays & Hashing");
-  if (/stack|push\(|pop\(/.test(text)) patterns.push("Stack");
-  if (/binary.?search|mid\s*=|\/\s*2/.test(text)) patterns.push("Binary Search");
-  if (/union|find\(|parent\[|disjoint/.test(text)) patterns.push("Union-Find");
-  if (/trie|children\[|prefix/.test(text)) patterns.push("Trie");
-  if (!patterns.length) patterns.push("Problem-specific reasoning");
+  const topic = item.tags[0];
   return {
-    patterns: [...new Set(patterns)].slice(0, 3),
-    summary: `Use ${patterns[0].toLowerCase()} to organize the key decisions, then verify the invariants against an edge case.`,
+    summary: topic
+      ? `Use the ${topic.toLowerCase()} topic to organize the key decisions, then verify the invariants against an edge case.`
+      : "Reconstruct the key decisions, then verify the invariants against an edge case.",
     steps: [
       "State the direct approach and identify its bottleneck.",
-      `Explain why ${patterns[0].toLowerCase()} fits the constraints.`,
+      topic ? `Explain why ${topic.toLowerCase()} fits the constraints.` : "Explain why the chosen approach fits the constraints.",
       "Walk through one edge case and justify the final complexity."
     ]
   };
@@ -403,13 +397,14 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
   const lines = [`# ${item.number}. ${item.title}`, ""];
   if (settings.includeLink !== false && item.url) lines.push(`[View problem on LeetCode](${item.url})`, "");
   lines.push(`- **Difficulty:** ${item.difficulty}`, `- **Language:** ${item.language}`);
+  if (item.tags.length) lines.push(`- **Topics:** ${item.tags.join(", ")}`);
   const solvedAt = formatSolvedAt(item.solvedAt);
   if (solvedAt) lines.push(`- **Solved:** ${solvedAt}`);
   if (settings.includeStats !== false) lines.push(`- **Runtime:** ${item.runtime}`, `- **Memory:** ${item.memory}`);
   if (item.problemContext) lines.push("", "## Problem description", "", item.problemContext);
   if (settings.aiEnabled === true && suppliedReview) {
     const review = suppliedReview;
-    lines.push("", "## Interview overview", "", `**Patterns:** ${review.patterns.join(", ")}`, "");
+    lines.push("", "## Interview overview", "");
     if (review.summary) lines.push(review.summary, "");
     lines.push("### Solution replay", "", "```mermaid", buildMermaidDiagram(item, review), "```", "");
     lines.push("### Approach", "");
@@ -434,13 +429,6 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
   return lines.join("\n");
 }
 
-function submissionPatterns(item) {
-  return [...new Set(submissionSolutions(item).flatMap((solution) => {
-    const review = solution.review || buildReview({ ...item, ...solution });
-    return review.patterns || [];
-  }))];
-}
-
 export function historyInsights(items = []) {
   const patterns = new Map();
   const languages = new Map();
@@ -449,7 +437,7 @@ export function historyInsights(items = []) {
     for (const solution of submissionSolutions(item)) {
       languages.set(solution.language, (languages.get(solution.language) || 0) + 1);
     }
-    for (const pattern of submissionPatterns(item)) patterns.set(pattern, (patterns.get(pattern) || 0) + 1);
+    for (const tag of item.tags) patterns.set(tag, (patterns.get(tag) || 0) + 1);
   }
   const sortCounts = (entries) => [...entries].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return { patterns: sortCounts(patterns), languages: sortCounts(languages) };
@@ -458,7 +446,7 @@ export function historyInsights(items = []) {
 export function submissionSearchText(input = {}) {
   const item = normalizeSubmission(input);
   const languages = submissionSolutions(item).map((solution) => solution.language);
-  return [item.number, item.title, item.difficulty, item.notes, ...languages, ...submissionPatterns(item)].join(" ").toLowerCase();
+  return [item.number, item.title, item.difficulty, item.notes, ...languages, ...item.tags].join(" ").toLowerCase();
 }
 
 export function buildProfileReadme(items = [], settings = {}) {
@@ -478,9 +466,9 @@ export function buildProfileReadme(items = [], settings = {}) {
     "",
     `**${normalized.length} solved** · ${counts.Easy} easy · ${counts.Medium} medium · ${counts.Hard} hard · ${insights.languages.length} languages`,
     "",
-    "## Pattern coverage",
+    "## Topic coverage",
     "",
-    insights.patterns.length ? insights.patterns.slice(0, 12).map(([pattern, count]) => `- ${pattern}: ${count}`).join("\n") : "Pattern data will appear after the first synced solution.",
+    insights.patterns.length ? insights.patterns.slice(0, 12).map(([tag, count]) => `- ${tag}: ${count}`).join("\n") : "Topic data will appear after the first synced solution.",
     "",
     "## Recent solutions",
     "",

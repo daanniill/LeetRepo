@@ -162,6 +162,7 @@
   function extractSubmission() {
     return {
       ...globalThis.LeetRepoProblem.getProblemIdentity(document, location),
+      tags: globalThis.LeetRepoProblem.getProblemTags(document),
       problemContext: extractProblemContext(),
       ...extractExample(),
       difficulty: detectDifficulty(),
@@ -297,7 +298,7 @@
       const complexity = response.review.complexity?.time && response.review.complexity?.space
         ? `<div class="lr-complexity"><span>Time · ${escapeHtml(response.review.complexity.time)}</span><span>Space · ${escapeHtml(response.review.complexity.space)}</span></div>`
         : "";
-      feedback.innerHTML = `<strong>30-second refresher</strong><p>${escapeHtml(response.review.summary || response.review.steps?.[0] || "Review the approach and its key invariant.")}</p><div class="lr-patterns">${(response.review.patterns || []).map((pattern) => `<span>${escapeHtml(pattern)}</span>`).join("")}</div>${complexity}`;
+      feedback.innerHTML = `<strong>30-second refresher</strong><p>${escapeHtml(response.review.summary || response.review.steps?.[0] || "Review the approach and its key invariant.")}</p><div class="lr-patterns">${(latest.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>${complexity}`;
       feedback.hidden = false;
       if (response.ai?.warning) showNotice(response.ai.warning, true);
     } catch (error) {
