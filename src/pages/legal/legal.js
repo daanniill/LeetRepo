@@ -1,8 +1,8 @@
 import { logo } from "../../shared/client.js";
 
 const documents = {
-  privacy: { file: "../../../PRIVACY.md", title: "Privacy Notice" },
-  terms: { file: "../../../TERMS.md", title: "Terms and Conditions" },
+  privacy: { file: "../../../docs/policies/privacy.md", title: "Privacy Notice" },
+  terms: { file: "../../../docs/policies/terms.md", title: "Terms and Conditions" },
   license: { file: "../../../LICENSE", title: "MIT License" }
 };
 
@@ -17,9 +17,9 @@ function escapeHtml(value = "") {
 }
 
 function documentHref(value) {
-  if (value === "PRIVACY.md") return "?document=privacy";
-  if (value === "TERMS.md") return "?document=terms";
-  if (value === "LICENSE") return "?document=license";
+  if (["PRIVACY.md", "privacy.md"].includes(value)) return "?document=privacy";
+  if (["TERMS.md", "terms.md"].includes(value)) return "?document=terms";
+  if (value === "LICENSE" || value.endsWith("/LICENSE")) return "?document=license";
   return /^https:\/\//.test(value) ? value : "#";
 }
 

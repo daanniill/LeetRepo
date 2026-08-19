@@ -37,7 +37,7 @@ assert(manifest.host_permissions.includes(`${apiOrigin}/*`), "The manifest must 
 
 await access(archive);
 const files = await filesBelow(extension);
-for (const required of ["manifest.json", "PRIVACY.md", "TERMS.md", "assets/icon-128.png", "src/background/service-worker.js"]) {
+for (const required of ["manifest.json", "docs/policies/privacy.md", "docs/policies/terms.md", "assets/icon-128.png", "src/background/service-worker.js"]) {
   assert(files.includes(required), `Release package is missing ${required}.`);
 }
 for (const forbidden of [".env", "server/", "tests/", "scripts/", "node_modules/", "src/core/llm.js"]) {

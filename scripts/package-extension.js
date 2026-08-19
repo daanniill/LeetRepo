@@ -33,8 +33,9 @@ async function archiveEntries(directory, prefix = "") {
 await rm(extension, { recursive: true, force: true });
 await rm(archive, { force: true });
 await mkdir(extension, { recursive: true });
+await mkdir(path.join(extension, "docs", "policies"), { recursive: true });
 
-for (const entry of ["manifest.json", "src", "LICENSE", "PRIVACY.md", "TERMS.md"]) {
+for (const entry of ["manifest.json", "src", "LICENSE", "docs/policies/privacy.md", "docs/policies/terms.md"]) {
   await cp(path.join(root, entry), path.join(extension, entry), { recursive: true });
 }
 await rm(path.join(extension, "src/core/llm.js"), { force: true });

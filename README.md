@@ -5,7 +5,7 @@
   Turn every Accepted LeetCode submission into an organized GitHub archive and a study system built from your own solutions.
 </p>
 
-![Every accepted LeetCode solution documented and pushed to GitHub](.github/readme-assets/hero.png)
+![Every accepted LeetCode solution documented and pushed to GitHub](https://raw.githubusercontent.com/daanniill/LeetRepo-Docs/main/assets/readme/hero.png)
 
 LeetRepo is a Chrome/Chromium extension that saves Accepted LeetCode solutions to GitHub—complete with problem context, solve metadata, and optional AI-generated interview notes. Its built-in dashboard then helps you search, analyze, and review what you have solved.
 
@@ -39,7 +39,7 @@ The generated README can include solve metadata, problem context, complexity, pe
 
 ## Your solution dashboard
 
-![LeetRepo solution library with synced problems and AI overviews](.github/readme-assets/solution-library.png)
+![LeetRepo solution library with synced problems and AI overviews](https://raw.githubusercontent.com/daanniill/LeetRepo-Docs/main/assets/readme/solution-library.png)
 
 ### Problems
 
@@ -49,13 +49,13 @@ Search and filter your solution library, read an interview overview, and jump ba
 
 Track repository growth, solve activity, pattern coverage, language usage, and the sequence of failed and Accepted attempts. You can also create a shareable progress image locally.
 
-![LeetRepo solve activity, pattern coverage, and language breakdown](.github/readme-assets/activity.png)
+![LeetRepo solve activity, pattern coverage, and language breakdown](https://raw.githubusercontent.com/daanniill/LeetRepo-Docs/main/assets/readme/activity.png)
 
 ### Study
 
 Review due and upcoming problems, recall a solution before revealing its refresher, and filter coverage by pattern or difficulty. You choose a review interval in days, weeks, or months; successful recalls use that interval while harder reviews return sooner.
 
-![LeetRepo spaced-repetition study queue](.github/readme-assets/study.png)
+![LeetRepo spaced-repetition study queue](https://raw.githubusercontent.com/daanniill/LeetRepo-Docs/main/assets/readme/study.png)
 
 ## Get started
 
@@ -68,7 +68,7 @@ You will need Chrome or another Chromium-based browser, a GitHub account, and a 
 
 You can change repository access from GitHub and update your LeetRepo preferences at any time.
 
-![LeetRepo appearance and repository settings](.github/readme-assets/settings.png)
+![LeetRepo appearance and repository settings](https://raw.githubusercontent.com/daanniill/LeetRepo-Docs/main/assets/readme/settings.png)
 
 ## Optional AI notes
 
@@ -89,7 +89,11 @@ Turning AI off does not affect solution syncing, local feedback, or the dashboar
 - Updating a repository's main profile README is always optional.
 - Deleting your LeetRepo account removes your LeetRepo data and authorization without changing your repositories.
 
-Read the [Privacy Notice](PRIVACY.md), [Terms and Conditions](TERMS.md), and [Security Policy](SECURITY.md) for complete details.
+Read the [Privacy Notice](https://github.com/daanniill/LeetRepo-Docs/blob/main/policies/privacy.md), [Terms and Conditions](https://github.com/daanniill/LeetRepo-Docs/blob/main/policies/terms.md), and [Security Policy](https://github.com/daanniill/LeetRepo-Docs/blob/main/policies/security.md) for complete details.
+
+## Documentation
+
+The [LeetRepo documentation repository](https://github.com/daanniill/LeetRepo-Docs) is the canonical index for architecture, feature requirements, operations, policies, release collateral, and imported creative assets. It is also mounted locally at `docs/` as a Git submodule.
 
 ## License
 

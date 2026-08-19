@@ -10,9 +10,11 @@
     "start": "node server/index.js",
     "start:render": "npm run db:migrate && npm start",
     "db:migrate": "node server/migrate.js",
+    "docs:generate": "node docs/scripts/docs.js --write --project-root . --docs-root docs",
+    "docs:check": "node docs/scripts/docs.js --check --project-root . --docs-root docs",
     "package:extension": "node scripts/package-extension.js",
     "verify:release": "node scripts/verify-release.js",
-    "release:check": "npm test && npm run package:extension && npm run verify:release",
+    "release:check": "npm run docs:check && npm test && npm run package:extension && npm run verify:release",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {

@@ -1,0 +1,74 @@
+name: Documentation
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Generate derived documentation
+        run: npm run docs:generate
+      - name: Validate documentation
+        run: npm run docs:check
+      - name: Require generated files in pull requests
+        run: git -C docs diff --exit-code -- README.md reference/project-inventory.md
+
+  synchronize:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Generate derived documentation
+        run: npm run docs:generate
+      - name: Validate documentation
+        run: npm run docs:check
+      - name: Commit generated files after pushes
+        env:
+          DOCS_REPO_TOKEN: ${{ secrets.DOCS_REPO_TOKEN }}
+        run: |
+          if git -C docs diff --quiet -- README.md reference/project-inventory.md; then
+            exit 0
+          fi
+          if [ -z "$DOCS_REPO_TOKEN" ]; then
+            echo "DOCS_REPO_TOKEN must have write access to daanniill/LeetRepo-Docs."
+            exit 1
+          fi
+          git -C docs config user.name "github-actions[bot]"
+          git -C docs config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C docs add README.md reference/project-inventory.md
+          git -C docs commit -m "docs: refresh generated inventory [skip ci]"
+          AUTH_HEADER=$(printf 'x-access-token:%s' "$DOCS_REPO_TOKEN" | base64 -w0)
+          git -C docs -c http.https://github.com/.extraheader="AUTHORIZATION: basic $AUTH_HEADER" push origin HEAD:main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          git commit -m "chore(docs): advance documentation submodule [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
