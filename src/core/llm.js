@@ -8,6 +8,67 @@ export const GROQ_MODELS = [
 ];
 export const MAX_CODE_CHARACTERS = 24_000;
 
+const REVIEW_RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "leetcode_solution_review",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        patterns: { type: "array", items: { type: "string" } },
+        approach: { type: "array", items: { type: "string" } },
+        complexity: {
+          type: "object",
+          properties: {
+            time: { type: "string" },
+            space: { type: "string" }
+          },
+          required: ["time", "space"],
+          additionalProperties: false
+        },
+        complexityCheck: {
+          type: "object",
+          properties: {
+            verdict: { type: "string", enum: ["optimal", "suboptimal", "unclear"] },
+            intended: { type: "string" },
+            note: { type: "string" }
+          },
+          required: ["verdict", "intended", "note"],
+          additionalProperties: false
+        },
+        edgeCases: { type: "array", items: { type: "string" } },
+        visual: {
+          type: "object",
+          properties: {
+            context: { type: "string" },
+            input: { type: "string" },
+            invariant: { type: "string" },
+            steps: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string" },
+                  state: { type: "string" }
+                },
+                required: ["label", "state"],
+                additionalProperties: false
+              }
+            },
+            result: { type: "string" }
+          },
+          required: ["context", "input", "invariant", "steps", "result"],
+          additionalProperties: false
+        }
+      },
+      required: ["summary", "patterns", "approach", "complexity", "complexityCheck", "edgeCases", "visual"],
+      additionalProperties: false
+    }
+  }
+};
+
 const MODEL_IDS = new Set(GROQ_MODELS.map(({ id }) => id));
 
 export function normalizeGroqModel(value) {
@@ -82,7 +143,7 @@ Return exactly one JSON object with this shape:
     "context": "one sentence stating the goal and what the output represents",
     "input": "short representative input; prefer the supplied official example",
     "invariant": "one short fact that stays true while the algorithm runs",
-    "steps": [["short action", "short state after the action"]],
+    "steps": [{"label": "short action", "state": "short state after the action"}],
     "result": "sample output plus a few words explaining what it represents"
   }
 }
@@ -136,9 +197,11 @@ export async function generateExplanation({
           },
           { role: "user", content: promptFor(submission) }
         ],
-        response_format: { type: "json_object" },
+        response_format: REVIEW_RESPONSE_FORMAT,
         temperature: 0.2,
-        max_completion_tokens: 800
+        reasoning_effort: "low",
+        include_reasoning: false,
+        max_completion_tokens: 1_600
       }),
       signal: controller.signal
     });
