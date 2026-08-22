@@ -150,7 +150,7 @@ async function recordAttempt(submission) {
   });
 }
 
-async function recordPush(submission, result, review, settings) {
+export async function recordPush(submission, result, review, settings) {
   return mutateLocal(async () => {
     const { submissions = [] } = await getLocal("submissions");
     const normalized = normalizeSubmission(submission);
@@ -175,7 +175,7 @@ async function clearAuthentication() {
   await clearDeviceAuthentication(chrome.storage);
 }
 
-async function handle(message) {
+export async function handle(message) {
   if (accountDeletionInProgress && message.type !== "DELETE_ACCOUNT") {
     throw new Error("Account deletion is in progress.");
   }
