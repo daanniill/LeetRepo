@@ -68,7 +68,9 @@ pushButton.addEventListener("click", async () => {
       ? `${pushed} ${response.ai.warning}`
       : response.ai?.generated
         ? `${pushed} A Groq-generated explanation was added.`
-        : `${pushed} Your GitHub commit is ready.`;
+        : response.ai?.reused
+          ? `${pushed} The existing AI explanation was reused without another request.`
+          : `${pushed} Your GitHub commit is ready.`;
     showNotice(notice, message);
     state = await send("GET_STATE");
     renderState();

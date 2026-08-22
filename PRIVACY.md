@@ -1,12 +1,12 @@
 # LeetRepo Privacy Notice
 
-Last updated: August 8, 2026
+Last updated: August 20, 2026
 
 LeetRepo is a browser extension and hosted service that reads accepted LeetCode submissions, commits user-selected content to a GitHub repository, and optionally generates AI study explanations. LeetRepo does not sell user data, serve advertising, or use browsing activity for advertising.
 
 ## Data stored on your device
 
-- Submission and attempt history, including problem metadata, detected problem context and examples, solution code, result status, personal notes, review schedule, and resulting commit details, is stored locally to power the dashboard.
+- Submission and attempt history, including problem metadata, detected description, examples, constraints, follow-up, hints, solution code, result status, personal notes, review schedule, and resulting commit details, is stored locally to power the dashboard.
 - A short-lived GitHub App user access token and an opaque LeetRepo session token are stored in local extension storage and are not synced.
 - Non-secret preferences, including the selected repository and AI consent setting, may be stored through Chrome's synced extension storage when browser sync is enabled.
 
@@ -34,7 +34,7 @@ GitHub's privacy terms apply to data sent to GitHub.
 
 ## Optional AI processing
 
-AI-generated READMEs are disabled by default and require affirmative opt-in during onboarding, in Settings, or from the LeetCode page panel. When enabled, the extension sends the problem title, difficulty, programming language, detected problem context and example input/output, and up to 24,000 characters of solution code to the LeetRepo service. The service sends that material to Groq to generate the requested README walkthrough.
+AI walkthroughs and diagrams are disabled by default and require affirmative opt-in during onboarding, in Settings, or from the LeetCode page panel. When enabled, the extension sends the problem title, difficulty, topics, programming language, detected problem context, one example, relevant constraints and follow-up, and up to 24,000 characters of solution code to the LeetRepo service. The service sends that material to Groq to generate the requested walkthrough and diagram. Official problem details and the rest of each README are generated locally without AI.
 
 AI request bodies and generated explanations are processed in memory and are not stored in the LeetRepo application database or ordinary application logs. The hosting provider may retain limited access and security logs, and Groq processes requests under its own privacy and data-processing terms. LeetRepo logs only the API route, response status, and request duration; it does not log request bodies, OAuth query values, access tokens, or session tokens.
 
@@ -46,7 +46,7 @@ No internet-connected service can guarantee absolute security. Revoke the GitHub
 
 ## Your choices and deletion
 
-- You can keep hosted AI disabled and continue syncing basic stats-only problem READMEs.
+- You can keep hosted AI disabled and continue syncing complete problem READMEs generated locally from captured official details.
 - Turning off AI stops future AI transmissions but preserves local history.
 - **Sign out** revokes the current LeetRepo session and removes GitHub and LeetRepo authorization tokens from this extension. It preserves your hosted account, GitHub App installation, repository preference, and local study history so you can sign in again without reinstalling the GitHub App.
 - **Delete LeetRepo account** deletes your hosted account, pending credential exchanges, encrypted GitHub credentials, sessions, and aggregate AI usage; clears all LeetRepo local, synced, and session extension storage; and revokes LeetRepo's GitHub authorization. It never modifies or deletes a GitHub repository. The GitHub App installation is not uninstalled and can be removed separately in GitHub settings.

@@ -8,6 +8,7 @@ import {
   normalizeStudyInterval,
   patternCoverage,
   rescheduleFirstReview,
+  reviewDueAfterSync,
   reviewDueAt,
   scheduleReview,
   studyIntervalDays,
@@ -56,6 +57,22 @@ test("changing the preference reschedules first reviews without moving completed
   assert.equal(pending.reviewDueAt, "2026-08-08T12:00:00.000Z");
   const completed = { syncedAt: "2026-08-01T12:00:00.000Z", lastReviewedAt: "2026-08-05T12:00:00.000Z", reviewDueAt: "2026-08-20T12:00:00.000Z" };
   assert.equal(rescheduleFirstReview(completed, 2).reviewDueAt, completed.reviewDueAt);
+});
+
+test("syncing again preserves a completed review cycle", () => {
+  assert.equal(reviewDueAfterSync({}, "2026-08-08T12:00:00.000Z", 7), "2026-08-15T12:00:00.000Z");
+  assert.equal(reviewDueAfterSync({
+    reviewCount: 2,
+    lastReviewedAt: "2026-08-05T12:00:00.000Z",
+    reviewIntervalDays: 14,
+    reviewDueAt: "2026-08-19T12:00:00.000Z"
+  }, "2026-08-08T12:00:00.000Z", 7), "2026-08-19T12:00:00.000Z");
+  assert.equal(reviewDueAfterSync({
+    reviewCount: 1,
+    lastReviewedAt: "2026-08-05T12:00:00.000Z",
+    reviewIntervalDays: 14
+  }, "2026-08-08T12:00:00.000Z", 7), "2026-08-19T12:00:00.000Z");
+  assert.equal(reviewDueAfterSync({}, "2026-08-08T12:00:00.000Z", 7, false), null);
 });
 
 test("completing and snoozing a review update only the intended study state", () => {

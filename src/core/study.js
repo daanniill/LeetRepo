@@ -34,6 +34,15 @@ export function reviewDateAfter(value, days) {
   return addDays(date, positiveInteger(days) || INITIAL_REVIEW_INTERVAL_DAYS).toISOString();
 }
 
+export function reviewDueAfterSync(item = {}, syncedAt, initialIntervalDays = INITIAL_REVIEW_INTERVAL_DAYS, enabled = true) {
+  if (!enabled) return null;
+  if (nonNegativeInteger(item.reviewCount) > 0 || item.lastReviewedAt) {
+    return validDate(item.reviewDueAt)?.toISOString()
+      || reviewDateAfter(item.lastReviewedAt, item.reviewIntervalDays || initialIntervalDays);
+  }
+  return reviewDateAfter(syncedAt, initialIntervalDays);
+}
+
 export function canonicalPattern(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }

@@ -9,8 +9,8 @@ import {
   revokeGitHubAppAuthorization,
   tokenExpiration
 } from "./github.js";
-import { generateExplanation, MAX_CODE_CHARACTERS } from "../src/core/llm.js";
-import { normalizeSubmission } from "../src/core/submissions.js";
+import { generateExplanation } from "../src/core/llm.js";
+import { aiSubmissionPayload } from "../src/core/submissions.js";
 
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
 
@@ -150,19 +150,9 @@ function clientRepository(repository) {
 }
 
 function aiSubmission(input) {
-  const item = normalizeSubmission(input);
+  const item = aiSubmissionPayload(input);
   if (!item.code) throw new HttpError(400, "CODE_REQUIRED", "Solution code is required.");
-  return {
-    number: item.number,
-    title: item.title,
-    difficulty: item.difficulty,
-    language: item.language,
-    code: item.code.slice(0, MAX_CODE_CHARACTERS),
-    problemContext: item.problemContext,
-    exampleInput: item.exampleInput,
-    exampleOutput: item.exampleOutput,
-    status: item.status
-  };
+  return item;
 }
 
 function requestId(value) {

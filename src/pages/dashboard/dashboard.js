@@ -167,7 +167,7 @@ function renderDetail(item) {
     ${review.complexity?.time ? `<div class="complexity-strip"><span><small>Time</small>${escapeHtml(review.complexity.time)}</span><span><small>Space</small>${escapeHtml(review.complexity.space)}</span></div>` : ""}
     ${review.complexityCheck?.verdict === "suboptimal" ? `<div class="complexity-warning"><strong>Suboptimal solution detected</strong><br>${escapeHtml(review.complexityCheck.note || "Compare this solution with the intended pattern.")}</div>` : ""}
     <ol class="review-steps">${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
-    <div class="detail-note"><label for="detail-note-input">Personal note</label><textarea id="detail-note-input" rows="3" maxlength="4000" aria-describedby="detail-note-help" placeholder="What should future-you remember?">${escapeHtml(selectedItem.notes || "")}</textarea><small id="detail-note-help">Saved locally. Included in AI-generated READMEs when that option is enabled.</small></div>
+    <div class="detail-note"><label for="detail-note-input">Personal note</label><textarea id="detail-note-input" rows="3" maxlength="4000" aria-describedby="detail-note-help" placeholder="What should future-you remember?">${escapeHtml(selectedItem.notes || "")}</textarea><small id="detail-note-help">Saved locally. Included when AI analysis and personal notes are enabled for READMEs.</small></div>
     <div class="detail-actions">
       <button class="button secondary full" id="save-detail-note">Save note</button>
       ${selectedItem.code ? `<button class="button full" id="regenerate-feedback" ${aiBlocked ? "disabled" : ""}>${feedbackLabel}</button>` : ""}

@@ -1,9 +1,9 @@
-import { aiLimitReached, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, mergeSubmissionSolutions, normalizeSubmission, normalizeTheme, sameProblem } from "../core/submissions.js";
+import { aiLimitReached, aiSubmissionPayload, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, mergeSubmissionSolutions, normalizeSubmission, normalizeTheme, reusableGeneratedReview, sameProblem } from "../core/submissions.js";
 import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.js";
 import { beginHostedGitHubSignIn, hostedRequest, launchIdentityWebAuthFlow, newRequestId } from "../core/service.js";
 import { clearDeviceAuthentication, hasCompletedOnboarding, settingsForSync } from "../core/auth.js";
 import { clearLeetRepoStorage } from "../core/storage.js";
-import { normalizeStudyInterval, rescheduleFirstReview, reviewDateAfter, scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
+import { normalizeStudyInterval, rescheduleFirstReview, reviewDueAfterSync, scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
 
 const getLocal = (keys) => chrome.storage.local.get(keys);
 const setLocal = (value) => chrome.storage.local.set(value);
@@ -89,7 +89,7 @@ async function explanationFor(settings, submission) {
     const generated = await hostedRequest("/v1/ai/explanations", {
       method: "POST",
       sessionToken: leetrepoSessionToken,
-      body: { requestId: newRequestId(), submission }
+      body: { requestId: newRequestId(), submission: aiSubmissionPayload(submission) }
     });
     return {
       review: generated.review,
@@ -164,9 +164,7 @@ async function recordPush(submission, result, review, settings) {
       commitUrl: result.url,
       commitSha: result.sha
     });
-    item.reviewDueAt = settings.spacedRepetition === false
-      ? null
-      : reviewDateAfter(syncedAt, studyIntervalDays(settings));
+    item.reviewDueAt = reviewDueAfterSync(item, syncedAt, studyIntervalDays(settings), settings.spacedRepetition !== false);
     const next = [item, ...submissions.filter((stored) => !sameProblem(stored, item))].slice(0, 500);
     await setLocal({ submissions: next, lastSubmission: item });
     return item;
@@ -306,7 +304,10 @@ async function handle(message) {
         submission.syncedAt = new Date().toISOString();
         submission.solvedAt = existing?.solvedAt || existing?.syncedAt || submission.syncedAt;
         submission.notes = submission.notes || submissionNotes[submission.id] || "";
-        const explanation = await explanationFor(normalizedSettings, submission);
+        const cachedReview = normalizedSettings.aiEnabled ? reusableGeneratedReview(existing, submission) : null;
+        const explanation = cachedReview
+          ? { review: cachedReview, ai: { generated: false, reused: true } }
+          : await explanationFor(normalizedSettings, submission);
         const result = await pushSubmission({
           token: accessToken,
           settings: normalizedSettings,

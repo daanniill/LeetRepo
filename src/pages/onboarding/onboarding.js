@@ -14,7 +14,7 @@ function setAiAvailability(ai = {}) {
   document.querySelector("#setup-ai-row").classList.toggle("ai-limit", limited);
   document.querySelector("#setup-ai-copy").textContent = limited
     ? "Your AI tier limit has been reached. Basic stats READMEs and local feedback remain available."
-    : "Opt in to sending solution details and code to LeetRepo's AI provider for a walkthrough and diagram. Off creates a basic stats-only README.";
+    : "Opt in to sending solution details and code to LeetRepo's AI provider for a walkthrough and diagram. Off still creates a complete README from official page details.";
 }
 
 function showStep(index) {

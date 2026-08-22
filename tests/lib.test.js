@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   aiLimitReached,
+  aiSubmissionPayload,
   buildMermaidDiagram,
   buildReadme,
   buildProfileReadme,
@@ -16,6 +17,7 @@ import {
   normalizeSubmission,
   normalizeTheme,
   relativeTime,
+  reusableGeneratedReview,
   sameProblem,
   submissionSearchText,
   submissionSolutions,
@@ -52,6 +54,25 @@ test("AI quota detection covers daily and monthly tier limits", () => {
   assert.equal(aiLimitReached({}), false);
 });
 
+test("AI payload includes only bounded fields needed for analysis", () => {
+  const payload = aiSubmissionPayload({
+    ...submission,
+    code: "x".repeat(25_000),
+    notes: "Do not transmit this note.",
+    hints: ["Do not transmit every hint."],
+    examples: [
+      { input: "first", output: "1" },
+      { input: "second", output: "2" }
+    ],
+    constraints: Array.from({ length: 15 }, (_, index) => `constraint ${index}`)
+  });
+  assert.equal(payload.code.length, 24_000);
+  assert.equal(payload.examples.length, 1);
+  assert.equal(payload.constraints.length, 12);
+  assert.equal("notes" in payload, false);
+  assert.equal("hints" in payload, false);
+});
+
 test("normalizeSubmission maps languages to extensions", () => {
   assert.equal(normalizeSubmission(submission).extension, "cpp");
   assert.equal(normalizeSubmission({ language: "Python3" }).extension, "py");
@@ -59,6 +80,16 @@ test("normalizeSubmission maps languages to extensions", () => {
   assert.equal(normalizeSubmission({ title: "Safe", slug: "../../unsafe/path" }).slug, "unsafe-path");
   assert.equal(normalizeSubmission({ syncedAt: "2026-08-07T12:34:56.000Z" }).solvedAt, "2026-08-07T12:34:56.000Z");
   assert.deepEqual(normalizeSubmission({ tags: [" Array ", "Hash   Table", "Array", ""] }).tags, ["Array", "Hash Table"]);
+  const enriched = normalizeSubmission({
+    problemDescription: "Full official statement.",
+    examples: [{ input: "n = 1", output: "1", explanation: "Base case." }],
+    constraints: [" 1 <= n <= 10 ", "1 <= n <= 10"],
+    hints: ["Use a map."],
+    followUp: "Can you use constant space?"
+  });
+  assert.equal(enriched.problemContext, "Full official statement.");
+  assert.deepEqual(enriched.examples, [{ input: "n = 1", output: "1", explanation: "Base case." }]);
+  assert.deepEqual(enriched.constraints, ["1 <= n <= 10"]);
 });
 
 test("problem identity is stable when a title or slug changes", () => {
@@ -83,6 +114,19 @@ test("problem records retain language variants and default to the latest solutio
   assert.match(submissionSearchText(searchable), /two pointers/);
   assert.doesNotMatch(submissionSearchText(searchable), /invented ai tag/);
   assert.match(submissionSearchText(searchable), /re-check equal heights/);
+});
+
+test("an unchanged language solution can reuse its generated review", () => {
+  const review = { summary: "Use a stack.", generatedBy: "Groq" };
+  const existing = {
+    ...submission,
+    language: "Python3",
+    code: "return 1",
+    review,
+    solutions: [{ language: "C++", extension: "cpp", code: "return 2;", review: { summary: "Use two pointers.", generatedBy: "Groq" } }]
+  };
+  assert.equal(reusableGeneratedReview(existing, { ...submission, language: "C++", code: "return 2;" }).summary, "Use two pointers.");
+  assert.equal(reusableGeneratedReview(existing, { ...submission, language: "C++", code: "return 3;" }), null);
 });
 
 test("repository backfill enriches an existing language without duplicating it", () => {
@@ -119,16 +163,36 @@ test("folder and commit formatting follow the configured convention", () => {
   assert.equal(formatCommit("solve: {number}. {title} [{language}]", submission), "solve: 42. Trapping Rain Water [C++]");
 });
 
-test("README defaults to basic LeetCode stats without a diagram", () => {
+test("README defaults to official problem details without an AI diagram", () => {
   const readme = buildReadme(submission);
   assert.match(readme, /# 42\. Trapping Rain Water/);
   assert.match(readme, /\*\*Runtime:\*\* 52 ms/);
   assert.match(readme, /## Problem description/);
   assert.match(readme, /Given an elevation map, compute how much rain water it can trap\./);
   assert.match(readme, /View problem on LeetCode/);
+  assert.match(readme, /## Solution metadata/);
+  assert.match(readme, /\[C\+\+\]\(\.\/cpp\/solution\.cpp\)/);
+  assert.match(readme, /## Study guide/);
   assert.match(readme, /\*\*Topics:\*\* Array, Two Pointers, Dynamic Programming, Stack, Monotonic Stack/);
   assert.doesNotMatch(readme, /Interview overview/);
   assert.doesNotMatch(readme, /```mermaid/);
+});
+
+test("README renders captured official examples, constraints, follow-up, and hints without AI", () => {
+  const readme = buildReadme({
+    ...submission,
+    problemDescription: "Given an elevation map, return the trapped water.",
+    examples: [{ input: "height = [2,0,2]", output: "2", explanation: "The middle bar holds two units." }],
+    constraints: ["1 <= height.length <= 2 * 10^4"],
+    followUp: "Can you solve it with constant extra space?",
+    hints: ["Compare the maximum height on each side."]
+  });
+  assert.match(readme, /## Examples/);
+  assert.match(readme, /Input:\nheight = \[2,0,2\]/);
+  assert.match(readme, /## Constraints/);
+  assert.match(readme, /## Follow-up/);
+  assert.match(readme, /<summary>Reveal official hints<\/summary>/);
+  assert.doesNotMatch(readme, /Interview overview|```mermaid/);
 });
 
 test("README omits an empty problem description", () => {
@@ -156,6 +220,7 @@ test("README shows the original solved timestamp", () => {
   const readme = buildReadme({ ...submission, solvedAt: "2026-08-07T12:34:56.000Z", syncedAt: "2026-08-09T08:00:00.000Z" });
   assert.match(readme, /\*\*Solved:\*\* 2026-08-07 12:34 UTC/);
   assert.doesNotMatch(readme, /2026-08-09/);
+  assert.doesNotMatch(buildReadme(submission), /1970-01-01/);
 });
 
 test("profile README summarizes real history without inventing totals", () => {

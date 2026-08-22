@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS = {
 };
 
 export const THEME_IDS = ["system", "light", "dark", "teal"];
+export const MAX_AI_CODE_CHARACTERS = 24_000;
 
 export function normalizeTheme(value) {
   return THEME_IDS.includes(value) ? value : DEFAULT_SETTINGS.theme;
@@ -70,6 +71,26 @@ export function slugify(value = "") {
     .replace(/^-+|-+$/g, "") || "problem";
 }
 
+function boundedText(value, maxLength) {
+  return String(value || "").replace(/\r/g, "").trim().slice(0, maxLength);
+}
+
+function boundedList(value, maxItems, maxLength) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((item) => boundedText(item, maxLength)).filter(Boolean))].slice(0, maxItems);
+}
+
+function normalizeProblemExamples(value) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((example) => {
+    if (!example || typeof example !== "object" || Array.isArray(example)) return [];
+    const input = boundedText(example.input, 1_500);
+    const output = boundedText(example.output, 1_500);
+    if (!input || !output) return [];
+    return [{ input, output, explanation: boundedText(example.explanation, 1_500) }];
+  }).slice(0, 4);
+}
+
 export function normalizeSubmission(input = {}) {
   const number = String(input.number || "0").replace(/\D/g, "") || "0";
   const title = String(input.title || "Untitled problem").trim();
@@ -77,6 +98,9 @@ export function normalizeSubmission(input = {}) {
   const tags = Array.isArray(input.tags)
     ? [...new Set(input.tags.map((tag) => String(tag || "").replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 20)
     : [];
+  const problemDescription = boundedText(input.problemDescription || input.problemContext, 5_000);
+  const examples = normalizeProblemExamples(input.examples);
+  const firstExample = examples[0] || {};
   const item = {
     id: `${number}-${slugify(title)}`,
     number,
@@ -92,9 +116,14 @@ export function normalizeSubmission(input = {}) {
     memory: String(input.memory || "—"),
     status: input.status || "Accepted",
     url: input.url || "",
-    problemContext: String(input.problemContext || "").trim().slice(0, 600),
-    exampleInput: String(input.exampleInput || "").trim().slice(0, 1_000),
-    exampleOutput: String(input.exampleOutput || "").trim().slice(0, 1_000),
+    problemDescription,
+    problemContext: boundedText(input.problemContext || problemDescription, 1_200),
+    examples,
+    exampleInput: boundedText(input.exampleInput || firstExample.input, 1_500),
+    exampleOutput: boundedText(input.exampleOutput || firstExample.output, 1_500),
+    constraints: boundedList(input.constraints, 30, 500),
+    hints: boundedList(input.hints, 6, 1_000),
+    followUp: boundedText(input.followUp, 1_500),
     solvedAt: input.solvedAt || input.syncedAt || null,
     syncedAt: input.syncedAt || null,
     commitUrl: input.commitUrl || "",
@@ -112,6 +141,26 @@ export function normalizeSubmission(input = {}) {
     ? input.solutions.map((solution) => normalizeSolution(solution, item))
     : [];
   return item;
+}
+
+export function aiSubmissionPayload(input = {}) {
+  const item = normalizeSubmission(input);
+  return {
+    number: item.number,
+    title: item.title,
+    difficulty: item.difficulty,
+    tags: item.tags.slice(0, 8),
+    language: item.language,
+    code: item.code.slice(0, MAX_AI_CODE_CHARACTERS),
+    problemDescription: item.problemDescription.slice(0, 1_400),
+    problemContext: item.problemContext,
+    examples: item.examples.slice(0, 1),
+    exampleInput: item.exampleInput,
+    exampleOutput: item.exampleOutput,
+    constraints: item.constraints.slice(0, 12),
+    followUp: item.followUp.slice(0, 500),
+    status: item.status
+  };
 }
 
 function normalizeSolution(input = {}, fallback = {}) {
@@ -154,6 +203,15 @@ export function submissionSolutions(input = {}) {
   });
 }
 
+export function reusableGeneratedReview(existing = {}, incoming = {}) {
+  const update = normalizeSubmission(incoming);
+  const match = submissionSolutions(existing).find((solution) => (
+    solution.language.toLowerCase() === update.language.toLowerCase()
+    && solution.code.trimEnd() === update.code.trimEnd()
+  ));
+  return match?.review?.generatedBy ? match.review : null;
+}
+
 export function mergeSubmissionSolutions(existing = {}, incoming = {}) {
   const hasPrevious = Object.keys(existing).length > 0;
   const previous = normalizeSubmission(existing);
@@ -177,9 +235,14 @@ export function mergeSubmissionSolutions(existing = {}, incoming = {}) {
     difficulty,
     tags: update.tags.length ? update.tags : previous.tags,
     url: update.url || previous.url,
+    problemDescription: update.problemDescription || previous.problemDescription,
     problemContext: update.problemContext || previous.problemContext,
+    examples: update.examples.length ? update.examples : previous.examples,
     exampleInput: update.exampleInput || previous.exampleInput,
     exampleOutput: update.exampleOutput || previous.exampleOutput,
+    constraints: update.constraints.length ? update.constraints : previous.constraints,
+    hints: update.hints.length ? update.hints : previous.hints,
+    followUp: update.followUp || previous.followUp,
     notes: update.notes || previous.notes,
     solvedAt: previous.solvedAt || update.solvedAt,
     reviewDueAt: update.reviewDueAt || previous.reviewDueAt,
@@ -363,6 +426,7 @@ export function isSubmissionPushReady(submission = {}) {
 }
 
 export function formatSolvedAt(value) {
+  if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
@@ -392,19 +456,67 @@ export function buildReview(submission) {
   };
 }
 
+function markdownText(value) {
+  return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function fencedText(value) {
+  const text = String(value || "");
+  const fence = text.includes("```") ? "````" : "```";
+  return [fence + "text", text, fence];
+}
+
+function inlineCode(value) {
+  return `\`${String(value || "").replace(/`/g, "'")}\``;
+}
+
+const BROAD_STUDY_TOPICS = new Set(["Array", "String", "Math", "Matrix", "Simulation", "Sorting"]);
+
 export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedReview) {
   const item = normalizeSubmission(submission);
   const lines = [`# ${item.number}. ${item.title}`, ""];
   if (settings.includeLink !== false && item.url) lines.push(`[View problem on LeetCode](${item.url})`, "");
+  lines.push("## Solution metadata", "");
   lines.push(`- **Difficulty:** ${item.difficulty}`, `- **Language:** ${item.language}`);
   if (item.tags.length) lines.push(`- **Topics:** ${item.tags.join(", ")}`);
   const solvedAt = formatSolvedAt(item.solvedAt);
   if (solvedAt) lines.push(`- **Solved:** ${solvedAt}`);
   if (settings.includeStats !== false) lines.push(`- **Runtime:** ${item.runtime}`, `- **Memory:** ${item.memory}`);
-  if (item.problemContext) lines.push("", "## Problem description", "", item.problemContext);
+  lines.push(`- **Solution:** [${item.language}](./${languageFolderFor(item)}/solution.${item.extension})`);
+
+  const problemDescription = item.problemDescription || item.problemContext;
+  if (problemDescription) {
+    lines.push("", "## Problem description", "");
+    if (settings.includeLink !== false && item.url) lines.push(`> Problem details captured from [LeetCode](${item.url}).`, "");
+    lines.push(markdownText(problemDescription));
+  }
+
+  const examples = item.examples.length
+    ? item.examples
+    : item.exampleInput && item.exampleOutput
+      ? [{ input: item.exampleInput, output: item.exampleOutput, explanation: "" }]
+      : [];
+  if (examples.length) {
+    lines.push("", "## Examples");
+    examples.forEach((example, index) => {
+      lines.push("", `### Example ${index + 1}`, "", ...fencedText(`Input:\n${example.input}\n\nOutput:\n${example.output}`));
+      if (example.explanation) lines.push("", `**Explanation:** ${markdownText(example.explanation)}`);
+    });
+  }
+  if (item.constraints.length) {
+    lines.push("", "## Constraints", "");
+    item.constraints.forEach((constraint) => lines.push(`- ${/[<>=]|\d/.test(constraint) ? inlineCode(constraint) : markdownText(constraint)}`));
+  }
+  if (item.followUp) lines.push("", "## Follow-up", "", markdownText(item.followUp));
+  if (item.hints.length) {
+    lines.push("", "## Hints", "", "<details>", "<summary>Reveal official hints</summary>", "");
+    item.hints.forEach((hint, index) => lines.push(`${index + 1}. ${markdownText(hint)}`));
+    lines.push("", "</details>");
+  }
+
   if (settings.aiEnabled === true && suppliedReview) {
     const review = suppliedReview;
-    lines.push("", "## Interview overview", "");
+    lines.push("", "## Interview overview", "", "> Generated from the submitted solution and the official problem details above. Verify AI analysis before relying on it.", "");
     if (review.summary) lines.push(review.summary, "");
     lines.push("### Solution replay", "", "```mermaid", buildMermaidDiagram(item, review), "```", "");
     lines.push("### Approach", "");
@@ -425,6 +537,20 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
     if (review.generatedBy) lines.push("", `_AI-generated with ${review.generatedBy}; verify the analysis before relying on it._`);
     if (settings.includeNotes !== false && item.notes) lines.push("", "## Personal notes", "", item.notes);
   }
+
+  const studyTopic = item.tags.find((topic) => !BROAD_STUDY_TOPICS.has(topic)) || item.tags[0];
+  lines.push(
+    "",
+    "## Study guide",
+    "",
+    "Before reopening the solution:",
+    "",
+    `1. Identify why ${studyTopic ? `**${studyTopic}**` : "the chosen technique"} fits the problem constraints.`,
+    "2. State the invariant that makes the algorithm correct.",
+    examples.length ? "3. Replay the first example without looking at the implementation." : "3. Walk through a representative input by hand.",
+    "4. Derive the time and space complexity from the implementation.",
+    "5. Name an edge case that would break a weaker approach."
+  );
   lines.push("", "---", "_Synced by [LeetRepo](https://github.com/)_");
   return lines.join("\n");
 }

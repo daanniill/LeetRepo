@@ -128,43 +128,16 @@
     return "—";
   }
 
-  function extractExample() {
-    const selectors = [
-      '[data-track-load="description_content"] pre',
-      '[data-cy="question-content"] pre',
-      '[data-e2e-locator="description-content"] pre',
-      "main pre"
-    ];
-    for (const node of document.querySelectorAll(selectors.join(","))) {
-      const value = normalizeSpace(node.textContent);
-      const input = value.match(/\bInput:\s*(.+?)\s+Output:/i)?.[1];
-      const output = value.match(/\bOutput:\s*(.+?)(?:\s+Explanation:|$)/i)?.[1];
-      if (input && output) return { exampleInput: input.slice(0, 1_000), exampleOutput: output.slice(0, 1_000) };
-    }
-    return { exampleInput: "", exampleOutput: "" };
-  }
-
-  function extractProblemContext() {
-    const roots = document.querySelectorAll([
-      '[data-track-load="description_content"]',
-      '[data-cy="question-content"]',
-      '[data-e2e-locator="description-content"]'
-    ].join(","));
-    for (const root of roots) {
-      for (const paragraph of root.querySelectorAll("p")) {
-        const value = normalizeSpace(paragraph.textContent);
-        if (value.length >= 20 && !/^(example|input|output|constraints)\b/i.test(value)) return value.slice(0, 600);
-      }
-    }
-    return "";
-  }
-
   function extractSubmission() {
+    const problemDetails = globalThis.LeetRepoProblem.getProblemDetails(document);
+    const firstExample = problemDetails.examples[0] || {};
     return {
       ...globalThis.LeetRepoProblem.getProblemIdentity(document, location),
       tags: globalThis.LeetRepoProblem.getProblemTags(document),
-      problemContext: extractProblemContext(),
-      ...extractExample(),
+      ...problemDetails,
+      problemContext: problemDetails.problemDescription.slice(0, 1_200),
+      exampleInput: firstExample.input || "",
+      exampleOutput: firstExample.output || "",
       difficulty: detectDifficulty(),
       language: globalThis.LeetRepoLanguage.detectLanguage(document),
       code: editorCode(),
@@ -197,7 +170,7 @@
           <label class="lr-notes-label" for="lr-personal-notes">Personal notes</label>
           <textarea class="lr-notes" id="lr-personal-notes" rows="2" maxlength="4000" placeholder="What should future-you remember?"></textarea>
           <div class="lr-auto"><span>Auto-push on Accepted</span><label class="lr-switch"><input class="lr-auto-push" type="checkbox"><span></span></label></div>
-          <div class="lr-auto lr-ai-option"><span class="lr-ai-copy">AI-generated README<small>Sends solution code to AI</small></span><label class="lr-switch"><input class="lr-ai-readme" type="checkbox" aria-label="Use AI-generated README"><span></span></label></div>
+          <div class="lr-auto lr-ai-option"><span class="lr-ai-copy">AI walkthrough + diagram<small>Sends solution code to AI</small></span><label class="lr-switch"><input class="lr-ai-readme" type="checkbox" aria-label="Use AI walkthrough and diagram"><span></span></label></div>
           <button class="lr-link lr-dashboard">Open dashboard →</button>
           <div class="lr-notice" hidden></div>
         </div></div>
@@ -233,7 +206,7 @@
         const response = await chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", settings: { aiEnabled: enabled, aiConsent: enabled } });
         if (!response?.ok) throw new Error(response?.error || "Could not update the AI README setting.");
         settings = response.settings;
-        showNotice(enabled ? "AI README enabled. Solution code will be processed by LeetRepo's AI provider." : "Basic stats-only README enabled.");
+        showNotice(enabled ? "AI walkthrough enabled. Solution code will be processed by LeetRepo's AI provider." : "Official problem details will still be included without AI.");
       } catch (error) {
         settings = { ...settings, aiEnabled: previous, aiConsent: previous };
         showNotice(error.message, true);
@@ -333,7 +306,11 @@
       const success = response.result?.updated
         ? automatic ? "Accepted solution updated automatically." : "Solution updated successfully on GitHub."
         : automatic ? "Accepted and pushed automatically." : "Pushed successfully to GitHub.";
-      showNotice(response.ai?.warning ? `${success} ${response.ai.warning}` : response.ai?.generated ? `${success} AI explanation added.` : success);
+      showNotice(response.ai?.warning
+        ? `${success} ${response.ai.warning}`
+        : response.ai?.generated
+          ? `${success} AI explanation added.`
+          : response.ai?.reused ? `${success} Existing AI explanation reused without another request.` : success);
     } catch (error) {
       showNotice(error.message, true);
     } finally {
