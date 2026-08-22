@@ -12,6 +12,12 @@ html, body { width: 376px; min-height: 590px; }
 .auth-gate .legal-copy { font-size: var(--text-3xs); }
 .auth-gate .legal-copy a, .legal-links a { color: var(--accent-ink); font-weight: 700; }
 
+.study-cta { padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); color: var(--accent-ink); background: var(--accent-tint); animation: recent-enter var(--dur-3) var(--ease-out) both; }
+.study-cta[hidden] { display: none; }
+.study-cta-copy { display: flex; align-items: baseline; gap: 7px; font-size: var(--text-xs); line-height: 1.3; }
+.study-cta-copy strong { font-size: var(--text-lg); font-family: var(--font-heading); }
+.study-cta .button { min-height: var(--control-h-sm); padding: 0 var(--space-4); font-size: var(--text-xs); white-space: nowrap; }
+
 .problem-card { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
 .problem-card:hover { border-color: color-mix(in srgb, var(--accent), transparent 65%); box-shadow: var(--shadow-lift); }
 .problem-card h1 { margin: 0 0 6px; font-size: var(--text-lg); line-height: 1.2; }

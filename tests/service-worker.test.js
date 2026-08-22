@@ -22,6 +22,7 @@ function createStorageArea(initial = {}) {
 }
 
 function createChromeMock({ local = {}, sync = {} } = {}) {
+  const createdTabs = [];
   return {
     storage: {
       local: createStorageArea(local),
@@ -35,8 +36,9 @@ function createChromeMock({ local = {}, sync = {} } = {}) {
       getURL: (path) => `chrome-extension://mock/${path}`,
       openOptionsPage: async () => {}
     },
-    tabs: { create: async () => {} },
-    identity: { getRedirectURL: () => "https://mock.example/redirect" }
+    tabs: { create: async ({ url }) => { createdTabs.push(url); } },
+    identity: { getRedirectURL: () => "https://mock.example/redirect" },
+    createdTabs
   };
 }
 
@@ -158,4 +160,21 @@ test("RATE_REVIEW requires GitHub onboarding to be finished", async () => {
 test("an unknown message type is rejected", async () => {
   globalThis.chrome = createChromeMock();
   await assert.rejects(() => handle({ type: "NOT_A_REAL_MESSAGE" }), /Unknown message/);
+});
+
+test("OPEN_DASHBOARD deep-links onboarded users into the requested view", async () => {
+  const mock = createChromeMock({
+    local: { leetrepoSessionToken: "token" },
+    sync: { settings: onboardedSettings }
+  });
+  globalThis.chrome = mock;
+  await handle({ type: "OPEN_DASHBOARD", view: "study" });
+  assert.equal(mock.createdTabs[0], "chrome-extension://mock/src/pages/dashboard/dashboard.html?view=study");
+});
+
+test("OPEN_DASHBOARD ignores the requested view for users who have not finished onboarding", async () => {
+  const mock = createChromeMock({ sync: { settings: {} } });
+  globalThis.chrome = mock;
+  await handle({ type: "OPEN_DASHBOARD", view: "study" });
+  assert.equal(mock.createdTabs[0], "chrome-extension://mock/src/pages/onboarding/onboarding.html");
 });

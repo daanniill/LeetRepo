@@ -25,6 +25,8 @@ async function load() {
   }
   state.attempts ||= [];
   render();
+  const requestedView = new URLSearchParams(globalThis.location.search).get("view");
+  if (requestedView === "study") showView("study");
 }
 
 function filteredItems() {

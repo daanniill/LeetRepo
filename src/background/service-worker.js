@@ -420,10 +420,10 @@ export async function handle(message) {
     case "OPEN_DASHBOARD":
       {
         const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
-        const path = hasCompletedOnboarding(settings, leetrepoSessionToken)
-          ? "src/pages/dashboard/dashboard.html"
-          : "src/pages/onboarding/onboarding.html";
-        await chrome.tabs.create({ url: chrome.runtime.getURL(path) });
+        const onboarded = hasCompletedOnboarding(settings, leetrepoSessionToken);
+        const path = onboarded ? "src/pages/dashboard/dashboard.html" : "src/pages/onboarding/onboarding.html";
+        const query = onboarded && message.view === "study" ? "?view=study" : "";
+        await chrome.tabs.create({ url: chrome.runtime.getURL(path) + query });
       }
       return { ok: true };
     case "OPEN_OPTIONS":
