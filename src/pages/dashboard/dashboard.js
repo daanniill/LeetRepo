@@ -60,7 +60,7 @@ function render() {
   document.querySelector("#profile-badges").innerHTML = [
     `${items.length} solved`,
     `${calculateStreak(items)}-day streak`,
-    `${items.filter((item) => item.review).length} reviewed`,
+    `${items.filter((item) => item.review).length} AI overviews`,
     `${historyInsights(items).languages.length} languages`
   ].map((label) => `<span class="badge unknown">${escapeHtml(label)}</span>`).join("");
   renderHeatmap(items);
