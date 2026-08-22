@@ -84,6 +84,28 @@ test("completing and snoozing a review update only the intended study state", ()
   const snoozed = snoozeReview(completed, now, 3);
   assert.equal(snoozed.reviewDueAt, "2026-08-11T12:00:00.000Z");
   assert.equal(snoozed.reviewCount, 3);
+  assert.equal(snoozed.reviewEvents.length, 1, "snoozing does not log a review event");
+});
+
+test("scheduling a review appends to review-event history instead of replacing it", () => {
+  const first = scheduleReview({ id: "1-two-sum" }, "hard", new Date("2026-08-01T12:00:00.000Z"));
+  assert.deepEqual(first.reviewEvents, [
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 }
+  ]);
+  const second = scheduleReview(first, "good", now);
+  assert.deepEqual(second.reviewEvents, [
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 },
+    { ratedAt: "2026-08-08T12:00:00.000Z", rating: "good", intervalDaysAfter: 7 }
+  ]);
+});
+
+test("review-event history is capped so storage cannot grow without bound", () => {
+  let item = { id: "1-two-sum" };
+  for (let i = 0; i < 205; i += 1) {
+    item = scheduleReview(item, "good", new Date(now.getTime() + i * 1000));
+  }
+  assert.equal(item.reviewEvents.length, 200);
+  assert.equal(item.reviewCount, 205);
 });
 
 test("study queue exposes due, overdue, upcoming, and next-week groups", () => {

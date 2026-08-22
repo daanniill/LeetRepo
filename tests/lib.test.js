@@ -149,6 +149,42 @@ test("repository backfill enriches an existing language without duplicating it",
   assert.equal(submissionSolutions(merged)[0].path, "0042-trapping-rain-water/cpp/solution.cpp");
 });
 
+test("normalizeSubmission validates and bounds review-event history", () => {
+  const item = normalizeSubmission({
+    ...submission,
+    reviewEvents: [
+      { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14 },
+      { ratedAt: "not-a-date", rating: "good", intervalDaysAfter: 14 },
+      { ratedAt: "2026-08-02T12:00:00.000Z", rating: "invalid-rating", intervalDaysAfter: 14 },
+      { ratedAt: "2026-08-03T12:00:00.000Z", rating: "hard", intervalDaysAfter: -1 },
+      "not-an-object"
+    ]
+  });
+  assert.deepEqual(item.reviewEvents, [
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14 }
+  ]);
+  assert.deepEqual(normalizeSubmission(submission).reviewEvents, []);
+});
+
+test("resyncing a re-pushed solution unions review-event history instead of dropping it", () => {
+  const existing = {
+    ...submission,
+    reviewCount: 1,
+    reviewEvents: [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 }]
+  };
+  const merged = mergeSubmissionSolutions(existing, { ...submission, code: "return 2;", syncedAt: "2026-08-07T10:00:00.000Z" });
+  assert.deepEqual(merged.reviewEvents, [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 }]);
+
+  const rereviewed = mergeSubmissionSolutions(merged, {
+    ...submission,
+    reviewEvents: [{ ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14 }]
+  });
+  assert.deepEqual(rereviewed.reviewEvents, [
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 },
+    { ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14 }
+  ]);
+});
+
 test("push readiness requires code from a freshly accepted LeetCode submission", () => {
   assert.equal(isSubmissionPushReady({ code: "return 1", status: "Accepted", pushReady: true }), true);
   assert.equal(isSubmissionPushReady({ code: "return 1", status: "Accepted" }), false);

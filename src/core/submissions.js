@@ -1,3 +1,5 @@
+import { MAX_REVIEW_EVENTS, REVIEW_RATINGS } from "./study.js";
+
 export { dueForReview, reviewDueAt } from "./study.js";
 
 export const DEFAULT_SETTINGS = {
@@ -91,6 +93,19 @@ function normalizeProblemExamples(value) {
   }).slice(0, 4);
 }
 
+function normalizeReviewEvents(value) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((event) => {
+    if (!event || typeof event !== "object") return [];
+    const ratedAt = new Date(event.ratedAt);
+    if (Number.isNaN(ratedAt.getTime())) return [];
+    if (!REVIEW_RATINGS.includes(event.rating)) return [];
+    const intervalDaysAfter = Number(event.intervalDaysAfter);
+    if (!Number.isFinite(intervalDaysAfter) || intervalDaysAfter <= 0) return [];
+    return [{ ratedAt: ratedAt.toISOString(), rating: event.rating, intervalDaysAfter: Math.floor(intervalDaysAfter) }];
+  }).slice(-MAX_REVIEW_EVENTS);
+}
+
 export function normalizeSubmission(input = {}) {
   const number = String(input.number || "0").replace(/\D/g, "") || "0";
   const title = String(input.title || "Untitled problem").trim();
@@ -135,7 +150,8 @@ export function normalizeSubmission(input = {}) {
     reviewIntervalDays: Number.isFinite(Number(input.reviewIntervalDays)) && Number(input.reviewIntervalDays) > 0 ? Math.floor(Number(input.reviewIntervalDays)) : null,
     reviewCount: Number.isFinite(Number(input.reviewCount)) && Number(input.reviewCount) >= 0 ? Math.floor(Number(input.reviewCount)) : 0,
     reviewLapses: Number.isFinite(Number(input.reviewLapses)) && Number(input.reviewLapses) >= 0 ? Math.floor(Number(input.reviewLapses)) : 0,
-    lastReviewRating: ["again", "hard", "good"].includes(input.lastReviewRating) ? input.lastReviewRating : null
+    lastReviewRating: ["again", "hard", "good"].includes(input.lastReviewRating) ? input.lastReviewRating : null,
+    reviewEvents: normalizeReviewEvents(input.reviewEvents)
   };
   item.solutions = Array.isArray(input.solutions)
     ? input.solutions.map((solution) => normalizeSolution(solution, item))
@@ -182,6 +198,16 @@ function normalizeSolution(input = {}, fallback = {}) {
     commitSha: input.commitSha || "",
     review: input.review && typeof input.review === "object" ? input.review : null
   };
+}
+
+function mergeReviewEvents(previous = [], update = []) {
+  const merged = new Map();
+  for (const event of [...previous, ...update]) {
+    merged.set(`${event.ratedAt}:${event.rating}`, event);
+  }
+  return [...merged.values()]
+    .sort((left, right) => Date.parse(left.ratedAt) - Date.parse(right.ratedAt))
+    .slice(-MAX_REVIEW_EVENTS);
 }
 
 function mergeSolution(left, right) {
@@ -251,6 +277,7 @@ export function mergeSubmissionSolutions(existing = {}, incoming = {}) {
     reviewCount: Math.max(update.reviewCount, previous.reviewCount),
     reviewLapses: Math.max(update.reviewLapses, previous.reviewLapses),
     lastReviewRating: update.lastReviewRating || previous.lastReviewRating,
+    reviewEvents: mergeReviewEvents(previous.reviewEvents, update.reviewEvents),
     solutions
   });
   return {

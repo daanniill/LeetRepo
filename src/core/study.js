@@ -2,6 +2,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const INITIAL_REVIEW_INTERVAL_DAYS = 30;
 export const REVIEW_RATINGS = ["again", "hard", "good"];
+export const MAX_REVIEW_EVENTS = 200;
 export const STUDY_INTERVAL_UNITS = ["days", "weeks", "months"];
 const INTERVAL_UNIT_DAYS = { days: 1, weeks: 7, months: 30 };
 const INTERVAL_UNIT_MAX = { days: 365, weeks: 52, months: 12 };
@@ -106,6 +107,10 @@ export function nextReviewInterval(item = {}, rating, preferredIntervalDays = nu
 export function scheduleReview(item = {}, rating, now = new Date(), preferredIntervalDays = null) {
   const reviewedAt = validDate(now) || new Date();
   const intervalDays = nextReviewInterval(item, rating, preferredIntervalDays);
+  const reviewEvents = [
+    ...(Array.isArray(item.reviewEvents) ? item.reviewEvents : []),
+    { ratedAt: reviewedAt.toISOString(), rating, intervalDaysAfter: intervalDays }
+  ].slice(-MAX_REVIEW_EVENTS);
   return {
     ...item,
     lastReviewedAt: reviewedAt.toISOString(),
@@ -113,7 +118,8 @@ export function scheduleReview(item = {}, rating, now = new Date(), preferredInt
     reviewIntervalDays: intervalDays,
     reviewCount: nonNegativeInteger(item.reviewCount) + 1,
     reviewLapses: nonNegativeInteger(item.reviewLapses) + (rating === "again" ? 1 : 0),
-    lastReviewRating: rating
+    lastReviewRating: rating,
+    reviewEvents
   };
 }
 
