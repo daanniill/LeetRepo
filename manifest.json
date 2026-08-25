@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LeetRepo",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Commit accepted LeetCode solutions to GitHub with clean READMEs and study metadata.",
   "permissions": ["storage", "clipboardWrite", "identity"],
   "host_permissions": ["https://api.github.com/*", "https://leetrepo.onrender.com/*"],
