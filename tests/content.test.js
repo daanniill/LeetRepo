@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 
 await import("../src/content/language.js");
 await import("../src/content/problem.js");
+await import("../src/content/attempt.js");
 
 const { detectLanguage, normalizeLanguage } = globalThis.LeetRepoLanguage;
 const { getProblemDetails, getProblemIdentity, getProblemTags, parseProblemText } = globalThis.LeetRepoProblem;
+const { beginAttempt, finishAttempt } = globalThis.LeetRepoAttempt;
 
 function rootWith({ mode = null, labels = [] } = {}) {
   return {
@@ -17,6 +19,15 @@ function rootWith({ mode = null, labels = [] } = {}) {
     }
   };
 }
+
+test("attempt capture requires a submit event and keeps the submitted code snapshot", () => {
+  const submitted = { number: "1", code: "return first", language: "Python3", runtime: "—", memory: "—" };
+  const pending = beginAttempt(submitted, 1_000);
+  const attempt = finishAttempt(pending, "Wrong Answer", { code: "return edited", runtime: "4 ms", memory: "10 MB" });
+
+  assert.equal(finishAttempt(null, "Wrong Answer", { code: "return edited" }), null);
+  assert.deepEqual(attempt, { ...submitted, status: "Wrong Answer", runtime: "4 ms", memory: "10 MB" });
+});
 
 test("language detection reads the current LeetCode editor mode", () => {
   assert.equal(detectLanguage(rootWith({ mode: "cpp" })), "C++");

@@ -14,6 +14,7 @@
   const themes = new Set(["light", "dark", "teal"]);
   const submissionStatuses = ["Accepted", "Wrong Answer", "Time Limit Exceeded", "Memory Limit Exceeded", "Runtime Error", "Compile Error", "Output Limit Exceeded"];
   const resultSelector = '[data-e2e-locator*="submission-result"], [data-cy*="submission-result"]';
+  const { beginAttempt, finishAttempt, submissionKey } = globalThis.LeetRepoAttempt;
 
   const text = (selector) => document.querySelector(selector)?.textContent?.trim() || "";
   const normalizeSpace = (value) => String(value || "").replace(/\s+/g, " ").trim();
@@ -29,10 +30,6 @@
   function isCurrentSolutionSynced() {
     const stored = syncedSolutionFor(latest);
     return Boolean(stored?.code && String(stored.code).trimEnd() === String(latest?.code || "").trimEnd());
-  }
-
-  function submissionKey(submission) {
-    return `${submission?.number || "0"}:${String(submission?.code || "").trimEnd()}`;
   }
 
   function hasFreshAcceptance(submission = latest) {
@@ -328,7 +325,6 @@
     latest = extractSubmission();
     latest.notes = notes[`${latest.number}-${latest.slug}`] || "";
     render();
-    if (!["Ready"].includes(latest.status) && latest.code) chrome.runtime.sendMessage({ type: "RECORD_ATTEMPT", submission: latest });
     if (settings?.autoPush && settings.connected && hasFreshAcceptance() && latest.code) push(true);
   }
 
@@ -388,7 +384,7 @@
     if (!submission.code) return;
     acceptedSubmissionKey = "";
     autoPushAttemptedKey = "";
-    pendingSubmission = { key: submissionKey(submission), startedAt: Date.now() };
+    pendingSubmission = beginAttempt(submission);
     latest = submission;
     showNotice("");
     render();
@@ -399,9 +395,11 @@
       ? resultStatusFromMutations(mutations)
       : null;
     if (resultStatus) {
+      const attempt = finishAttempt(pendingSubmission, resultStatus, extractSubmission());
       if (resultStatus === "Accepted") acceptedSubmissionKey = pendingSubmission.key;
       else acceptedSubmissionKey = "";
       pendingSubmission = null;
+      chrome.runtime.sendMessage({ type: "RECORD_ATTEMPT", submission: attempt });
     }
     const pageChanged = mutations.some((mutation) => {
       const target = mutation.target.nodeType === Node.ELEMENT_NODE ? mutation.target : mutation.target.parentElement;
