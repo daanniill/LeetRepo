@@ -61,18 +61,43 @@ export async function repoInfo(token, owner, repo) {
   return request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
 }
 
+function difficultyFromReadme(blob = {}) {
+  if (blob.encoding !== "base64" || typeof blob.content !== "string") return "Unknown";
+  try {
+    const binary = atob(blob.content.replace(/\s/g, ""));
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const readme = new TextDecoder().decode(bytes);
+    const match = readme.match(/^\s*-\s+\*\*Difficulty:\*\*\s+(Easy|Medium|Hard)\s*$/im);
+    return match ? match[1][0].toUpperCase() + match[1].slice(1).toLowerCase() : "Unknown";
+  } catch {
+    return "Unknown";
+  }
+}
+
 export async function listSolutionFolders(token, owner, repo, branch = "") {
   const info = await repoInfo(token, owner, repo);
   const selectedBranch = branch || info.default_branch || "main";
   const tree = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(selectedBranch)}?recursive=1`);
   if (tree.truncated) throw new Error("This repository is too large to backfill safely in one request.");
+  const entries = tree.tree || [];
+  const difficultyByFolder = new Map();
+  const readmes = entries.flatMap((entry) => {
+    const match = entry.type === "blob" && entry.path.match(/^(\d{4,}-[^/]+)\/README\.md$/i);
+    return match && entry.sha ? [{ folder: match[1], sha: entry.sha }] : [];
+  });
+  for (let index = 0; index < readmes.length; index += 10) {
+    await Promise.all(readmes.slice(index, index + 10).map(async (readme) => {
+      const blob = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs/${encodeURIComponent(readme.sha)}`);
+      difficultyByFolder.set(readme.folder, difficultyFromReadme(blob));
+    }));
+  }
   const languages = {
     bash: "Bash", sh: "Bash", c: "C", cpp: "C++", csharp: "C#", cs: "C#", dart: "Dart", elixir: "Elixir", ex: "Elixir",
     erlang: "Erlang", erl: "Erlang", go: "Go", java: "Java", javascript: "JavaScript", js: "JavaScript", kotlin: "Kotlin", kt: "Kotlin",
     mysql: "MySQL", sql: "SQL", php: "PHP", python: "Python3", python3: "Python3", py: "Python3", racket: "Racket", rkt: "Racket",
     ruby: "Ruby", rb: "Ruby", rust: "Rust", rs: "Rust", scala: "Scala", swift: "Swift", typescript: "TypeScript", ts: "TypeScript"
   };
-  const solutions = (tree.tree || []).flatMap((entry) => {
+  const solutions = entries.flatMap((entry) => {
     const match = entry.type === "blob" && entry.path.match(/^(\d{4,})-([^/]+)\/(?:(?:([^/]+)\/)?solution\.([A-Za-z0-9]+))$/);
     if (!match) return [];
     const [, number, slug, languageFolder, extension] = match;
@@ -80,7 +105,7 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
       number: String(Number(number)),
       title: slug.split("-").map((part) => part ? part[0].toUpperCase() + part.slice(1) : "").join(" "),
       slug,
-      difficulty: "Unknown",
+      difficulty: difficultyByFolder.get(`${number}-${slug}`) || "Unknown",
       language: languages[languageFolder?.toLowerCase()] || languages[extension.toLowerCase()] || extension.toUpperCase(),
       extension: extension.toLowerCase(),
       path: entry.path,

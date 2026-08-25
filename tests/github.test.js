@@ -39,11 +39,12 @@ test("listSolutionFolders imports every solution with its latest commit metadata
     { default_branch: "main" },
     { tree: [
       { type: "blob", path: "0001-two-sum/solution.py" },
-      { type: "blob", path: "0001-two-sum/README.md" },
+      { type: "blob", path: "0001-two-sum/README.md", sha: "two-sum-readme" },
       { type: "blob", path: "0001-two-sum/cpp/solution.cpp" },
       { type: "blob", path: "0002-add-two-numbers/python/solution.py" },
       { type: "blob", path: "notes.txt" }
     ] },
+    { encoding: "base64", content: btoa("# 1. Two Sum\n\n## Solution metadata\n\n- **Difficulty:** Easy\n") },
     [{ sha: "python-commit", commit: { committer: { date: "2026-08-01T10:00:00.000Z" } } }],
     [{ sha: "cpp-commit", commit: { committer: { date: "2026-08-07T10:00:00.000Z" } } }],
     [{ sha: "add-two-numbers-commit", commit: { author: { date: "2026-08-05T10:00:00.000Z" } } }]
@@ -56,16 +57,20 @@ test("listSolutionFolders imports every solution with its latest commit metadata
   const items = await listSolutionFolders("secret", "alex-c", "solutions");
   assert.equal(items.length, 2);
   assert.equal(items[0].title, "Two Sum");
+  assert.equal(items[0].difficulty, "Easy");
   assert.equal(items[0].language, "C++");
   assert.equal(items[0].syncedAt, "2026-08-07T10:00:00.000Z");
   assert.deepEqual(items[0].solutions.map((solution) => solution.language), ["C++", "Python3"]);
+  assert.deepEqual(items[0].solutions.map((solution) => solution.difficulty), ["Easy", "Easy"]);
   assert.equal(items[0].solutions[0].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum/cpp");
   assert.equal(items[1].title, "Add Two Numbers");
+  assert.equal(items[1].difficulty, "Unknown");
   assert.equal(items[1].syncedAt, "2026-08-05T10:00:00.000Z");
   assert.equal(items[1].commitSha, "add-two-numbers-commit");
-  assert.match(calls[2], /path=0001-two-sum%2Fsolution.py/);
-  assert.match(calls[3], /path=0001-two-sum%2Fcpp%2Fsolution.cpp/);
-  assert.match(calls[4], /path=0002-add-two-numbers%2Fpython%2Fsolution.py/);
+  assert.match(calls[2], /git\/blobs\/two-sum-readme$/);
+  assert.match(calls[3], /path=0001-two-sum%2Fsolution.py/);
+  assert.match(calls[4], /path=0001-two-sum%2Fcpp%2Fsolution.cpp/);
+  assert.match(calls[5], /path=0002-add-two-numbers%2Fpython%2Fsolution.py/);
 });
 
 test("pushSubmission builds one tree and advances one branch ref", async (t) => {

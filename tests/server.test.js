@@ -183,7 +183,7 @@ test("session exchange replaces only the current device session", async () => {
   assert.equal(exchange.replacedSessionHash, hashToken("previous-session"));
 });
 
-test("creating a session never evicts sessions belonging to other devices", async () => {
+test("session exchange persists the user, credentials, and session without evicting other devices", async () => {
   const queries = [];
   const auth = {
     github_user_id: "42",
@@ -211,6 +211,9 @@ test("creating a session never evicts sessions belonging to other devices", asyn
     sessionExpiresAt: new Date(Date.now() + 86_400_000)
   });
 
+  assert.equal(queries.some(({ sql }) => /INSERT INTO users/.test(sql)), true);
+  assert.equal(queries.some(({ sql }) => /INSERT INTO github_credentials/.test(sql)), true);
+  assert.equal(queries.some(({ sql }) => /INSERT INTO sessions/.test(sql)), true);
   const sessionDeletes = queries.filter(({ sql }) => /DELETE FROM sessions/.test(sql));
   assert.equal(sessionDeletes.length, 1);
   assert.deepEqual(sessionDeletes[0].values, ["previous-session-hash", "42"]);
