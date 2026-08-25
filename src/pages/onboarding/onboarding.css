@@ -43,6 +43,7 @@
 .include-grid input { position: absolute; opacity: 0; pointer-events: none; }
 .include-grid span { min-height: 30px; padding: 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-pill); display: inline-flex; align-items: center; color: var(--muted); font-size: var(--text-2xs); font-weight: 700; transition: color var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), background-color var(--dur-3) var(--ease-out), transform var(--dur-2) var(--ease-out); }
 .include-grid input:checked + span { border-color: transparent; color: var(--accent-ink); background: var(--accent-tint); }
+.include-grid > .required { border-color: transparent; color: var(--accent-ink); background: var(--accent-tint); }
 .include-grid label:hover span { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent), transparent 55%); }
 .include-grid label:active span { transform: translateY(0) scale(.97); transition-duration: var(--dur-1); }
 .include-grid input:focus-visible + span { outline: 3px solid color-mix(in srgb, var(--accent), transparent 68%); outline-offset: 2px; }

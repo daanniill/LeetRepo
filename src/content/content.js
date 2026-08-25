@@ -267,6 +267,10 @@
       const response = await chrome.runtime.sendMessage({ type: "GENERATE_FEEDBACK", submission: latest });
       if (!response?.ok) throw new Error(response?.error || "Feedback failed.");
       ai = { ...ai, ...response.ai };
+      latest.review = response.review;
+      if (response.submission && response.persisted) {
+        syncedSubmissions = [response.submission, ...syncedSubmissions.filter((item) => String(item.number) !== String(response.submission.number))];
+      }
       const feedback = document.querySelector(`#${PANEL_ID} .lr-feedback`);
       const complexity = response.review.complexity?.time && response.review.complexity?.space
         ? `<div class="lr-complexity"><span>Time · ${escapeHtml(response.review.complexity.time)}</span><span>Space · ${escapeHtml(response.review.complexity.space)}</span></div>`
@@ -274,6 +278,7 @@
       feedback.innerHTML = `<strong>30-second refresher</strong><p>${escapeHtml(response.review.summary || response.review.steps?.[0] || "Review the approach and its key invariant.")}</p><div class="lr-patterns">${(latest.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>${complexity}`;
       feedback.hidden = false;
       if (response.ai?.warning) showNotice(response.ai.warning, true);
+      else if (response.persisted === false) showNotice("Feedback is ready and will be stored in the README when this Accepted solution is synced.");
     } catch (error) {
       showNotice(error.message, true);
     } finally {

@@ -1,12 +1,12 @@
 # LeetRepo Privacy Notice
 
-Last updated: August 20, 2026
+Last updated: August 25, 2026
 
 LeetRepo is a browser extension and hosted service that reads accepted LeetCode submissions, commits user-selected content to a GitHub repository, and optionally generates AI study explanations. LeetRepo does not sell user data, serve advertising, or use browsing activity for advertising.
 
 ## Data stored on your device
 
-- Submission and attempt history, including problem metadata, detected description, examples, constraints, follow-up, hints, solution code, result status, personal notes, review schedule, and resulting commit details, is stored locally to power the dashboard.
+- Compact attempt-event metadata (problem number and title, language, result, performance metrics, and time) is stored locally. Problem statements, examples, constraints, hints, solution source, accepted-solution records, explanations, personal notes, and study progress are not written to the local dashboard store.
 - A short-lived GitHub App user access token and an opaque LeetRepo session token are stored in local extension storage and are not synced.
 - Non-secret preferences, including the selected repository and AI consent setting, may be stored through Chrome's synced extension storage when browser sync is enabled.
 
@@ -28,7 +28,7 @@ OAuth state expires after 10 minutes, one-time extension exchange codes expire a
 
 During sign-in, the hosted service exchanges GitHub's authorization code and verifies the repositories available through your GitHub App installations. The GitHub App requests only repository **Contents: read and write** access for repositories selected during installation. It does not request Repository administration permission and cannot use GitHub's repository-deletion endpoint.
 
-When syncing, the extension sends repository details, solution code, generated README content, and Git commit data directly to GitHub using the short-lived user access token. If repository-profile generation is enabled, LeetRepo may update the selected repository's root `README.md`. When backfilling, LeetRepo reads the selected repository's Git tree and stores matching solution metadata locally.
+When syncing, the extension sends repository details, solution code, generated README content, and Git commit data directly to GitHub using the short-lived user access token. Each problem README contains a versioned LeetRepo data tag with the problem details, solution variants and source, explanations, notes, and study state used to rebuild the dashboard. If repository-profile generation is enabled, LeetRepo may update the selected repository's root `README.md`. Dashboard loading and backfill read the selected repository's Git tree and problem READMEs directly; the hosted service does not proxy or archive that repository content.
 
 GitHub's privacy terms apply to data sent to GitHub.
 
@@ -47,15 +47,15 @@ No internet-connected service can guarantee absolute security. Revoke the GitHub
 ## Your choices and deletion
 
 - You can keep hosted AI disabled and continue syncing complete problem READMEs generated locally from captured official details.
-- Turning off AI stops future AI transmissions but preserves local history.
-- **Sign out** revokes the current LeetRepo session and removes GitHub and LeetRepo authorization tokens from this extension. It preserves your hosted account, GitHub App installation, repository preference, and local study history so you can sign in again without reinstalling the GitHub App.
+- Turning off AI stops future AI transmissions but preserves explanations already committed to your GitHub problem READMEs.
+- **Sign out** revokes the current LeetRepo session and removes GitHub and LeetRepo authorization tokens from this extension. It preserves your hosted account, GitHub App installation, repository preference, and GitHub-backed solution and study history so you can sign in again without reinstalling the GitHub App.
 - **Delete LeetRepo account** deletes your hosted account, pending credential exchanges, encrypted GitHub credentials, sessions, and aggregate AI usage; clears all LeetRepo local, synced, and session extension storage; and revokes LeetRepo's GitHub authorization. It never modifies or deletes a GitHub repository. The GitHub App installation is not uninstalled and can be removed separately in GitHub settings.
 - Uninstalling the extension removes local extension storage according to browser behavior. Synced preferences may remain in your browser-sync account, and uninstalling alone does not notify the hosted service. Use **Delete LeetRepo account** before uninstalling if you want immediate comprehensive deletion; otherwise inactive hosted account data is removed as described above.
 - You can also revoke or narrow the GitHub App installation from GitHub settings.
 
 ## Chrome Web Store Limited Use disclosure
 
-LeetRepo uses data obtained through extension permissions only to provide and improve its user-facing GitHub sync, local study dashboard, and optional AI explanation features. LeetRepo does not use or transfer this data for personalized advertising, creditworthiness, lending, or sale to data brokers. Humans do not read solution code or other user content except with the user's specific consent for support, when necessary for security, when required by law, or in aggregated and anonymized form for internal operations.
+LeetRepo uses data obtained through extension permissions only to provide and improve its user-facing GitHub sync, GitHub-backed study dashboard, and optional AI explanation features. LeetRepo does not use or transfer this data for personalized advertising, creditworthiness, lending, or sale to data brokers. Humans do not read solution code or other user content except with the user's specific consent for support, when necessary for security, when required by law, or in aggregated and anonymized form for internal operations.
 
 ## Changes and contact
 

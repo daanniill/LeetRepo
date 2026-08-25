@@ -58,7 +58,7 @@
             <div class="field"><label for="repo">Repository</label><input class="input" id="repo" required></div>
             <div class="field"><label for="branch">Branch</label><input class="input" id="branch" placeholder="main"></div>
           </div>
-          <div class="repository-actions"><button class="button secondary" id="backfill-repository" type="button">Backfill existing solution folders</button><span class="muted">Imports LeetRepo-style folders into the local dashboard without changing GitHub.</span></div>
+          <div class="repository-actions"><button class="button secondary" id="backfill-repository" type="button">Refresh from repository READMEs</button><span class="muted">Reads tagged LeetRepo problem READMEs directly from GitHub without changing the repository.</span></div>
         </section>
         <hr class="divider">
         <section>
@@ -66,10 +66,10 @@
           <div class="field"><label for="commit-template">Commit message format</label><input class="input mono" id="commit-template"></div>
           <div class="toggle-list">
             <label class="setting-line"><div><strong>Auto-push on Accepted</strong><small>Sync immediately after LeetCode accepts</small></div><span class="switch"><input id="autoPush" type="checkbox"><span></span></span></label>
-            <label class="setting-line"><div><strong>Generate a README</strong><small>Always include problem details and stats; AI content is controlled below</small></div><span class="switch"><input id="includeReadme" type="checkbox"><span></span></span></label>
+            <div class="setting-line"><div><strong>Tagged problem README</strong><small>Required as the source of truth for dashboard and backfill data</small></div><span class="badge accepted">Always on</span></div>
             <label class="setting-line"><div><strong>Runtime and memory</strong><small>Include captured submission metrics</small></div><span class="switch"><input id="includeStats" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>LeetCode link</strong><small>Link back to the original problem</small></div><span class="switch"><input id="includeLink" type="checkbox"><span></span></span></label>
-            <label class="setting-line"><div><strong>Personal notes</strong><small>Include notes in opted-in AI READMEs</small></div><span class="switch"><input id="includeNotes" type="checkbox"><span></span></span></label>
+            <label class="setting-line"><div><strong>Personal notes</strong><small>Show GitHub-backed notes in problem READMEs</small></div><span class="switch"><input id="includeNotes" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>Repository profile README</strong><small>Opt in to replacing the root README with generated stats on every push</small></div><span class="switch"><input id="includeProfile" type="checkbox"><span></span></span></label>
             <label class="setting-line"><div><strong>Spaced repetition</strong><small>Bring synced solutions back on a schedule you choose</small></div><span class="switch"><input id="spacedRepetition" type="checkbox"><span></span></span></label>
           </div>
@@ -85,7 +85,7 @@
         <hr class="divider">
         <section>
           <div class="section-title">
-            <div><h2>Optional AI analysis</h2><p>Add a code-specific walkthrough and diagram to the locally generated README.</p></div>
+            <div><h2>Optional AI analysis</h2><p>Add a code-specific walkthrough and diagram to the GitHub problem README.</p></div>
             <span class="badge unknown" id="ai-status-badge">Sign-in required</span>
           </div>
           <label class="setting-line ai-toggle" id="ai-toggle-row"><div><strong>Add an AI walkthrough and diagram</strong><small>Off still creates a complete README from official page details.</small></div><span class="switch"><input id="aiEnabled" type="checkbox"><span></span></span></label>

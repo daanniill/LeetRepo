@@ -24,7 +24,7 @@ LeetRepo is a Chrome/Chromium extension that saves Accepted LeetCode solutions t
 1. **Solve a problem on LeetCode.** LeetRepo detects the problem, language, code, result, and available performance metrics.
 2. **Confirm the solution.** Push from the page panel or toolbar popup, or enable automatic pushes for newly Accepted submissions.
 3. **Sync one clean commit.** LeetRepo creates or updates the problem folder without changing unrelated repository files.
-4. **Review it later.** Use the local dashboard to search your library, explore activity, and work through your study queue.
+4. **Review it later.** The dashboard rebuilds your library from GitHub READMEs so you can search, explore activity, and work through your study queue on another signed-in device.
 
 A synced problem looks like this:
 
@@ -35,7 +35,7 @@ A synced problem looks like this:
     └── solution.py
 ```
 
-The generated README can include solve metadata, problem context, complexity, personal notes, interview prompts, and an approach walkthrough. Solving the same problem in another language updates its existing folder while preserving the original solved time.
+The generated README includes a hidden, versioned LeetRepo data tag containing the problem, solution variants, explanations, notes, and study state needed by the dashboard and repository backfill. Its rendered Markdown stays human-readable. Solving the same problem in another language updates its existing folder while preserving the original solved time.
 
 ## Your solution dashboard
 
@@ -78,7 +78,7 @@ When enabled, AI can add an approach walkthrough, complexity analysis, interview
 
 The free tier includes up to 3 requests per day and 30 per month. If AI notes are unavailable or you reach the limit, your solution still syncs with a standard README. Because generated notes can be inaccurate, review them before relying on them.
 
-Turning AI off does not affect solution syncing, local feedback, or the dashboard.
+Turning AI off does not affect solution syncing, previously committed feedback, local fallback feedback, or the GitHub-backed dashboard.
 
 ## Privacy and safety
 

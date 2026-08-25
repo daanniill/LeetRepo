@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { listRepos, listSolutionFolders, pushSubmission } from "../src/core/github.js";
+import { buildReadme } from "../src/core/submissions.js";
 
 test("listRepos returns only repositories selected for GitHub App installations", async (t) => {
   const replies = [
@@ -71,6 +72,54 @@ test("listSolutionFolders imports every solution with its latest commit metadata
   assert.match(calls[3], /path=0001-two-sum%2Fsolution.py/);
   assert.match(calls[4], /path=0001-two-sum%2Fcpp%2Fsolution.cpp/);
   assert.match(calls[5], /path=0002-add-two-numbers%2Fpython%2Fsolution.py/);
+});
+
+test("listSolutionFolders restores dashboard content from a tagged problem README", async (t) => {
+  const review = {
+    summary: "Use a hash map to find each complement.",
+    approach: ["Scan the array once.", "Return a stored complement."],
+    complexity: { time: "O(n)", space: "O(n)" },
+    generatedBy: "Groq"
+  };
+  const readme = buildReadme({
+    number: 1,
+    title: "Two Sum",
+    slug: "two-sum",
+    difficulty: "Easy",
+    tags: ["Array", "Hash Table"],
+    language: "Python3",
+    code: "return [0, 1]",
+    runtime: "40 ms",
+    memory: "18 MB",
+    problemDescription: "Return the indices of two values that add to the target.",
+    examples: [{ input: "nums = [2,7], target = 9", output: "[0,1]", explanation: "2 + 7 = 9." }],
+    constraints: ["2 <= nums.length <= 10^4"],
+    notes: "Remember duplicate values.",
+    reviewDueAt: "2026-09-01T00:00:00.000Z"
+  }, { aiEnabled: true }, review);
+  const replies = [
+    { default_branch: "main" },
+    { tree: [
+      { type: "blob", path: "0001-two-sum/README.md", sha: "readme-sha" },
+      { type: "blob", path: "0001-two-sum/python/solution.py", sha: "solution-sha" }
+    ] },
+    { encoding: "base64", content: Buffer.from(readme, "utf8").toString("base64") },
+    [{ sha: "solution-commit", commit: { committer: { date: "2026-08-01T10:00:00.000Z" } } }]
+  ];
+  let index = 0;
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(replies[index++]), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  }));
+
+  const [item] = await listSolutionFolders("secret", "alex-c", "solutions");
+  assert.equal(item.problemDescription, "Return the indices of two values that add to the target.");
+  assert.equal(item.code, "return [0, 1]");
+  assert.equal(item.review.summary, review.summary);
+  assert.equal(item.notes, "Remember duplicate values.");
+  assert.equal(item.reviewDueAt, "2026-09-01T00:00:00.000Z");
+  assert.deepEqual(item.examples, [{ input: "nums = [2,7], target = 9", output: "[0,1]", explanation: "2 + 7 = 9." }]);
+  assert.deepEqual(item.constraints, ["2 <= nums.length <= 10^4"]);
 });
 
 test("pushSubmission builds one tree and advances one branch ref", async (t) => {

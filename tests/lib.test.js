@@ -16,6 +16,7 @@ import {
   mergeSubmissionSolutions,
   normalizeSubmission,
   normalizeTheme,
+  parseReadmeData,
   relativeTime,
   reusableGeneratedReview,
   sameProblem,
@@ -244,12 +245,81 @@ test("README respects disabled optional sections", () => {
   assert.doesNotMatch(readme, /View problem/);
 });
 
-test("README includes personal notes only when enabled", () => {
+test("README stores personal notes in GitHub unless their visible section is disabled", () => {
   const withNotes = { ...submission, notes: "Re-check the decreasing-height case." };
   const review = { patterns: ["Stack"], approach: ["Scan the bars."] };
   assert.match(buildReadme(withNotes, { aiEnabled: true }, review), /## Personal notes/);
   assert.doesNotMatch(buildReadme(withNotes, { aiEnabled: true, includeNotes: false }, review), /Personal notes/);
-  assert.doesNotMatch(buildReadme(withNotes), /Personal notes/);
+  assert.match(buildReadme(withNotes), /## Personal notes/);
+  assert.equal(parseReadmeData(buildReadme(withNotes, { includeNotes: false })).notes, withNotes.notes);
+});
+
+test("tagged README data round-trips problem, solution, AI, notes, and study fields", () => {
+  const review = {
+    summary: "Track complements in a hash map.",
+    approach: ["Scan once.", "Return the stored complement."],
+    complexity: { time: "O(n)", space: "O(n)" },
+    generatedBy: "Groq"
+  };
+  const original = {
+    ...submission,
+    notes: "Check duplicate values.",
+    reviewDueAt: "2026-09-01T00:00:00.000Z",
+    reviewCount: 2
+  };
+  const parsed = parseReadmeData(buildReadme(original, { aiEnabled: true }, review));
+  assert.equal(parsed.problemDescription, original.problemContext);
+  assert.equal(parsed.code, original.code);
+  assert.equal(parsed.review.summary, review.summary);
+  assert.equal(parsed.notes, original.notes);
+  assert.equal(parsed.reviewDueAt, original.reviewDueAt);
+  assert.equal(parsed.reviewCount, 2);
+  assert.equal(parsed.path, "0042-trapping-rain-water/cpp/solution.cpp");
+});
+
+test("legacy LeetRepo Markdown backfills visible AI feedback and notes", () => {
+  const parsed = parseReadmeData(`# 1. Two Sum
+
+[View problem on LeetCode](https://leetcode.com/problems/two-sum/)
+
+## Solution metadata
+
+- **Difficulty:** Easy
+- **Language:** Python3
+- **Topics:** Array, Hash Table
+- **Solved:** 2026-08-07 12:34 UTC
+
+## Problem description
+
+Find a matching pair.
+
+## Interview overview
+
+> Generated from the submitted solution and the official problem details above.
+
+Use a hash map.
+
+### Approach
+
+1. Scan once.
+2. Return the stored complement.
+
+### Complexity
+
+- **Time:** O(n)
+- **Space:** O(n)
+
+_AI-generated with Groq; verify the analysis before relying on it._
+
+## Personal notes
+
+Check duplicate values.`);
+  assert.equal(parsed.problemDescription, "Find a matching pair.");
+  assert.equal(parsed.review.summary, "Use a hash map.");
+  assert.deepEqual(parsed.review.approach, ["Scan once.", "Return the stored complement."]);
+  assert.equal(parsed.review.generatedBy, "Groq");
+  assert.equal(parsed.notes, "Check duplicate values.");
+  assert.equal(parsed.solvedAt, "2026-08-07T12:34:00.000Z");
 });
 
 test("README shows the original solved timestamp", () => {
@@ -305,15 +375,21 @@ test("README renders a validated AI explanation with a verification note", () =>
   assert.match(readme, /AI-generated with Groq/);
 });
 
-test("README ignores a supplied AI review when the user has opted out", () => {
-  const readme = buildReadme(submission, { aiEnabled: false }, {
-    summary: "This content must not be included.",
-    patterns: ["Two Pointers"],
+test("README preserves committed AI feedback after opt-out but ignores unsourced feedback", () => {
+  const generated = buildReadme(submission, { aiEnabled: false }, {
+    summary: "Keep this previously generated feedback.",
     approach: ["Build a diagram."],
     generatedBy: "Groq"
   });
-  assert.doesNotMatch(readme, /This content must not be included/);
-  assert.doesNotMatch(readme, /mermaid|AI-generated/);
+  const unsourced = buildReadme(submission, { aiEnabled: false }, {
+    summary: "This content must not be included.",
+    patterns: ["Two Pointers"],
+    approach: ["Build a diagram."]
+  });
+  assert.match(generated, /Keep this previously generated feedback/);
+  assert.match(generated, /AI-generated with Groq/);
+  assert.doesNotMatch(unsourced, /This content must not be included/);
+  assert.doesNotMatch(unsourced, /mermaid|AI-generated/);
 });
 
 test("Mermaid replay falls back by a LeetCode topic and escapes untrusted labels", () => {

@@ -13,7 +13,7 @@ function setAiAvailability(ai = {}) {
   toggle.disabled = limited && !toggle.checked;
   document.querySelector("#setup-ai-row").classList.toggle("ai-limit", limited);
   document.querySelector("#setup-ai-copy").textContent = limited
-    ? "Your AI tier limit has been reached. Basic stats READMEs and local feedback remain available."
+    ? "Your AI tier limit has been reached. Tagged READMEs and local fallback feedback remain available."
     : "Opt in to sending solution details and code to LeetRepo's AI provider for a walkthrough and diagram. Off still creates a complete README from official page details.";
 }
 
@@ -77,7 +77,7 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
       repo,
       branch,
       autoPush: document.querySelector("#setup-auto-push").checked,
-      includeReadme: document.querySelector("#setup-readme").checked,
+      includeReadme: true,
       includeStats: document.querySelector("#setup-stats").checked,
       includeLink: document.querySelector("#setup-link").checked,
       includeNotes: document.querySelector("#setup-notes").checked,

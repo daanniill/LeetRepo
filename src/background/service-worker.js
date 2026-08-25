@@ -1,15 +1,16 @@
-import { aiLimitReached, aiSubmissionPayload, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, mergeSubmissionSolutions, normalizeSubmission, normalizeTheme, reusableGeneratedReview, sameProblem } from "../core/submissions.js";
+import { aiLimitReached, aiSubmissionPayload, buildReview, DEFAULT_SETTINGS, isSubmissionPushReady, mergeSubmissionSolutions, normalizeSubmission, normalizeTheme, reusableGeneratedReview, sameProblem, submissionSolutions } from "../core/submissions.js";
 import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.js";
 import { beginHostedGitHubSignIn, hostedRequest, launchIdentityWebAuthFlow, newRequestId } from "../core/service.js";
 import { clearDeviceAuthentication, hasCompletedOnboarding, settingsForSync } from "../core/auth.js";
 import { clearLeetRepoStorage } from "../core/storage.js";
-import { normalizeStudyInterval, rescheduleFirstReview, reviewDueAfterSync, scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
+import { normalizeStudyInterval, reviewDueAfterSync, scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
 
 const getLocal = (keys) => chrome.storage.local.get(keys);
 const setLocal = (value) => chrome.storage.local.set(value);
 const getSync = (keys) => chrome.storage.sync.get(keys);
 const setSync = (value) => chrome.storage.sync.set(value);
 let localMutationQueue = Promise.resolve();
+let repositoryMutationQueue = Promise.resolve();
 let accountDeletionInProgress = false;
 const pushesInFlight = new Map();
 
@@ -42,6 +43,7 @@ function normalizeSettings(value = {}) {
     ...stored,
     aiConsent: stored.aiConsent === true,
     aiEnabled: stored.aiEnabled === true && stored.aiConsent === true,
+    includeReadme: true,
     studyIntervalValue: studyInterval.value,
     studyIntervalUnit: studyInterval.unit,
     theme: normalizeTheme(stored.theme)
@@ -68,7 +70,7 @@ async function hostedUsage() {
 }
 
 async function explanationFor(settings, submission) {
-  if (settings.includeReadme === false || !settings.aiEnabled) {
+  if (!settings.aiEnabled) {
     return { review: null, ai: { generated: false } };
   }
   const usage = await hostedUsage();
@@ -132,10 +134,36 @@ function mutateLocal(update) {
   return task;
 }
 
+function mutateRepository(update) {
+  const task = repositoryMutationQueue.then(() => {
+    if (accountDeletionInProgress) throw new Error("Account deletion is in progress.");
+    return update();
+  });
+  repositoryMutationQueue = task.catch(() => {});
+  return task;
+}
+
 function codeHash(value = "") {
   let result = 0;
   for (let index = 0; index < value.length; index += 1) result = ((result << 5) - result + value.charCodeAt(index)) | 0;
   return result;
+}
+
+function compactAttempt(input = {}) {
+  const item = normalizeSubmission(input);
+  return {
+    key: String(input.key || `${item.id}:${item.status}:${codeHash(item.code)}`),
+    id: item.id,
+    number: item.number,
+    title: item.title,
+    slug: item.slug,
+    difficulty: item.difficulty,
+    language: item.language,
+    runtime: item.runtime,
+    memory: item.memory,
+    status: item.status,
+    recordedAt: input.recordedAt || new Date().toISOString()
+  };
 }
 
 async function recordAttempt(submission) {
@@ -144,30 +172,54 @@ async function recordAttempt(submission) {
     const { attempts = [] } = await getLocal("attempts");
     const key = `${item.id}:${item.status}:${codeHash(item.code)}`;
     if (attempts.some((attempt) => attempt.key === key)) return null;
-    const attempt = { ...item, key, recordedAt: new Date().toISOString() };
+    const attempt = compactAttempt({ ...item, key, recordedAt: new Date().toISOString() });
     await setLocal({ attempts: [attempt, ...attempts].slice(0, 500) });
     return attempt;
   });
 }
 
-export async function recordPush(submission, result, review, settings) {
-  return mutateLocal(async () => {
-    const { submissions = [] } = await getLocal("submissions");
-    const normalized = normalizeSubmission(submission);
-    const existing = submissions.find((item) => sameProblem(item, normalized)) || {};
-    const syncedAt = normalized.syncedAt || new Date().toISOString();
-    const item = mergeSubmissionSolutions(existing, {
-      ...normalized,
-      solvedAt: existing.solvedAt || normalized.solvedAt || existing.syncedAt || syncedAt,
-      review: review || normalized.review || buildReview(normalized),
-      syncedAt,
-      commitUrl: result.url,
-      commitSha: result.sha
-    });
-    item.reviewDueAt = reviewDueAfterSync(item, syncedAt, studyIntervalDays(settings), settings.spacedRepetition !== false);
-    const next = [item, ...submissions.filter((stored) => !sameProblem(stored, item))].slice(0, 500);
-    await setLocal({ submissions: next, lastSubmission: item });
-    return item;
+export async function recordPush(submission, result, review, settings, existing = {}) {
+  const normalized = normalizeSubmission(submission);
+  const syncedAt = normalized.syncedAt || new Date().toISOString();
+  const item = mergeSubmissionSolutions(existing, {
+    ...normalized,
+    solvedAt: existing.solvedAt || normalized.solvedAt || existing.syncedAt || syncedAt,
+    review: review || normalized.review || buildReview(normalized),
+    syncedAt,
+    commitUrl: result.url || normalized.commitUrl,
+    commitSha: result.sha || normalized.commitSha
+  });
+  item.reviewDueAt = reviewDueAfterSync(item, syncedAt, studyIntervalDays(settings), settings.spacedRepetition !== false);
+  return item;
+}
+
+async function repositorySubmissions(accessToken, settings) {
+  return listSolutionFolders(accessToken, settings.owner, settings.repo, settings.branch);
+}
+
+function selectedSubmission(item, selected) {
+  const normalized = normalizeSubmission(selected);
+  const solution = submissionSolutions(item).find((candidate) => candidate.key === `${normalized.language.toLowerCase()}:${normalized.extension}`)
+    || submissionSolutions(item)[0];
+  return solution ? { ...item, ...solution, solutions: item.solutions } : item;
+}
+
+function notesFor(items) {
+  const notes = {};
+  for (const item of items) {
+    if (!item.notes) continue;
+    notes[item.id] = item.notes;
+    notes[`${item.number}-${item.slug}`] = item.notes;
+  }
+  return notes;
+}
+
+async function updateRepositoryReadme(accessToken, settings, submission, commitTemplate) {
+  return pushSubmission({
+    token: accessToken,
+    settings: { ...settings, includeReadme: true, includeProfile: false, commitTemplate },
+    submission,
+    review: submission.review
   });
 }
 
@@ -183,20 +235,26 @@ export async function handle(message) {
     case "GET_STATE": {
       const [{ settings }, local, usage] = await Promise.all([
         getSync("settings"),
-        getLocal(["submissions", "lastSubmission", "attempts", "submissionNotes", "leetrepoSessionToken"]),
+        getLocal(["attempts", "leetrepoSessionToken"]),
         hostedUsage()
       ]);
       const connected = hasCompletedOnboarding(settings, local.leetrepoSessionToken) && usage.authenticationRequired !== true;
       if (usage.authenticationRequired) {
         await clearDeviceAuthentication(chrome.storage);
       }
+      const normalizedSettings = normalizeSettings({ ...settings, connected });
+      const submissions = connected
+        ? await repositorySubmissions(await getGitHubAccessToken(), normalizedSettings)
+        : [];
+      const attempts = (local.attempts || []).map(compactAttempt);
+      if (JSON.stringify(attempts) !== JSON.stringify(local.attempts || [])) await setLocal({ attempts });
       const { authenticationRequired: _authenticationRequired, ...visibleUsage } = usage;
       return {
-        settings: normalizeSettings({ ...settings, connected }),
-        submissions: local.submissions || [],
-        attempts: local.attempts || [],
-        notes: local.submissionNotes || {},
-        lastSubmission: local.lastSubmission || null,
+        settings: normalizedSettings,
+        submissions,
+        attempts,
+        notes: notesFor(submissions),
+        lastSubmission: submissions[0] || null,
         ai: {
           available: connected,
           usage: visibleUsage,
@@ -218,15 +276,6 @@ export async function handle(message) {
       }
       const next = normalizeSettings({ ...requested, connected: hasCompletedOnboarding(requested, leetrepoSessionToken) });
       await setSync({ settings: settingsForSync(next, settings) });
-      const previousInterval = normalizeStudyInterval(settings.studyIntervalValue, settings.studyIntervalUnit);
-      if (previousInterval.value !== next.studyIntervalValue || previousInterval.unit !== next.studyIntervalUnit) {
-        await mutateLocal(async () => {
-          const { submissions = [], lastSubmission } = await getLocal(["submissions", "lastSubmission"]);
-          const nextSubmissions = submissions.map((item) => rescheduleFirstReview(item, studyIntervalDays(next)));
-          const nextLast = lastSubmission ? rescheduleFirstReview(lastSubmission, studyIntervalDays(next)) : lastSubmission;
-          await setLocal({ submissions: nextSubmissions, lastSubmission: nextLast });
-        });
-      }
       return { settings: next, ai: { available: next.connected } };
     }
     case "START_GITHUB_SIGN_IN": {
@@ -260,31 +309,11 @@ export async function handle(message) {
         throw new Error("Finish GitHub setup before backfilling.");
       }
       const imported = await listSolutionFolders(accessToken, settings.owner, settings.repo, settings.branch);
-      return mutateLocal(async () => {
-        const { submissions = [] } = await getLocal("submissions");
-        const next = submissions.slice();
-        let added = 0;
-        let updated = 0;
-        for (const importedItem of imported.map(normalizeSubmission)) {
-          const index = next.findIndex((existing) => sameProblem(existing, importedItem));
-          if (index === -1) {
-            next.push(mergeSubmissionSolutions({}, importedItem));
-            added += 1;
-          } else {
-            const merged = mergeSubmissionSolutions(next[index], importedItem);
-            if (JSON.stringify(merged) !== JSON.stringify(next[index])) updated += 1;
-            next[index] = merged;
-          }
-        }
-        next.sort((left, right) => (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0));
-        await setLocal({ submissions: next.slice(0, 500) });
-        return { imported: added, updated };
-      });
+      return { imported: imported.length, updated: 0, submissions: imported };
     }
     case "PUSH_SUBMISSION": {
-      const [accessToken, { submissions = [], submissionNotes = {} }, { settings }, { leetrepoSessionToken }] = await Promise.all([
+      const [accessToken, { settings }, { leetrepoSessionToken }] = await Promise.all([
         getGitHubAccessToken(),
-        getLocal(["submissions", "submissionNotes"]),
         getSync("settings"),
         getLocal("leetrepoSessionToken")
       ]);
@@ -299,25 +328,30 @@ export async function handle(message) {
         submission
       });
       if (pushesInFlight.has(pushKey)) return pushesInFlight.get(pushKey);
-      const task = (async () => {
-        const existing = submissions.find((item) => sameProblem(item, submission));
+      const task = mutateRepository(async () => {
+        const submissions = await repositorySubmissions(accessToken, normalizedSettings);
+        const existing = submissions.find((item) => sameProblem(item, submission)) || {};
         submission.syncedAt = new Date().toISOString();
         submission.solvedAt = existing?.solvedAt || existing?.syncedAt || submission.syncedAt;
-        submission.notes = submission.notes || submissionNotes[submission.id] || "";
-        const cachedReview = normalizedSettings.aiEnabled ? reusableGeneratedReview(existing, submission) : null;
+        submission.notes = submission.notes || existing.notes || "";
+        const cachedReview = submission.review?.generatedBy
+          ? submission.review
+          : normalizedSettings.aiEnabled ? reusableGeneratedReview(existing, submission) : null;
         const explanation = cachedReview
           ? { review: cachedReview, ai: { generated: false, reused: true } }
           : await explanationFor(normalizedSettings, submission);
+        const prepared = await recordPush(submission, {}, explanation.review, normalizedSettings, existing);
         const result = await pushSubmission({
           token: accessToken,
           settings: normalizedSettings,
-          submission,
-          review: explanation.review,
+          submission: prepared,
+          review: prepared.review,
           profileItems: submissions
         });
         await recordAttempt(submission);
-        return { result, submission: await recordPush(submission, result, explanation.review, normalizedSettings), ai: explanation.ai };
-      })();
+        const stored = await recordPush(prepared, result, prepared.review, normalizedSettings, existing);
+        return { result, submission: stored, ai: explanation.ai };
+      });
       pushesInFlight.set(pushKey, task);
       try {
         return await task;
@@ -326,27 +360,39 @@ export async function handle(message) {
       }
     }
     case "GENERATE_FEEDBACK": {
-      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
+      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([
+        getSync("settings"),
+        getLocal("leetrepoSessionToken")
+      ]);
       if (!hasCompletedOnboarding(settings, leetrepoSessionToken)) throw new Error("Finish GitHub setup first.");
+      const accessToken = await getGitHubAccessToken();
+      if (!accessToken) throw new Error("Finish GitHub setup first.");
       const normalizedSettings = normalizeSettings(settings);
       const explanation = await explanationFor({ ...normalizedSettings, includeReadme: true }, message.submission);
       const review = explanation.review || buildReview(message.submission);
       const normalized = normalizeSubmission(message.submission);
-      let updatedSubmission = null;
-      await mutateLocal(async () => {
-        const { submissions = [], lastSubmission } = await getLocal(["submissions", "lastSubmission"]);
-        if (!submissions.some((item) => sameProblem(item, normalized))) return;
-        const next = submissions.map((item) => {
-          if (!sameProblem(item, normalized)) return item;
-          updatedSubmission = mergeSubmissionSolutions(item, { ...normalized, review });
-          return updatedSubmission;
-        });
-        const nextLast = lastSubmission && sameProblem(lastSubmission, normalized)
-          ? mergeSubmissionSolutions(lastSubmission, { ...normalized, review })
-          : lastSubmission;
-        await setLocal({ submissions: next, lastSubmission: nextLast });
+      return mutateRepository(async () => {
+        const submissions = await repositorySubmissions(accessToken, normalizedSettings);
+        const existing = submissions.find((item) => sameProblem(item, normalized));
+        if (!existing) {
+          return { review, submission: { ...normalized, review }, persisted: false, ai: explanation.ai };
+        }
+        const merged = mergeSubmissionSolutions(existing, { ...normalized, review });
+        const updatedSubmission = selectedSubmission(merged, normalized);
+        const result = await updateRepositoryReadme(
+          accessToken,
+          normalizedSettings,
+          updatedSubmission,
+          "docs: update {number}. {title} feedback"
+        );
+        return {
+          review,
+          result,
+          submission: { ...updatedSubmission, commitUrl: result.url, commitSha: result.sha },
+          persisted: true,
+          ai: explanation.ai
+        };
       });
-      return { review, submission: updatedSubmission, ai: explanation.ai };
     }
     case "RECORD_ATTEMPT": {
       const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
@@ -356,41 +402,57 @@ export async function handle(message) {
       return { attempt: await recordAttempt(message.submission) };
     }
     case "SAVE_NOTES": {
-      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
+      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([
+        getSync("settings"),
+        getLocal("leetrepoSessionToken")
+      ]);
       if (!hasCompletedOnboarding(settings, leetrepoSessionToken)) throw new Error("Finish GitHub setup first.");
+      const accessToken = await getGitHubAccessToken();
+      if (!accessToken) throw new Error("Finish GitHub setup first.");
+      const normalizedSettings = normalizeSettings(settings);
       const normalized = normalizeSubmission({ ...message.submission, notes: message.notes });
-      return mutateLocal(async () => {
-        const { submissions = [], lastSubmission, submissionNotes = {} } = await getLocal(["submissions", "lastSubmission", "submissionNotes"]);
-        const next = submissions.map((item) => sameProblem(item, normalized) ? { ...item, notes: normalized.notes } : item);
-        const nextLast = lastSubmission && sameProblem(lastSubmission, normalized) ? { ...lastSubmission, notes: normalized.notes } : lastSubmission;
-        await setLocal({ submissions: next, lastSubmission: nextLast, submissionNotes: {
-          ...submissionNotes,
-          [normalized.id]: normalized.notes,
-          [`${normalized.number}-${normalized.slug}`]: normalized.notes
-        } });
-        return { notes: normalized.notes };
+      return mutateRepository(async () => {
+        const submissions = await repositorySubmissions(accessToken, normalizedSettings);
+        const existing = submissions.find((item) => sameProblem(item, normalized));
+        if (!existing) return { notes: normalized.notes, persisted: false };
+        const updatedSubmission = selectedSubmission({ ...existing, notes: normalized.notes }, normalized);
+        const result = await updateRepositoryReadme(
+          accessToken,
+          normalizedSettings,
+          updatedSubmission,
+          "docs: update {number}. {title} notes"
+        );
+        return { notes: normalized.notes, submission: updatedSubmission, result, persisted: true };
       });
     }
     case "SNOOZE_REVIEW":
     case "MARK_REVIEWED":
     case "RATE_REVIEW": {
-      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([getSync("settings"), getLocal("leetrepoSessionToken")]);
+      const [{ settings }, { leetrepoSessionToken }] = await Promise.all([
+        getSync("settings"),
+        getLocal("leetrepoSessionToken")
+      ]);
       if (!hasCompletedOnboarding(settings, leetrepoSessionToken)) throw new Error("Finish GitHub setup first.");
       if (settings?.spacedRepetition === false) throw new Error("Turn on spaced repetition in Settings to schedule reviews.");
+      const accessToken = await getGitHubAccessToken();
+      if (!accessToken) throw new Error("Finish GitHub setup first.");
       const id = String(message.id || "");
-      return mutateLocal(async () => {
-        const { submissions = [] } = await getLocal("submissions");
+      const normalizedSettings = normalizeSettings(settings);
+      return mutateRepository(async () => {
+        const submissions = await repositorySubmissions(accessToken, normalizedSettings);
+        const existing = submissions.find((item) => item.id === id);
+        if (!existing) throw new Error("That review is no longer in your study queue.");
         const now = new Date();
-        let updatedSubmission = null;
-        const next = submissions.map((item) => {
-          if (item.id !== id) return item;
-          updatedSubmission = message.type === "SNOOZE_REVIEW"
-            ? snoozeReview(item, now, 3)
-            : scheduleReview(item, message.type === "MARK_REVIEWED" ? "good" : message.rating, now, studyIntervalDays(settings));
-          return updatedSubmission;
-        });
-        if (!updatedSubmission) throw new Error("That review is no longer in your study queue.");
-        await setLocal({ submissions: next });
+        const updatedSubmission = message.type === "SNOOZE_REVIEW"
+          ? snoozeReview(existing, now, 3)
+          : scheduleReview(existing, message.type === "MARK_REVIEWED" ? "good" : message.rating, now, studyIntervalDays(settings));
+        await updateRepositoryReadme(
+          accessToken,
+          normalizedSettings,
+          updatedSubmission,
+          "docs: update {number}. {title} study progress"
+        );
+        const next = submissions.map((item) => item.id === id ? updatedSubmission : item);
         return { submissions: next, submission: updatedSubmission };
       });
     }
@@ -406,11 +468,11 @@ export async function handle(message) {
       if (accountDeletionInProgress) throw new Error("Account deletion is already in progress.");
       accountDeletionInProgress = true;
       try {
+        await Promise.allSettled([localMutationQueue, repositoryMutationQueue]);
         const { leetrepoSessionToken } = await getLocal("leetrepoSessionToken");
         if (leetrepoSessionToken) {
           await hostedRequest("/v1/account", { method: "DELETE", sessionToken: leetrepoSessionToken });
         }
-        await localMutationQueue;
         await clearLeetRepoStorage(chrome.storage);
         return { ok: true };
       } finally {

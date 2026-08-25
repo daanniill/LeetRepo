@@ -4,7 +4,7 @@ import { applyTheme, logo, send, setBusy, showNotice } from "../../shared/client
 
 document.querySelector("#logo").innerHTML = logo();
 const notice = document.querySelector("#notice");
-const toggleKeys = ["autoPush", "includeReadme", "includeStats", "includeLink", "includeNotes", "includeProfile", "spacedRepetition", "aiEnabled"];
+const toggleKeys = ["autoPush", "includeStats", "includeLink", "includeNotes", "includeProfile", "spacedRepetition", "aiEnabled"];
 const intervalMaximums = { days: 365, weeks: 52, months: 12 };
 
 function syncStudyIntervalControls({ clamp = false } = {}) {

@@ -1,4 +1,4 @@
-import { buildProfileReadme, buildReadme, folderFor, formatCommit, languageFolderFor, normalizeSubmission, sameProblem } from "./submissions.js";
+import { buildProfileReadme, buildReadme, folderFor, formatCommit, languageFolderFor, normalizeSubmission, parseReadmeData, sameProblem, submissionSolutions } from "./submissions.js";
 import { assertSafeGitHubAppPermissions } from "./github-permissions.js";
 
 const API = "https://api.github.com";
@@ -61,26 +61,30 @@ export async function repoInfo(token, owner, repo) {
   return request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
 }
 
-function difficultyFromReadme(blob = {}) {
-  if (blob.encoding !== "base64" || typeof blob.content !== "string") return "Unknown";
+function textFromBlob(blob = {}) {
+  if (blob.encoding !== "base64" || typeof blob.content !== "string") return "";
   try {
     const binary = atob(blob.content.replace(/\s/g, ""));
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    const readme = new TextDecoder().decode(bytes);
-    const match = readme.match(/^\s*-\s+\*\*Difficulty:\*\*\s+(Easy|Medium|Hard)\s*$/im);
-    return match ? match[1][0].toUpperCase() + match[1].slice(1).toLowerCase() : "Unknown";
+    return new TextDecoder().decode(bytes);
   } catch {
-    return "Unknown";
+    return "";
   }
 }
 
 export async function listSolutionFolders(token, owner, repo, branch = "") {
   const info = await repoInfo(token, owner, repo);
   const selectedBranch = branch || info.default_branch || "main";
-  const tree = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(selectedBranch)}?recursive=1`);
+  let tree;
+  try {
+    tree = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(selectedBranch)}?recursive=1`);
+  } catch (error) {
+    if (isEmptyRepoError(error)) return [];
+    throw error;
+  }
   if (tree.truncated) throw new Error("This repository is too large to backfill safely in one request.");
   const entries = tree.tree || [];
-  const difficultyByFolder = new Map();
+  const readmeByFolder = new Map();
   const readmes = entries.flatMap((entry) => {
     const match = entry.type === "blob" && entry.path.match(/^(\d{4,}-[^/]+)\/README\.md$/i);
     return match && entry.sha ? [{ folder: match[1], sha: entry.sha }] : [];
@@ -88,7 +92,8 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
   for (let index = 0; index < readmes.length; index += 10) {
     await Promise.all(readmes.slice(index, index + 10).map(async (readme) => {
       const blob = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs/${encodeURIComponent(readme.sha)}`);
-      difficultyByFolder.set(readme.folder, difficultyFromReadme(blob));
+      const parsed = parseReadmeData(textFromBlob(blob));
+      if (parsed) readmeByFolder.set(readme.folder, parsed);
     }));
   }
   const languages = {
@@ -101,18 +106,36 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
     const match = entry.type === "blob" && entry.path.match(/^(\d{4,})-([^/]+)\/(?:(?:([^/]+)\/)?solution\.([A-Za-z0-9]+))$/);
     if (!match) return [];
     const [, number, slug, languageFolder, extension] = match;
+    const folder = `${number}-${slug}`;
+    const readme = readmeByFolder.get(folder);
+    const language = languages[languageFolder?.toLowerCase()] || languages[extension.toLowerCase()] || extension.toUpperCase();
+    const stored = readme && submissionSolutions(readme).find((solution) => (
+      solution.path === entry.path
+      || (solution.language.toLowerCase() === language.toLowerCase() && solution.extension === extension.toLowerCase())
+    ));
+    const { solutions: _solutions, ...problem } = readme || {};
     return [{
+      ...problem,
+      ...(stored || {}),
       number: String(Number(number)),
-      title: slug.split("-").map((part) => part ? part[0].toUpperCase() + part.slice(1) : "").join(" "),
+      title: readme?.title || slug.split("-").map((part) => part ? part[0].toUpperCase() + part.slice(1) : "").join(" "),
       slug,
-      difficulty: difficultyByFolder.get(`${number}-${slug}`) || "Unknown",
-      language: languages[languageFolder?.toLowerCase()] || languages[extension.toLowerCase()] || extension.toUpperCase(),
+      difficulty: readme?.difficulty || "Unknown",
+      language,
       extension: extension.toLowerCase(),
       path: entry.path,
+      blobSha: entry.sha || "",
       status: "Accepted",
       commitUrl: `https://github.com/${owner}/${repo}/tree/${encodeURIComponent(selectedBranch)}/${number}-${slug}${languageFolder ? `/${encodeURIComponent(languageFolder)}` : ""}`
     }];
   });
+  for (let index = 0; index < solutions.length; index += 10) {
+    await Promise.all(solutions.slice(index, index + 10).map(async (solution) => {
+      if (solution.code || !solution.blobSha) return;
+      const blob = await request(token, `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs/${encodeURIComponent(solution.blobSha)}`);
+      solution.code = textFromBlob(blob).trimEnd();
+    }));
+  }
   const grouped = new Map();
   for (const solution of solutions) {
     const key = solution.number;
@@ -125,6 +148,7 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
       const latest = commits[0];
       solution.syncedAt = latest?.commit?.committer?.date || latest?.commit?.author?.date || null;
       solution.commitSha = latest?.sha || "";
+      delete solution.blobSha;
     }));
   }
   return [...grouped.values()].map((items) => {
@@ -133,8 +157,9 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
       return dateDifference || left.path.localeCompare(right.path);
     });
     const latest = variants[0];
-    return { ...latest, solutions: variants };
-  });
+    const readme = readmeByFolder.get(`${String(latest.number).padStart(4, "0")}-${latest.slug}`);
+    return normalizeSubmission({ ...(readme || {}), ...latest, solutions: variants });
+  }).sort((left, right) => (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0));
 }
 
 async function createBlob(token, owner, repo, content) {
@@ -222,10 +247,8 @@ export async function pushSubmission({ token, settings, submission, review, prof
   const readmePath = `${folder}/README.md`;
   const solution = await createBlob(token, owner, repo, `${item.code}\n`);
   const entries = [{ path: solutionPath, mode: "100644", type: "blob", sha: solution.sha }];
-  if (settings.includeReadme !== false) {
-    const readme = await createBlob(token, owner, repo, buildReadme(item, settings, review));
-    entries.push({ path: readmePath, mode: "100644", type: "blob", sha: readme.sha });
-  }
+  const readme = await createBlob(token, owner, repo, buildReadme(item, settings, review));
+  entries.push({ path: readmePath, mode: "100644", type: "blob", sha: readme.sha });
   if (settings.includeProfile === true) {
     const history = [
       { ...item, syncedAt: item.syncedAt || new Date().toISOString(), review: review || item.review },

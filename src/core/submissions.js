@@ -188,6 +188,7 @@ function normalizeSolution(input = {}, fallback = {}) {
     path,
     language,
     extension,
+    difficulty: ["Easy", "Medium", "Hard"].includes(input.difficulty) ? input.difficulty : fallback.difficulty || "Unknown",
     code: String(input.code || "").trimEnd(),
     runtime: String(input.runtime || "—"),
     memory: String(input.memory || "—"),
@@ -498,9 +499,133 @@ function inlineCode(value) {
 }
 
 const BROAD_STUDY_TOPICS = new Set(["Array", "String", "Math", "Matrix", "Simulation", "Sorting"]);
+const README_DATA_START = "<!-- leetrepo:data:v1";
+const README_DATA_END = "leetrepo:data:end -->";
+
+function utf8Base64(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function base64Utf8(value) {
+  const binary = atob(value);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function readmeSubmission(input, suppliedReview) {
+  const item = normalizeSubmission({
+    ...input,
+    review: suppliedReview || input?.review || null
+  });
+  const folder = folderFor(item);
+  const solutions = submissionSolutions(item).map((solution) => ({
+    ...solution,
+    path: solution.path || `${folder}/${languageFolderFor(solution)}/solution.${solution.extension}`
+  }));
+  const current = solutions.find((solution) => solution.key === `${item.language.toLowerCase()}:${item.extension}`) || solutions[0];
+  return {
+    ...item,
+    ...(current || {}),
+    id: item.id,
+    number: item.number,
+    title: item.title,
+    slug: item.slug,
+    difficulty: item.difficulty,
+    tags: item.tags,
+    url: item.url,
+    problemDescription: item.problemDescription,
+    problemContext: item.problemContext,
+    examples: item.examples,
+    exampleInput: item.exampleInput,
+    exampleOutput: item.exampleOutput,
+    constraints: item.constraints,
+    hints: item.hints,
+    followUp: item.followUp,
+    notes: item.notes,
+    reviewDueAt: item.reviewDueAt,
+    lastReviewedAt: item.lastReviewedAt,
+    reviewIntervalDays: item.reviewIntervalDays,
+    reviewCount: item.reviewCount,
+    reviewLapses: item.reviewLapses,
+    lastReviewRating: item.lastReviewRating,
+    reviewEvents: item.reviewEvents,
+    solutions
+  };
+}
+
+export function buildReadmeData(input, suppliedReview) {
+  const payload = JSON.stringify({ version: 1, submission: readmeSubmission(input, suppliedReview) });
+  return `${README_DATA_START}\n${utf8Base64(payload)}\n${README_DATA_END}`;
+}
+
+function section(markdown, heading) {
+  const match = String(markdown || "").match(new RegExp(`^## ${heading}\\s*$([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, "im"));
+  return match?.[1]?.trim() || "";
+}
+
+function legacyReadmeData(markdown) {
+  const heading = String(markdown || "").match(/^#\s+(\d+)\.\s+(.+)$/m);
+  if (!heading) return null;
+  const metadata = section(markdown, "Solution metadata");
+  const field = (name) => metadata.match(new RegExp(`^\\s*-\\s+\\*\\*${name}:\\*\\*\\s+(.+)$`, "im"))?.[1]?.trim() || "";
+  const solved = field("Solved");
+  const solvedAt = solved && !Number.isNaN(Date.parse(solved.replace(/ UTC$/, "Z")))
+    ? new Date(solved.replace(/ UTC$/, "Z")).toISOString()
+    : null;
+  const problemDescription = section(markdown, "Problem description")
+    .replace(/^>\s+Problem details captured[^\n]*\n?/i, "")
+    .trim();
+  const interview = section(markdown, "Interview overview");
+  const summary = interview
+    .replace(/^>[^\n]*\n?/i, "")
+    .split(/^### /m)[0]
+    .trim();
+  const approach = interview.match(/^### Approach\s*$([\s\S]*?)(?=^### |(?![\s\S]))/im)?.[1]
+    ?.match(/^\s*\d+\.\s+(.+)$/gm)
+    ?.map((line) => line.replace(/^\s*\d+\.\s+/, "").trim()) || [];
+  const time = interview.match(/^\s*-\s+\*\*Time:\*\*\s+(.+)$/im)?.[1]?.trim() || "";
+  const space = interview.match(/^\s*-\s+\*\*Space:\*\*\s+(.+)$/im)?.[1]?.trim() || "";
+  const edgeCases = interview.match(/^### Edge cases\s*$([\s\S]*?)(?=^### |(?![\s\S]))/im)?.[1]
+    ?.match(/^\s*-\s+(.+)$/gm)
+    ?.map((line) => line.replace(/^\s*-\s+/, "").trim()) || [];
+  const generatedBy = interview.match(/_AI-generated with ([^;_]+)[;_]/i)?.[1]?.trim() || "";
+  const review = summary || approach.length || time || space || edgeCases.length
+    ? { summary, approach, complexity: { time, space }, edgeCases, generatedBy }
+    : null;
+  return normalizeSubmission({
+    number: heading[1],
+    title: heading[2].trim(),
+    difficulty: field("Difficulty"),
+    tags: field("Topics").split(",").map((tag) => tag.trim()).filter(Boolean),
+    language: field("Language"),
+    runtime: field("Runtime"),
+    memory: field("Memory"),
+    solvedAt,
+    url: String(markdown || "").match(/\[View problem on LeetCode\]\((https:\/\/[^)]+)\)/i)?.[1] || "",
+    problemDescription,
+    problemContext: problemDescription,
+    notes: section(markdown, "Personal notes"),
+    review
+  });
+}
+
+export function parseReadmeData(markdown) {
+  const tagged = String(markdown || "").match(/<!--\s*leetrepo:data:v1\s*\n([A-Za-z0-9+/=\r\n]+?)\nleetrepo:data:end\s*-->/i);
+  if (!tagged) return legacyReadmeData(markdown);
+  try {
+    const value = JSON.parse(base64Utf8(tagged[1].replace(/\s/g, "")));
+    if (value?.version !== 1 || !value.submission || typeof value.submission !== "object") return null;
+    return readmeSubmission(value.submission, value.submission.review);
+  } catch {
+    return null;
+  }
+}
 
 export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedReview) {
-  const item = normalizeSubmission(submission);
+  const item = readmeSubmission(submission, suppliedReview);
   const lines = [`# ${item.number}. ${item.title}`, ""];
   if (settings.includeLink !== false && item.url) lines.push(`[View problem on LeetCode](${item.url})`, "");
   lines.push("## Solution metadata", "");
@@ -510,6 +635,10 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
   if (solvedAt) lines.push(`- **Solved:** ${solvedAt}`);
   if (settings.includeStats !== false) lines.push(`- **Runtime:** ${item.runtime}`, `- **Memory:** ${item.memory}`);
   lines.push(`- **Solution:** [${item.language}](./${languageFolderFor(item)}/solution.${item.extension})`);
+  const otherSolutions = item.solutions.filter((solution) => solution.key !== `${item.language.toLowerCase()}:${item.extension}`);
+  for (const solution of otherSolutions) {
+    lines.push(`- **Solution (${solution.language}):** [${solution.language}](./${languageFolderFor(solution)}/solution.${solution.extension})`);
+  }
 
   const problemDescription = item.problemDescription || item.problemContext;
   if (problemDescription) {
@@ -541,7 +670,7 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
     lines.push("", "</details>");
   }
 
-  if (settings.aiEnabled === true && suppliedReview) {
+  if (suppliedReview && (settings.aiEnabled === true || suppliedReview.generatedBy)) {
     const review = suppliedReview;
     lines.push("", "## Interview overview", "", "> Generated from the submitted solution and the official problem details above. Verify AI analysis before relying on it.", "");
     if (review.summary) lines.push(review.summary, "");
@@ -562,8 +691,9 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
       review.edgeCases.forEach((edgeCase) => lines.push(`- ${edgeCase}`));
     }
     if (review.generatedBy) lines.push("", `_AI-generated with ${review.generatedBy}; verify the analysis before relying on it._`);
-    if (settings.includeNotes !== false && item.notes) lines.push("", "## Personal notes", "", item.notes);
   }
+
+  if (settings.includeNotes !== false && item.notes) lines.push("", "## Personal notes", "", item.notes);
 
   const studyTopic = item.tags.find((topic) => !BROAD_STUDY_TOPICS.has(topic)) || item.tags[0];
   lines.push(
@@ -578,7 +708,7 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
     "4. Derive the time and space complexity from the implementation.",
     "5. Name an edge case that would break a weaker approach."
   );
-  lines.push("", "---", "_Synced by [LeetRepo](https://github.com/)_");
+  lines.push("", "---", "_Synced by [LeetRepo](https://github.com/)_", "", buildReadmeData(item, suppliedReview));
   return lines.join("\n");
 }
 
