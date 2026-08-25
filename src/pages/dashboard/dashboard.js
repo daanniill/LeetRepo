@@ -189,11 +189,12 @@ async function saveDetailNote(item, notes, button) {
   try {
     await send("SAVE_NOTES", { submission: item, notes });
     state.submissions = state.submissions.map((stored) => stored.id === item.id ? { ...stored, notes } : stored);
+    button.textContent = "Note saved";
+    delete button.dataset.label;
     showToast(notes.trim() ? "Personal note saved." : "Personal note cleared.");
   } catch (error) {
-    showToast(error.message);
-  } finally {
     setBusy(button, false);
+    showToast(error.message);
   }
 }
 

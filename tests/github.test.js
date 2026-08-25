@@ -63,7 +63,7 @@ test("listSolutionFolders imports every solution with its latest commit metadata
   assert.equal(items[0].syncedAt, "2026-08-07T10:00:00.000Z");
   assert.deepEqual(items[0].solutions.map((solution) => solution.language), ["C++", "Python3"]);
   assert.deepEqual(items[0].solutions.map((solution) => solution.difficulty), ["Easy", "Easy"]);
-  assert.equal(items[0].solutions[0].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum/cpp");
+  assert.equal(items[0].solutions[0].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum");
   assert.equal(items[1].title, "Add Two Numbers");
   assert.equal(items[1].difficulty, "Unknown");
   assert.equal(items[1].syncedAt, "2026-08-05T10:00:00.000Z");
@@ -170,7 +170,7 @@ test("pushSubmission builds one tree and advances one branch ref", async (t) => 
   assert.deepEqual(calls[8].body.parents, ["parent-sha"]);
   assert.equal(calls[9].init.method, "PATCH");
   assert.equal(calls[9].body.sha, "new-commit");
-  assert.equal(result.url, "https://github.com/alex-c/solutions/commit/new-commit");
+  assert.equal(result.url, "https://github.com/alex-c/solutions/tree/main/0001-two-sum");
   assert.equal(result.updated, false);
 });
 
@@ -402,7 +402,7 @@ test("pushSubmission treats a matching competing branch update as success", asyn
   });
 
   assert.equal(result.sha, "landed-commit");
-  assert.equal(result.url, "https://github.com/alex-c/solutions/commit/landed-commit");
+  assert.equal(result.url, "https://github.com/alex-c/solutions/tree/main/0001-two-sum");
   assert.equal(calls.filter((call) => call.url.endsWith("/git/commits") && call.init.method === "POST").length, 1);
   assert.equal(calls.filter((call) => call.url.includes("/git/refs/heads/") && call.init.method === "PATCH").length, 1);
   assert.equal(calls.length, 13);

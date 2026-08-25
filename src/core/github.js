@@ -126,7 +126,7 @@ export async function listSolutionFolders(token, owner, repo, branch = "") {
       path: entry.path,
       blobSha: entry.sha || "",
       status: "Accepted",
-      commitUrl: `https://github.com/${owner}/${repo}/tree/${encodeURIComponent(selectedBranch)}/${number}-${slug}${languageFolder ? `/${encodeURIComponent(languageFolder)}` : ""}`
+      commitUrl: `https://github.com/${owner}/${repo}/tree/${encodeURIComponent(selectedBranch)}/${number}-${slug}`
     }];
   });
   for (let index = 0; index < solutions.length; index += 10) {
@@ -241,6 +241,7 @@ export async function pushSubmission({ token, settings, submission, review, prof
   }
   let parentCommit = await request(token, `/repos/${owner}/${repo}/git/commits/${parentSha}`);
   const folder = folderFor(item);
+  const problemUrl = `https://github.com/${settings.owner}/${settings.repo}/tree/${encodeURIComponent(branch)}/${folder}`;
   const languageFolder = languageFolderFor(item);
   let previousTree = await repositoryTree(token, owner, repo, parentCommit.tree.sha);
   const solutionPath = `${folder}/${languageFolder}/solution.${item.extension}`;
@@ -262,7 +263,7 @@ export async function pushSubmission({ token, settings, submission, review, prof
     if (treeContainsEntries(previousTree, entries)) {
       return {
         sha: parentSha,
-        url: `https://github.com/${settings.owner}/${settings.repo}/commit/${parentSha}`,
+        url: problemUrl,
         branch,
         updated: updatesExistingSolution
       };
@@ -288,7 +289,7 @@ export async function pushSubmission({ token, settings, submission, review, prof
       });
       return {
         sha: commit.sha,
-        url: `https://github.com/${settings.owner}/${settings.repo}/commit/${commit.sha}`,
+        url: problemUrl,
         branch,
         updated: updatesExistingSolution
       };
