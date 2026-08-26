@@ -1,4 +1,5 @@
 import { calculateStreak, relativeTime } from "../../core/submissions.js";
+import { buildStudyQueue, studyIntervalDays } from "../../core/study.js";
 import { currentSubmission, difficultyClass, escapeHtml, logo, send, setBusy, showNotice } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
@@ -23,6 +24,19 @@ async function init() {
   submission = await currentSubmission();
   renderState();
   renderSubmission();
+  renderStudyCta();
+}
+
+function renderStudyCta() {
+  const cta = document.querySelector("#study-cta");
+  const enabled = state.settings.spacedRepetition !== false;
+  const dueCount = enabled
+    ? buildStudyQueue(state.submissions, new Date(), studyIntervalDays(state.settings)).due.length
+    : 0;
+  cta.hidden = dueCount === 0;
+  if (dueCount === 0) return;
+  document.querySelector("#study-cta-count").textContent = dueCount;
+  document.querySelector("#study-cta-label").textContent = dueCount === 1 ? "review due" : "reviews due";
 }
 
 function renderState() {
@@ -68,11 +82,14 @@ pushButton.addEventListener("click", async () => {
       ? `${pushed} ${response.ai.warning}`
       : response.ai?.generated
         ? `${pushed} A ${response.ai.providerLabel || "provider"}-generated explanation was added.`
-        : `${pushed} Your GitHub commit is ready.`;
+        : response.ai?.reused
+          ? `${pushed} The existing AI explanation was reused without another request.`
+          : `${pushed} Your GitHub commit is ready.`;
     showNotice(notice, message);
     state = await send("GET_STATE");
     renderState();
     renderSubmission();
+    renderStudyCta();
   } catch (error) {
     showNotice(notice, error.message, true);
   } finally {
@@ -80,6 +97,8 @@ pushButton.addEventListener("click", async () => {
     renderSubmission();
   }
 });
+
+document.querySelector("#study-cta-button").addEventListener("click", () => send("OPEN_DASHBOARD", { view: "study" }));
 
 document.querySelector("#auto-push").addEventListener("change", async (event) => {
   await send("SAVE_SETTINGS", { settings: { autoPush: event.target.checked } });

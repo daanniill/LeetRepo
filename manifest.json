@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LeetRepo Lite",
-  "version": "2.0.0",
+  "version": "2.0.4",
   "description": "Local-first LeetCode solution sync, analytics, and study tools with user-supplied GitHub and AI tokens.",
   "permissions": ["storage", "clipboardWrite"],
   "host_permissions": [
@@ -37,7 +37,7 @@
   "content_scripts": [
     {
       "matches": ["https://leetcode.com/problems/*", "https://www.leetcode.com/problems/*"],
-      "js": ["src/content/language.js", "src/content/problem.js", "src/content/content.js"],
+      "js": ["src/content/language.js", "src/content/problem.js", "src/content/attempt.js", "src/content/content.js"],
       "css": ["src/content/content.css"],
       "run_at": "document_idle"
     }

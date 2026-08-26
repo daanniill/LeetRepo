@@ -22,10 +22,10 @@ LeetRepo Lite is a local-first Chrome/Chromium extension that saves Accepted Lee
 
 ## How it works
 
-1. LeetRepo Lite detects the current LeetCode problem, language, code, result, and available performance metrics.
-2. A fresh Accepted result can be pushed from the page panel or toolbar popup, or synced automatically.
-3. The extension commits the solution and README directly to the selected GitHub repository with your token.
-4. Local history powers the Problems, Activity, and Study views without a LeetRepo server.
+1. **Solve a problem on LeetCode.** LeetRepo Lite detects the problem, language, code, result, and available performance metrics.
+2. **Confirm the solution.** Push from the page panel or toolbar popup, or enable automatic pushes for newly Accepted submissions.
+3. **Sync one clean commit.** The extension commits the solution and tagged README directly to the selected GitHub repository with your token, without changing unrelated files.
+4. **Review it later.** The dashboard rebuilds your library, notes, and study state from GitHub READMEs; compact attempt events remain on this device.
 
 A synced problem looks like this:
 
@@ -40,11 +40,13 @@ A synced problem looks like this:
 
 ## Dashboard
 
+The generated README includes a hidden, versioned LeetRepo data tag containing the problem, solution variants, explanations, notes, and study state needed by the dashboard and repository backfill. Its rendered Markdown stays human-readable. Solving the same problem in another language updates its existing folder while preserving the original solved time.
+
 ![LeetRepo Lite solution library with synced problems and AI overviews](.github/readme-assets/solution-library.png)
 
 ### Problems
 
-Search and filter the solution library, inspect every language variant, edit local notes, and jump back to LeetCode or GitHub.
+Search and filter the solution library, inspect every language variant, edit GitHub-backed notes, and jump back to LeetCode or GitHub.
 
 ### Activity
 
@@ -106,10 +108,10 @@ Custom remote endpoints request an additional Chrome host permission when saved.
 ## Privacy and safety
 
 - GitHub and AI credentials stay in local extension storage and are sent only to the configured services.
-- Submission history, notes, settings, and study schedules stay in the browser profile.
+- Credentials, settings, AI usage, and compact attempt events stay in the browser profile; solution history, notes, and study schedules live in tagged GitHub READMEs.
 - Repository-profile generation is opt-in because it replaces the destination repository's root `README.md`.
 - Before moving a branch, LeetRepo Lite reads the proposed tree back and stops unless existing files are preserved.
-- Repository backfill is read-only and rebuilds the local dashboard from matching solution folders.
+- Repository refresh is read-only and rebuilds the dashboard from tagged problem READMEs and solution folders.
 - **Clear all local data** removes credentials, preferences, history, notes, and review state without changing GitHub repositories.
 
 Read the [Privacy Notice](PRIVACY.md), [Terms and Conditions](TERMS.md), and [Security Policy](SECURITY.md) for more detail.
@@ -144,7 +146,6 @@ src/
 tests/                   Node.js tests
 manifest.json            Extension entry point and permissions
 ```
-
 ## License
 
 LeetRepo Lite is available under the [MIT License](LICENSE).

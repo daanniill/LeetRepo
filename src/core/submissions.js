@@ -1,3 +1,5 @@
+import { MAX_REVIEW_EVENTS, REVIEW_RATINGS } from "./study.js";
+
 export { dueForReview, reviewDueAt } from "./study.js";
 
 export const DEFAULT_SETTINGS = {
@@ -25,6 +27,7 @@ export const DEFAULT_SETTINGS = {
 };
 
 export const THEME_IDS = ["system", "light", "dark", "teal"];
+export const MAX_AI_CODE_CHARACTERS = 24_000;
 
 export function normalizeTheme(value) {
   return THEME_IDS.includes(value) ? value : DEFAULT_SETTINGS.theme;
@@ -66,16 +69,56 @@ export function slugify(value = "") {
     .replace(/^-+|-+$/g, "") || "problem";
 }
 
+function boundedText(value, maxLength) {
+  return String(value || "").replace(/\r/g, "").trim().slice(0, maxLength);
+}
+
+function boundedList(value, maxItems, maxLength) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((item) => boundedText(item, maxLength)).filter(Boolean))].slice(0, maxItems);
+}
+
+function normalizeProblemExamples(value) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((example) => {
+    if (!example || typeof example !== "object" || Array.isArray(example)) return [];
+    const input = boundedText(example.input, 1_500);
+    const output = boundedText(example.output, 1_500);
+    if (!input || !output) return [];
+    return [{ input, output, explanation: boundedText(example.explanation, 1_500) }];
+  }).slice(0, 4);
+}
+
+function normalizeReviewEvents(value) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((event) => {
+    if (!event || typeof event !== "object") return [];
+    const ratedAt = new Date(event.ratedAt);
+    if (Number.isNaN(ratedAt.getTime())) return [];
+    if (!REVIEW_RATINGS.includes(event.rating)) return [];
+    const intervalDaysAfter = Number(event.intervalDaysAfter);
+    if (!Number.isFinite(intervalDaysAfter) || intervalDaysAfter <= 0) return [];
+    return [{ ratedAt: ratedAt.toISOString(), rating: event.rating, intervalDaysAfter: Math.floor(intervalDaysAfter) }];
+  }).slice(-MAX_REVIEW_EVENTS);
+}
+
 export function normalizeSubmission(input = {}) {
   const number = String(input.number || "0").replace(/\D/g, "") || "0";
   const title = String(input.title || "Untitled problem").trim();
   const language = String(input.language || "text").trim();
+  const tags = Array.isArray(input.tags)
+    ? [...new Set(input.tags.map((tag) => String(tag || "").replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 20)
+    : [];
+  const problemDescription = boundedText(input.problemDescription || input.problemContext, 5_000);
+  const examples = normalizeProblemExamples(input.examples);
+  const firstExample = examples[0] || {};
   const item = {
     id: `${number}-${slugify(title)}`,
     number,
     title,
     slug: slugify(input.slug || title),
     difficulty: ["Easy", "Medium", "Hard"].includes(input.difficulty) ? input.difficulty : "Unknown",
+    tags,
     language,
     extension: LANGUAGE_EXTENSIONS[language.toLowerCase()] || "txt",
     path: String(input.path || "").trim(),
@@ -84,9 +127,14 @@ export function normalizeSubmission(input = {}) {
     memory: String(input.memory || "—"),
     status: input.status || "Accepted",
     url: input.url || "",
-    problemContext: String(input.problemContext || "").trim().slice(0, 600),
-    exampleInput: String(input.exampleInput || "").trim().slice(0, 1_000),
-    exampleOutput: String(input.exampleOutput || "").trim().slice(0, 1_000),
+    problemDescription,
+    problemContext: boundedText(input.problemContext || problemDescription, 1_200),
+    examples,
+    exampleInput: boundedText(input.exampleInput || firstExample.input, 1_500),
+    exampleOutput: boundedText(input.exampleOutput || firstExample.output, 1_500),
+    constraints: boundedList(input.constraints, 30, 500),
+    hints: boundedList(input.hints, 6, 1_000),
+    followUp: boundedText(input.followUp, 1_500),
     solvedAt: input.solvedAt || input.syncedAt || null,
     syncedAt: input.syncedAt || null,
     commitUrl: input.commitUrl || "",
@@ -98,12 +146,33 @@ export function normalizeSubmission(input = {}) {
     reviewIntervalDays: Number.isFinite(Number(input.reviewIntervalDays)) && Number(input.reviewIntervalDays) > 0 ? Math.floor(Number(input.reviewIntervalDays)) : null,
     reviewCount: Number.isFinite(Number(input.reviewCount)) && Number(input.reviewCount) >= 0 ? Math.floor(Number(input.reviewCount)) : 0,
     reviewLapses: Number.isFinite(Number(input.reviewLapses)) && Number(input.reviewLapses) >= 0 ? Math.floor(Number(input.reviewLapses)) : 0,
-    lastReviewRating: ["again", "hard", "good"].includes(input.lastReviewRating) ? input.lastReviewRating : null
+    lastReviewRating: ["again", "hard", "good"].includes(input.lastReviewRating) ? input.lastReviewRating : null,
+    reviewEvents: normalizeReviewEvents(input.reviewEvents)
   };
   item.solutions = Array.isArray(input.solutions)
     ? input.solutions.map((solution) => normalizeSolution(solution, item))
     : [];
   return item;
+}
+
+export function aiSubmissionPayload(input = {}) {
+  const item = normalizeSubmission(input);
+  return {
+    number: item.number,
+    title: item.title,
+    difficulty: item.difficulty,
+    tags: item.tags.slice(0, 8),
+    language: item.language,
+    code: item.code.slice(0, MAX_AI_CODE_CHARACTERS),
+    problemDescription: item.problemDescription.slice(0, 1_400),
+    problemContext: item.problemContext,
+    examples: item.examples.slice(0, 1),
+    exampleInput: item.exampleInput,
+    exampleOutput: item.exampleOutput,
+    constraints: item.constraints.slice(0, 12),
+    followUp: item.followUp.slice(0, 500),
+    status: item.status
+  };
 }
 
 function normalizeSolution(input = {}, fallback = {}) {
@@ -115,6 +184,7 @@ function normalizeSolution(input = {}, fallback = {}) {
     path,
     language,
     extension,
+    difficulty: ["Easy", "Medium", "Hard"].includes(input.difficulty) ? input.difficulty : fallback.difficulty || "Unknown",
     code: String(input.code || "").trimEnd(),
     runtime: String(input.runtime || "—"),
     memory: String(input.memory || "—"),
@@ -125,6 +195,16 @@ function normalizeSolution(input = {}, fallback = {}) {
     commitSha: input.commitSha || "",
     review: input.review && typeof input.review === "object" ? input.review : null
   };
+}
+
+function mergeReviewEvents(previous = [], update = []) {
+  const merged = new Map();
+  for (const event of [...previous, ...update]) {
+    merged.set(`${event.ratedAt}:${event.rating}`, event);
+  }
+  return [...merged.values()]
+    .sort((left, right) => Date.parse(left.ratedAt) - Date.parse(right.ratedAt))
+    .slice(-MAX_REVIEW_EVENTS);
 }
 
 function mergeSolution(left, right) {
@@ -144,6 +224,15 @@ export function submissionSolutions(input = {}) {
     const dateDifference = (Date.parse(right.syncedAt) || 0) - (Date.parse(left.syncedAt) || 0);
     return dateDifference || left.key.localeCompare(right.key);
   });
+}
+
+export function reusableGeneratedReview(existing = {}, incoming = {}) {
+  const update = normalizeSubmission(incoming);
+  const match = submissionSolutions(existing).find((solution) => (
+    solution.language.toLowerCase() === update.language.toLowerCase()
+    && solution.code.trimEnd() === update.code.trimEnd()
+  ));
+  return match?.review?.generatedBy ? match.review : null;
 }
 
 export function mergeSubmissionSolutions(existing = {}, incoming = {}) {
@@ -167,10 +256,16 @@ export function mergeSubmissionSolutions(existing = {}, incoming = {}) {
     title: hasPrevious ? previous.title : update.title,
     slug: hasPrevious ? previous.slug : update.slug,
     difficulty,
+    tags: update.tags.length ? update.tags : previous.tags,
     url: update.url || previous.url,
+    problemDescription: update.problemDescription || previous.problemDescription,
     problemContext: update.problemContext || previous.problemContext,
+    examples: update.examples.length ? update.examples : previous.examples,
     exampleInput: update.exampleInput || previous.exampleInput,
     exampleOutput: update.exampleOutput || previous.exampleOutput,
+    constraints: update.constraints.length ? update.constraints : previous.constraints,
+    hints: update.hints.length ? update.hints : previous.hints,
+    followUp: update.followUp || previous.followUp,
     notes: update.notes || previous.notes,
     solvedAt: previous.solvedAt || update.solvedAt,
     reviewDueAt: update.reviewDueAt || previous.reviewDueAt,
@@ -179,6 +274,7 @@ export function mergeSubmissionSolutions(existing = {}, incoming = {}) {
     reviewCount: Math.max(update.reviewCount, previous.reviewCount),
     reviewLapses: Math.max(update.reviewLapses, previous.reviewLapses),
     lastReviewRating: update.lastReviewRating || previous.lastReviewRating,
+    reviewEvents: mergeReviewEvents(previous.reviewEvents, update.reviewEvents),
     solutions
   });
   return {
@@ -266,8 +362,8 @@ const FALLBACK_VISUALS = {
   }
 };
 
-function fallbackSolutionVisual(item, review = {}) {
-  const pattern = (review.patterns || [])[0];
+function fallbackSolutionVisual(item) {
+  const pattern = item.tags[0];
   const template = FALLBACK_VISUALS[pattern] || {
     invariant: "Each step preserves the information needed to compute the final result.",
     steps: [["Initialize", "Create the required working state"], ["Process", "Update state from the current input"], ["Return", "Produce the result from the completed state"]]
@@ -293,7 +389,7 @@ function mermaidText(value) {
 export function buildMermaidDiagram(submission, review = {}) {
   const item = normalizeSubmission(submission);
   const suppliedVisual = normalizeSolutionVisual(review.visual);
-  const visual = suppliedVisual || fallbackSolutionVisual(item, review);
+  const visual = suppliedVisual || fallbackSolutionVisual(item);
   const context = visual.context || item.problemContext || `Solve ${item.number}. ${item.title}.`;
   const nodes = [
     `  n0["Goal<br/>${mermaidText(context)}"]`,
@@ -354,6 +450,7 @@ export function isSubmissionPushReady(submission = {}) {
 }
 
 export function formatSolvedAt(value) {
+  if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
@@ -370,42 +467,208 @@ export function formatCommit(template, submission) {
 
 export function buildReview(submission) {
   const item = normalizeSubmission(submission);
-  const text = item.code.toLowerCase();
-  const patterns = [];
-  if (/left|right|two.?pointer/.test(text)) patterns.push("Two Pointers");
-  if (/while\s*\(?.*(left|right)|window|start.*end/.test(text)) patterns.push("Sliding Window");
-  if (/heap|priorityqueue|priority_queue/.test(text)) patterns.push("Heap");
-  if (/dfs|bfs|queue|visited/.test(text)) patterns.push("Graph Traversal");
-  if (/memo|dp\[|cache/.test(text)) patterns.push("Dynamic Programming");
-  if (/map|dict|set\(|unordered_/.test(text)) patterns.push("Arrays & Hashing");
-  if (/stack|push\(|pop\(/.test(text)) patterns.push("Stack");
-  if (/binary.?search|mid\s*=|\/\s*2/.test(text)) patterns.push("Binary Search");
-  if (/union|find\(|parent\[|disjoint/.test(text)) patterns.push("Union-Find");
-  if (/trie|children\[|prefix/.test(text)) patterns.push("Trie");
-  if (!patterns.length) patterns.push("Problem-specific reasoning");
+  const topic = item.tags[0];
   return {
-    patterns: [...new Set(patterns)].slice(0, 3),
-    summary: `Use ${patterns[0].toLowerCase()} to organize the key decisions, then verify the invariants against an edge case.`,
+    summary: topic
+      ? `Use the ${topic.toLowerCase()} topic to organize the key decisions, then verify the invariants against an edge case.`
+      : "Reconstruct the key decisions, then verify the invariants against an edge case.",
     steps: [
       "State the direct approach and identify its bottleneck.",
-      `Explain why ${patterns[0].toLowerCase()} fits the constraints.`,
+      topic ? `Explain why ${topic.toLowerCase()} fits the constraints.` : "Explain why the chosen approach fits the constraints.",
       "Walk through one edge case and justify the final complexity."
     ]
   };
 }
 
+function markdownText(value) {
+  return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function fencedText(value) {
+  const text = String(value || "");
+  const fence = text.includes("```") ? "````" : "```";
+  return [fence + "text", text, fence];
+}
+
+function inlineCode(value) {
+  return `\`${String(value || "").replace(/`/g, "'")}\``;
+}
+
+const BROAD_STUDY_TOPICS = new Set(["Array", "String", "Math", "Matrix", "Simulation", "Sorting"]);
+const README_DATA_START = "<!-- leetrepo:data:v1";
+const README_DATA_END = "leetrepo:data:end -->";
+
+function utf8Base64(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function base64Utf8(value) {
+  const binary = atob(value);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function readmeSubmission(input, suppliedReview) {
+  const item = normalizeSubmission({
+    ...input,
+    review: suppliedReview || input?.review || null
+  });
+  const folder = folderFor(item);
+  const solutions = submissionSolutions(item).map((solution) => ({
+    ...solution,
+    path: solution.path || `${folder}/${languageFolderFor(solution)}/solution.${solution.extension}`
+  }));
+  const current = solutions.find((solution) => solution.key === `${item.language.toLowerCase()}:${item.extension}`) || solutions[0];
+  return {
+    ...item,
+    ...(current || {}),
+    id: item.id,
+    number: item.number,
+    title: item.title,
+    slug: item.slug,
+    difficulty: item.difficulty,
+    tags: item.tags,
+    url: item.url,
+    problemDescription: item.problemDescription,
+    problemContext: item.problemContext,
+    examples: item.examples,
+    exampleInput: item.exampleInput,
+    exampleOutput: item.exampleOutput,
+    constraints: item.constraints,
+    hints: item.hints,
+    followUp: item.followUp,
+    notes: item.notes,
+    reviewDueAt: item.reviewDueAt,
+    lastReviewedAt: item.lastReviewedAt,
+    reviewIntervalDays: item.reviewIntervalDays,
+    reviewCount: item.reviewCount,
+    reviewLapses: item.reviewLapses,
+    lastReviewRating: item.lastReviewRating,
+    reviewEvents: item.reviewEvents,
+    solutions
+  };
+}
+
+export function buildReadmeData(input, suppliedReview) {
+  const payload = JSON.stringify({ version: 1, submission: readmeSubmission(input, suppliedReview) });
+  return `${README_DATA_START}\n${utf8Base64(payload)}\n${README_DATA_END}`;
+}
+
+function section(markdown, heading) {
+  const match = String(markdown || "").match(new RegExp(`^## ${heading}\\s*$([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, "im"));
+  return match?.[1]?.trim() || "";
+}
+
+function legacyReadmeData(markdown) {
+  const heading = String(markdown || "").match(/^#\s+(\d+)\.\s+(.+)$/m);
+  if (!heading) return null;
+  const metadata = section(markdown, "Solution metadata");
+  const field = (name) => metadata.match(new RegExp(`^\\s*-\\s+\\*\\*${name}:\\*\\*\\s+(.+)$`, "im"))?.[1]?.trim() || "";
+  const solved = field("Solved");
+  const solvedAt = solved && !Number.isNaN(Date.parse(solved.replace(/ UTC$/, "Z")))
+    ? new Date(solved.replace(/ UTC$/, "Z")).toISOString()
+    : null;
+  const problemDescription = section(markdown, "Problem description")
+    .replace(/^>\s+Problem details captured[^\n]*\n?/i, "")
+    .trim();
+  const interview = section(markdown, "Interview overview");
+  const summary = interview
+    .replace(/^>[^\n]*\n?/i, "")
+    .split(/^### /m)[0]
+    .trim();
+  const approach = interview.match(/^### Approach\s*$([\s\S]*?)(?=^### |(?![\s\S]))/im)?.[1]
+    ?.match(/^\s*\d+\.\s+(.+)$/gm)
+    ?.map((line) => line.replace(/^\s*\d+\.\s+/, "").trim()) || [];
+  const time = interview.match(/^\s*-\s+\*\*Time:\*\*\s+(.+)$/im)?.[1]?.trim() || "";
+  const space = interview.match(/^\s*-\s+\*\*Space:\*\*\s+(.+)$/im)?.[1]?.trim() || "";
+  const edgeCases = interview.match(/^### Edge cases\s*$([\s\S]*?)(?=^### |(?![\s\S]))/im)?.[1]
+    ?.match(/^\s*-\s+(.+)$/gm)
+    ?.map((line) => line.replace(/^\s*-\s+/, "").trim()) || [];
+  const generatedBy = interview.match(/_AI-generated with ([^;_]+)[;_]/i)?.[1]?.trim() || "";
+  const review = summary || approach.length || time || space || edgeCases.length
+    ? { summary, approach, complexity: { time, space }, edgeCases, generatedBy }
+    : null;
+  return normalizeSubmission({
+    number: heading[1],
+    title: heading[2].trim(),
+    difficulty: field("Difficulty"),
+    tags: field("Topics").split(",").map((tag) => tag.trim()).filter(Boolean),
+    language: field("Language"),
+    runtime: field("Runtime"),
+    memory: field("Memory"),
+    solvedAt,
+    url: String(markdown || "").match(/\[View problem on LeetCode\]\((https:\/\/[^)]+)\)/i)?.[1] || "",
+    problemDescription,
+    problemContext: problemDescription,
+    notes: section(markdown, "Personal notes"),
+    review
+  });
+}
+
+export function parseReadmeData(markdown) {
+  const tagged = String(markdown || "").match(/<!--\s*leetrepo:data:v1\s*\n([A-Za-z0-9+/=\r\n]+?)\nleetrepo:data:end\s*-->/i);
+  if (!tagged) return legacyReadmeData(markdown);
+  try {
+    const value = JSON.parse(base64Utf8(tagged[1].replace(/\s/g, "")));
+    if (value?.version !== 1 || !value.submission || typeof value.submission !== "object") return null;
+    return readmeSubmission(value.submission, value.submission.review);
+  } catch {
+    return null;
+  }
+}
+
 export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedReview) {
-  const item = normalizeSubmission(submission);
+  const item = readmeSubmission(submission, suppliedReview);
   const lines = [`# ${item.number}. ${item.title}`, ""];
   if (settings.includeLink !== false && item.url) lines.push(`[View problem on LeetCode](${item.url})`, "");
+  lines.push("## Solution metadata", "");
   lines.push(`- **Difficulty:** ${item.difficulty}`, `- **Language:** ${item.language}`);
+  if (item.tags.length) lines.push(`- **Topics:** ${item.tags.join(", ")}`);
   const solvedAt = formatSolvedAt(item.solvedAt);
   if (solvedAt) lines.push(`- **Solved:** ${solvedAt}`);
   if (settings.includeStats !== false) lines.push(`- **Runtime:** ${item.runtime}`, `- **Memory:** ${item.memory}`);
-  if (item.problemContext) lines.push("", "## Problem description", "", item.problemContext);
-  if (settings.aiEnabled === true && suppliedReview) {
+  lines.push(`- **Solution:** [${item.language}](./${languageFolderFor(item)}/solution.${item.extension})`);
+  const otherSolutions = item.solutions.filter((solution) => solution.key !== `${item.language.toLowerCase()}:${item.extension}`);
+  for (const solution of otherSolutions) {
+    lines.push(`- **Solution (${solution.language}):** [${solution.language}](./${languageFolderFor(solution)}/solution.${solution.extension})`);
+  }
+
+  const problemDescription = item.problemDescription || item.problemContext;
+  if (problemDescription) {
+    lines.push("", "## Problem description", "");
+    if (settings.includeLink !== false && item.url) lines.push(`> Problem details captured from [LeetCode](${item.url}).`, "");
+    lines.push(markdownText(problemDescription));
+  }
+
+  const examples = item.examples.length
+    ? item.examples
+    : item.exampleInput && item.exampleOutput
+      ? [{ input: item.exampleInput, output: item.exampleOutput, explanation: "" }]
+      : [];
+  if (examples.length) {
+    lines.push("", "## Examples");
+    examples.forEach((example, index) => {
+      lines.push("", `### Example ${index + 1}`, "", ...fencedText(`Input:\n${example.input}\n\nOutput:\n${example.output}`));
+      if (example.explanation) lines.push("", `**Explanation:** ${markdownText(example.explanation)}`);
+    });
+  }
+  if (item.constraints.length) {
+    lines.push("", "## Constraints", "");
+    item.constraints.forEach((constraint) => lines.push(`- ${/[<>=]|\d/.test(constraint) ? inlineCode(constraint) : markdownText(constraint)}`));
+  }
+  if (item.followUp) lines.push("", "## Follow-up", "", markdownText(item.followUp));
+  if (item.hints.length) {
+    lines.push("", "## Hints", "", "<details>", "<summary>Reveal official hints</summary>", "");
+    item.hints.forEach((hint, index) => lines.push(`${index + 1}. ${markdownText(hint)}`));
+    lines.push("", "</details>");
+  }
+
+  if (suppliedReview && (settings.aiEnabled === true || suppliedReview.generatedBy)) {
     const review = suppliedReview;
-    lines.push("", "## Interview overview", "", `**Patterns:** ${review.patterns.join(", ")}`, "");
+    lines.push("", "## Interview overview", "", "> Generated from the submitted solution and the official problem details above. Verify AI analysis before relying on it.", "");
     if (review.summary) lines.push(review.summary, "");
     lines.push("### Solution replay", "", "```mermaid", buildMermaidDiagram(item, review), "```", "");
     lines.push("### Approach", "");
@@ -424,20 +687,24 @@ export function buildReadme(submission, settings = DEFAULT_SETTINGS, suppliedRev
       review.edgeCases.forEach((edgeCase) => lines.push(`- ${edgeCase}`));
     }
     if (review.generatedBy) lines.push("", `_AI-generated with ${review.generatedBy}; verify the analysis before relying on it._`);
-    if (settings.includeNotes !== false && item.notes) lines.push("", "## Personal notes", "", item.notes);
   }
-  if (settings.includeNotes !== false && item.notes && !(settings.aiEnabled === true && suppliedReview)) {
-    lines.push("", "## Personal notes", "", item.notes);
-  }
-  lines.push("", "---", "_Synced by LeetRepo Lite_");
-  return lines.join("\n");
-}
+  if (settings.includeNotes !== false && item.notes) lines.push("", "## Personal notes", "", item.notes);
 
-function submissionPatterns(item) {
-  return [...new Set(submissionSolutions(item).flatMap((solution) => {
-    const review = solution.review || buildReview({ ...item, ...solution });
-    return review.patterns || [];
-  }))];
+  const studyTopic = item.tags.find((topic) => !BROAD_STUDY_TOPICS.has(topic)) || item.tags[0];
+  lines.push(
+    "",
+    "## Study guide",
+    "",
+    "Before reopening the solution:",
+    "",
+    `1. Identify why ${studyTopic ? `**${studyTopic}**` : "the chosen technique"} fits the problem constraints.`,
+    "2. State the invariant that makes the algorithm correct.",
+    examples.length ? "3. Replay the first example without looking at the implementation." : "3. Walk through a representative input by hand.",
+    "4. Derive the time and space complexity from the implementation.",
+    "5. Name an edge case that would break a weaker approach."
+  );
+  lines.push("", "---", "_Synced by LeetRepo Lite_", "", buildReadmeData(item, suppliedReview));
+  return lines.join("\n");
 }
 
 export function historyInsights(items = []) {
@@ -448,7 +715,7 @@ export function historyInsights(items = []) {
     for (const solution of submissionSolutions(item)) {
       languages.set(solution.language, (languages.get(solution.language) || 0) + 1);
     }
-    for (const pattern of submissionPatterns(item)) patterns.set(pattern, (patterns.get(pattern) || 0) + 1);
+    for (const tag of item.tags) patterns.set(tag, (patterns.get(tag) || 0) + 1);
   }
   const sortCounts = (entries) => [...entries].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return { patterns: sortCounts(patterns), languages: sortCounts(languages) };
@@ -457,7 +724,7 @@ export function historyInsights(items = []) {
 export function submissionSearchText(input = {}) {
   const item = normalizeSubmission(input);
   const languages = submissionSolutions(item).map((solution) => solution.language);
-  return [item.number, item.title, item.difficulty, item.notes, ...languages, ...submissionPatterns(item)].join(" ").toLowerCase();
+  return [item.number, item.title, item.difficulty, item.notes, ...languages, ...item.tags].join(" ").toLowerCase();
 }
 
 export function buildProfileReadme(items = [], settings = {}) {
@@ -477,9 +744,9 @@ export function buildProfileReadme(items = [], settings = {}) {
     "",
     `**${normalized.length} solved** · ${counts.Easy} easy · ${counts.Medium} medium · ${counts.Hard} hard · ${insights.languages.length} languages`,
     "",
-    "## Pattern coverage",
+    "## Topic coverage",
     "",
-    insights.patterns.length ? insights.patterns.slice(0, 12).map(([pattern, count]) => `- ${pattern}: ${count}`).join("\n") : "Pattern data will appear after the first synced solution.",
+    insights.patterns.length ? insights.patterns.slice(0, 12).map(([tag, count]) => `- ${tag}: ${count}`).join("\n") : "Topic data will appear after the first synced solution.",
     "",
     "## Recent solutions",
     "",

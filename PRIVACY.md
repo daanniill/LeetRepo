@@ -1,6 +1,6 @@
 # LeetRepo Lite Privacy Notice
 
-Last updated: August 11, 2026
+Last updated: August 25, 2026
 
 LeetRepo Lite is a local-first browser extension that reads LeetCode submission details, commits user-selected content to GitHub, and optionally requests AI study explanations. It has no LeetRepo account, hosted backend, analytics service, or advertising system.
 
@@ -12,19 +12,23 @@ LeetRepo Lite stores the following in your browser profile:
 - an optional AI provider API key;
 - the selected AI provider, endpoint, model, and local request counter;
 - repository and extension preferences; and
-- submission and attempt history, including problem metadata, detected context and examples, solution code, result status, personal notes, review schedule, and commit details.
+- compact attempt-event metadata, including the problem number and title, language, result, performance metrics, and time.
 
 Credentials use `chrome.storage.local` and are not synced. Non-secret settings may use Chrome's synced extension storage when browser sync is enabled. Browser extension storage is protected by the browser profile but is not separately encrypted by LeetRepo Lite.
+
+Problem statements, examples, constraints, hints, solution source, Accepted-solution records, explanations, personal notes, and study progress are stored in tagged READMEs and solution files in the selected GitHub repository rather than in the local dashboard store.
 
 ## Data sent to GitHub
 
 When connecting, LeetRepo Lite sends the supplied token to GitHub's API to verify the account and list accessible repositories. When syncing, it sends the selected repository details, solution code, generated README, and Git commit data directly to GitHub.
 
-If repository-profile generation is enabled, the extension may update the selected repository's root `README.md`. Repository backfill reads the selected repository tree and recent commit metadata but does not change the repository. GitHub's terms and privacy policy apply.
+Each problem README contains a versioned LeetRepo data tag with problem details, solution variants and source, explanations, notes, and study state used to rebuild the dashboard. If repository-profile generation is enabled, the extension may update the selected repository's root `README.md`. Dashboard loading and repository refresh read the selected repository's Git tree, problem READMEs, solution blobs, and recent commit metadata directly; no LeetRepo service proxies or archives that content.
+
+GitHub's privacy terms apply to data sent to GitHub.
 
 ## Optional AI processing
 
-AI processing is disabled by default. When enabled, LeetRepo Lite sends the problem title, difficulty, language, detected problem context and example, and up to 24,000 characters of solution code directly to the AI chat-completions endpoint selected by the user. The selected provider's terms, privacy policy, retention rules, and charges apply.
+AI walkthroughs and diagrams are disabled by default and require affirmative opt-in during onboarding, in Settings, or from the LeetCode page panel. When enabled, LeetRepo Lite sends the problem title, difficulty, topics, programming language, detected problem context, one example, relevant constraints and follow-up, and up to 24,000 characters of solution code directly to the AI chat-completions endpoint selected by the user. The selected provider's terms, privacy policy, retention rules, and charges apply. Official problem details and the rest of each README are generated locally without AI.
 
 LeetRepo Lite does not proxy, retain, or inspect these requests on a LeetRepo server. A local daily counter helps prevent accidental use but is not an access-control or billing boundary. Generated content may be inaccurate and should be reviewed.
 
@@ -38,9 +42,11 @@ LeetRepo Lite requests storage and clipboard access, access to LeetCode problem 
 
 ## Retention and deletion
 
-Local data remains until the user removes it, clears browser data, removes the extension, or selects **Clear all local data** in Settings. Clearing local data removes saved tokens, settings, history, notes, and study state but does not delete or modify existing GitHub repositories or provider-side records.
+Local data remains until the user removes it, clears browser data, removes the extension, or selects **Clear all local data** in Settings. Clearing local data removes saved tokens, settings, AI usage, and compact attempt history but does not delete or modify existing GitHub repositories, GitHub-backed notes or study state, or provider-side records.
 
 Users can revoke tokens independently through GitHub or their AI provider. Removing an optional endpoint permission prevents future requests to that origin but does not remove the saved provider configuration.
+
+Turning off AI stops future AI transmissions but preserves explanations already committed to GitHub problem READMEs. Disconnecting GitHub removes the saved GitHub credential from the extension without changing repository content.
 
 ## Limited-use disclosure
 

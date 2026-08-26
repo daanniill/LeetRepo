@@ -1,5 +1,5 @@
 import { buildReview, calculateStreak, historyInsights, relativeTime, solveTimestamp, submissionSearchText, submissionSolutions } from "../../core/submissions.js";
-import { buildStudyQueue, canonicalPattern, formatStudyInterval, nextReviewInterval, patternCoverage, studyIntervalDays } from "../../core/study.js";
+import { buildStudyQueue, formatStudyInterval, nextReviewInterval, patternCoverage, studyIntervalDays } from "../../core/study.js";
 import { difficultyClass, escapeHtml, logo, send, setBusy } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
@@ -25,6 +25,8 @@ async function load() {
   }
   state.attempts ||= [];
   render();
+  const requestedView = new URLSearchParams(globalThis.location.search).get("view");
+  if (requestedView === "study") showView("study");
 }
 
 function filteredItems() {
@@ -60,7 +62,7 @@ function render() {
   document.querySelector("#profile-badges").innerHTML = [
     `${items.length} solved`,
     `${calculateStreak(items)}-day streak`,
-    `${items.filter((item) => item.review).length} reviewed`,
+    `${items.filter((item) => item.review).length} AI overviews`,
     `${historyInsights(items).languages.length} languages`
   ].map((label) => `<span class="badge unknown">${escapeHtml(label)}</span>`).join("");
   renderHeatmap(items);
@@ -163,11 +165,11 @@ function renderDetail(item) {
       ${solutions.length > 1 ? `<label class="language-picker"><span>Language</span><select id="language-select" aria-label="Select solution language">${solutions.map((candidate) => `<option value="${escapeHtml(candidate.key)}" ${candidate.key === solution.key ? "selected" : ""}>${escapeHtml(candidate.language)}</option>`).join("")}</select></label>` : `<span class="detail-language">${escapeHtml(selectedItem.language)}</span>`}
     </div>
     <p class="detail-summary">${escapeHtml(review.summary || "Use the replay steps below to reconstruct the solution.")}</p>
-    <div class="patterns">${(review.patterns || []).map((pattern) => `<span class="badge unknown">${escapeHtml(pattern)}</span>`).join("")}</div>
+    <div class="patterns">${(selectedItem.tags || []).map((tag) => `<span class="badge unknown">${escapeHtml(tag)}</span>`).join("")}</div>
     ${review.complexity?.time ? `<div class="complexity-strip"><span><small>Time</small>${escapeHtml(review.complexity.time)}</span><span><small>Space</small>${escapeHtml(review.complexity.space)}</span></div>` : ""}
     ${review.complexityCheck?.verdict === "suboptimal" ? `<div class="complexity-warning"><strong>Suboptimal solution detected</strong><br>${escapeHtml(review.complexityCheck.note || "Compare this solution with the intended pattern.")}</div>` : ""}
     <ol class="review-steps">${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
-    <div class="detail-note"><label for="detail-note-input">Personal note</label><textarea id="detail-note-input" rows="3" maxlength="4000" aria-describedby="detail-note-help" placeholder="What should future-you remember?">${escapeHtml(selectedItem.notes || "")}</textarea><small id="detail-note-help">Saved locally. Included in AI-generated READMEs when that option is enabled.</small></div>
+    <div class="detail-note"><label for="detail-note-input">Personal note</label><textarea id="detail-note-input" rows="3" maxlength="4000" aria-describedby="detail-note-help" placeholder="What should future-you remember?">${escapeHtml(selectedItem.notes || "")}</textarea><small id="detail-note-help">Saved to the tagged problem README on GitHub.</small></div>
     <div class="detail-actions">
       <button class="button secondary full" id="save-detail-note">Save note</button>
       ${selectedItem.code ? `<button class="button full" id="regenerate-feedback" ${aiBlocked ? "disabled" : ""}>${feedbackLabel}</button>` : ""}
@@ -187,11 +189,12 @@ async function saveDetailNote(item, notes, button) {
   try {
     await send("SAVE_NOTES", { submission: item, notes });
     state.submissions = state.submissions.map((stored) => stored.id === item.id ? { ...stored, notes } : stored);
+    button.textContent = "Note saved";
+    delete button.dataset.label;
     showToast(notes.trim() ? "Personal note saved." : "Personal note cleared.");
   } catch (error) {
-    showToast(error.message);
-  } finally {
     setBusy(button, false);
+    showToast(error.message);
   }
 }
 
@@ -237,7 +240,7 @@ function reviewFor(item) {
 }
 
 function studyPatternsFor(item) {
-  return [...new Set((reviewFor(item).patterns || []).map(canonicalPattern).filter(Boolean))];
+  return [...new Set((item.tags || []).map((tag) => String(tag || "").replace(/\s+/g, " ").trim()).filter(Boolean))];
 }
 
 function studyDueLabel(value, now = new Date()) {
@@ -257,7 +260,7 @@ function populateStudyFilters(coverage) {
   const patternSelect = document.querySelector("#study-pattern-filter");
   const available = coverage.filter(({ count }) => count > 0).map(({ pattern }) => pattern);
   if (studyPattern !== "All" && !available.includes(studyPattern)) studyPattern = "All";
-  patternSelect.innerHTML = ['<option value="All">All patterns</option>', ...available.map((pattern) => `<option value="${escapeHtml(pattern)}">${escapeHtml(pattern)}</option>`)].join("");
+  patternSelect.innerHTML = ['<option value="All">All topics</option>', ...available.map((pattern) => `<option value="${escapeHtml(pattern)}">${escapeHtml(pattern)}</option>`)].join("");
   patternSelect.value = studyPattern;
   document.querySelector("#study-difficulty-filter").value = studyDifficulty;
 }
@@ -408,7 +411,7 @@ async function rateStudyReview(item, rating, button) {
 }
 
 function renderPatternCoverage(coverage, enabled) {
-  const visibleCoverage = enabled ? coverage : coverage.map((entry) => ({ ...entry, status: entry.count ? "rotation" : "unseen", dueCount: 0 }));
+  const visibleCoverage = enabled ? coverage : coverage.map((entry) => ({ ...entry, status: "rotation", dueCount: 0 }));
   const cloud = document.querySelector("#pattern-cloud");
   cloud.innerHTML = visibleCoverage.map(({ pattern, count, dueCount, status }) => `<button class="pattern-chip ${status} ${studyPattern === pattern ? "active" : ""}" data-study-pattern="${escapeHtml(pattern)}" ${count ? "" : "disabled"}>
     ${escapeHtml(pattern)}<span>${dueCount ? `${dueCount} due` : count}</span>
@@ -422,14 +425,13 @@ function renderPatternCoverage(coverage, enabled) {
     document.querySelector(".study-workspace").scrollIntoView({ behavior: "smooth", block: "start" });
   }));
   const duePatterns = visibleCoverage.filter(({ dueCount }) => dueCount > 0);
-  const unseen = visibleCoverage.filter(({ status }) => status === "unseen");
   document.querySelector("#gap-callout").innerHTML = !enabled
-    ? "<strong>Review scheduling is paused.</strong> Pattern coverage remains available while spaced repetition is off."
+    ? "<strong>Review scheduling is paused.</strong> Topic coverage remains available while spaced repetition is off."
     : duePatterns.length
-      ? `<strong>${duePatterns.length} pattern${duePatterns.length === 1 ? " has" : "s have"} reviews due.</strong> Start with ${escapeHtml(duePatterns.slice(0, 3).map(({ pattern }) => pattern).join(", "))}.`
-      : unseen.length
-        ? `<strong>${unseen.length} common patterns aren’t represented yet.</strong> Coverage grows only from solutions you sync.`
-        : "<strong>Every common pattern is represented.</strong> Keep using the review queue to maintain recall.";
+      ? `<strong>${duePatterns.length} topic${duePatterns.length === 1 ? " has" : "s have"} reviews due.</strong> Start with ${escapeHtml(duePatterns.slice(0, 3).map(({ pattern }) => pattern).join(", "))}.`
+      : visibleCoverage.length
+        ? "<strong>Your captured topics are in rotation.</strong> Keep using the review queue to maintain recall."
+        : "<strong>No topics captured yet.</strong> Sync a problem to add its LeetCode topics.";
 }
 
 function renderStudy() {

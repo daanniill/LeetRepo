@@ -94,7 +94,7 @@ document.querySelector("#configure-step").addEventListener("submit", async (even
       repo,
       branch,
       autoPush: document.querySelector("#setup-auto-push").checked,
-      includeReadme: document.querySelector("#setup-readme").checked,
+      includeReadme: true,
       includeStats: document.querySelector("#setup-stats").checked,
       includeLink: document.querySelector("#setup-link").checked,
       includeNotes: document.querySelector("#setup-notes").checked,

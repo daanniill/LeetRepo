@@ -2,39 +2,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const INITIAL_REVIEW_INTERVAL_DAYS = 30;
 export const REVIEW_RATINGS = ["again", "hard", "good"];
+export const MAX_REVIEW_EVENTS = 200;
 export const STUDY_INTERVAL_UNITS = ["days", "weeks", "months"];
-export const STUDY_PATTERNS = Object.freeze([
-  "Arrays & Hashing",
-  "Two Pointers",
-  "Sliding Window",
-  "Stack",
-  "Monotonic Stack",
-  "Binary Search",
-  "Dynamic Programming",
-  "Graph Traversal",
-  "Heap",
-  "Union-Find",
-  "Trie",
-  "Segment Tree"
-]);
-
-const PATTERN_ALIASES = new Map([
-  ["array", "Arrays & Hashing"],
-  ["arrays", "Arrays & Hashing"],
-  ["hash map", "Arrays & Hashing"],
-  ["hashing", "Arrays & Hashing"],
-  ["two pointer", "Two Pointers"],
-  ["graph", "Graph Traversal"],
-  ["graphs", "Graph Traversal"],
-  ["bfs", "Graph Traversal"],
-  ["dfs", "Graph Traversal"],
-  ["priority queue", "Heap"],
-  ["heap / priority queue", "Heap"],
-  ["disjoint set", "Union-Find"],
-  ["union find", "Union-Find"],
-  ["dp", "Dynamic Programming"]
-]);
-
 const INTERVAL_UNIT_DAYS = { days: 1, weeks: 7, months: 30 };
 const INTERVAL_UNIT_MAX = { days: 365, weeks: 52, months: 12 };
 
@@ -66,11 +35,17 @@ export function reviewDateAfter(value, days) {
   return addDays(date, positiveInteger(days) || INITIAL_REVIEW_INTERVAL_DAYS).toISOString();
 }
 
+export function reviewDueAfterSync(item = {}, syncedAt, initialIntervalDays = INITIAL_REVIEW_INTERVAL_DAYS, enabled = true) {
+  if (!enabled) return null;
+  if (nonNegativeInteger(item.reviewCount) > 0 || item.lastReviewedAt) {
+    return validDate(item.reviewDueAt)?.toISOString()
+      || reviewDateAfter(item.lastReviewedAt, item.reviewIntervalDays || initialIntervalDays);
+  }
+  return reviewDateAfter(syncedAt, initialIntervalDays);
+}
+
 export function canonicalPattern(value) {
-  const pattern = String(value || "").trim();
-  if (!pattern) return "";
-  const known = STUDY_PATTERNS.find((candidate) => candidate.toLowerCase() === pattern.toLowerCase());
-  return known || PATTERN_ALIASES.get(pattern.toLowerCase()) || pattern;
+  return String(value || "").replace(/\s+/g, " ").trim();
 }
 
 export function normalizeStudyInterval(value = INITIAL_REVIEW_INTERVAL_DAYS, unit = "days") {
@@ -132,6 +107,10 @@ export function nextReviewInterval(item = {}, rating, preferredIntervalDays = nu
 export function scheduleReview(item = {}, rating, now = new Date(), preferredIntervalDays = null) {
   const reviewedAt = validDate(now) || new Date();
   const intervalDays = nextReviewInterval(item, rating, preferredIntervalDays);
+  const reviewEvents = [
+    ...(Array.isArray(item.reviewEvents) ? item.reviewEvents : []),
+    { ratedAt: reviewedAt.toISOString(), rating, intervalDaysAfter: intervalDays }
+  ].slice(-MAX_REVIEW_EVENTS);
   return {
     ...item,
     lastReviewedAt: reviewedAt.toISOString(),
@@ -139,7 +118,8 @@ export function scheduleReview(item = {}, rating, now = new Date(), preferredInt
     reviewIntervalDays: intervalDays,
     reviewCount: nonNegativeInteger(item.reviewCount) + 1,
     reviewLapses: nonNegativeInteger(item.reviewLapses) + (rating === "again" ? 1 : 0),
-    lastReviewRating: rating
+    lastReviewRating: rating,
+    reviewEvents
   };
 }
 
@@ -175,9 +155,9 @@ export function buildStudyQueue(items = [], now = new Date(), initialIntervalDay
   };
 }
 
-export function patternCoverage(items = [], patternsFor = (item) => item.review?.patterns || [], now = new Date(), initialIntervalDays = INITIAL_REVIEW_INTERVAL_DAYS) {
+export function patternCoverage(items = [], patternsFor = (item) => item.tags || [], now = new Date(), initialIntervalDays = INITIAL_REVIEW_INTERVAL_DAYS) {
   const current = validDate(now) || new Date();
-  const entries = new Map(STUDY_PATTERNS.map((pattern) => [pattern, { pattern, count: 0, dueCount: 0 }]));
+  const entries = new Map();
   for (const item of items) {
     const dueAt = reviewDueAt(item, initialIntervalDays);
     const patterns = [...new Set((patternsFor(item) || []).map(canonicalPattern).filter(Boolean))];

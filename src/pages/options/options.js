@@ -6,7 +6,7 @@ import { applyTheme, ensureProviderPermission, logo, send, setBusy, showNotice }
 document.querySelector("#logo").innerHTML = logo();
 const notice = document.querySelector("#notice");
 const providerSelect = document.querySelector("#ai-provider");
-const toggleKeys = ["autoPush", "includeReadme", "includeStats", "includeLink", "includeNotes", "includeProfile", "spacedRepetition", "aiEnabled"];
+const toggleKeys = ["autoPush", "includeStats", "includeLink", "includeNotes", "includeProfile", "spacedRepetition", "aiEnabled"];
 const intervalMaximums = { days: 365, weeks: 52, months: 12 };
 
 providerSelect.replaceChildren(...Object.entries(LLM_PROVIDERS).map(([id, provider]) => new Option(provider.label, id)));
@@ -139,7 +139,7 @@ document.querySelector("#sign-out").addEventListener("click", async () => {
   }
 });
 document.querySelector("#delete-local-data").addEventListener("click", async () => {
-  if (!globalThis.confirm("Clear the saved tokens, settings, solution history, notes, and study schedule from this browser? Existing GitHub repositories will not be changed.")) return;
+  if (!globalThis.confirm("Clear saved tokens, settings, AI usage, and compact attempt history from this browser? GitHub-backed solutions, notes, and study state will not be changed.")) return;
   const button = document.querySelector("#delete-local-data");
   setBusy(button, true, "Clearing…");
   try {

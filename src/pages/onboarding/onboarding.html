@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Set up LeetRepo Lite</title>
     <link rel="stylesheet" href="../../shared/common.css">
-    <link rel="stylesheet" href="onboarding.css?v=2.0.0">
+    <link rel="stylesheet" href="onboarding.css?v=2.0.4">
   </head>
   <body>
     <main class="onboarding-shell">
@@ -21,7 +21,7 @@
           <li data-step-marker="2"><span>2</span><div><strong>Choose your repo</strong><small>Configure how solutions land</small></div></li>
           <li data-step-marker="3"><span>3</span><div><strong>Start solving</strong><small>Push manually or automatically</small></div></li>
         </ol>
-        <div class="privacy-note">LeetRepo Lite stores tokens and solution history only in this browser profile. It has no account or hosted backend. <a href="../legal/legal.html?document=privacy" target="_blank" rel="noreferrer">Privacy Notice</a> · <a href="../legal/legal.html?document=terms" target="_blank" rel="noreferrer">Terms</a></div>
+        <div class="privacy-note">LeetRepo Lite stores credentials and compact attempt events in this browser profile. Solution history, notes, and study state live in your GitHub repository. It has no account or hosted backend. <a href="../legal/legal.html?document=privacy" target="_blank" rel="noreferrer">Privacy Notice</a> · <a href="../legal/legal.html?document=terms" target="_blank" rel="noreferrer">Terms</a></div>
       </section>
 
       <section class="setup-wrap">
@@ -86,10 +86,10 @@
             <div class="field">
               <span class="field-label">Include in each commit</span>
               <div class="include-grid">
-                <label><input id="setup-readme" type="checkbox" checked><span>README</span></label>
+                <span class="required">Tagged README</span>
                 <label><input id="setup-stats" type="checkbox" checked><span>Runtime &amp; memory</span></label>
                 <label><input id="setup-link" type="checkbox" checked><span>LeetCode link</span></label>
-                <label><input id="setup-notes" type="checkbox" checked><span>Notes with AI</span></label>
+                <label><input id="setup-notes" type="checkbox" checked><span>Personal notes</span></label>
               </div>
             </div>
             <div class="setting-line"><div><strong>Auto-push on Accepted</strong><small>Also push manually anytime from the popup</small></div><label class="switch"><input id="setup-auto-push" type="checkbox" checked><span></span></label></div>

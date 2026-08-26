@@ -10,9 +10,11 @@
   let syncedSubmissions = [];
   let pendingSubmission = null;
   let acceptedSubmissionKey = "";
+  let autoPushAttemptedKey = "";
   const themes = new Set(["light", "dark", "teal"]);
   const submissionStatuses = ["Accepted", "Wrong Answer", "Time Limit Exceeded", "Memory Limit Exceeded", "Runtime Error", "Compile Error", "Output Limit Exceeded"];
   const resultSelector = '[data-e2e-locator*="submission-result"], [data-cy*="submission-result"]';
+  const { beginAttempt, finishAttempt, submissionKey } = globalThis.LeetRepoAttempt;
 
   const text = (selector) => document.querySelector(selector)?.textContent?.trim() || "";
   const normalizeSpace = (value) => String(value || "").replace(/\s+/g, " ").trim();
@@ -28,10 +30,6 @@
   function isCurrentSolutionSynced() {
     const stored = syncedSolutionFor(latest);
     return Boolean(stored?.code && String(stored.code).trimEnd() === String(latest?.code || "").trimEnd());
-  }
-
-  function submissionKey(submission) {
-    return `${submission?.number || "0"}:${String(submission?.code || "").trimEnd()}`;
   }
 
   function hasFreshAcceptance(submission = latest) {
@@ -127,42 +125,16 @@
     return "—";
   }
 
-  function extractExample() {
-    const selectors = [
-      '[data-track-load="description_content"] pre',
-      '[data-cy="question-content"] pre',
-      '[data-e2e-locator="description-content"] pre',
-      "main pre"
-    ];
-    for (const node of document.querySelectorAll(selectors.join(","))) {
-      const value = normalizeSpace(node.textContent);
-      const input = value.match(/\bInput:\s*(.+?)\s+Output:/i)?.[1];
-      const output = value.match(/\bOutput:\s*(.+?)(?:\s+Explanation:|$)/i)?.[1];
-      if (input && output) return { exampleInput: input.slice(0, 1_000), exampleOutput: output.slice(0, 1_000) };
-    }
-    return { exampleInput: "", exampleOutput: "" };
-  }
-
-  function extractProblemContext() {
-    const roots = document.querySelectorAll([
-      '[data-track-load="description_content"]',
-      '[data-cy="question-content"]',
-      '[data-e2e-locator="description-content"]'
-    ].join(","));
-    for (const root of roots) {
-      for (const paragraph of root.querySelectorAll("p")) {
-        const value = normalizeSpace(paragraph.textContent);
-        if (value.length >= 20 && !/^(example|input|output|constraints)\b/i.test(value)) return value.slice(0, 600);
-      }
-    }
-    return "";
-  }
-
   function extractSubmission() {
+    const problemDetails = globalThis.LeetRepoProblem.getProblemDetails(document);
+    const firstExample = problemDetails.examples[0] || {};
     return {
       ...globalThis.LeetRepoProblem.getProblemIdentity(document, location),
-      problemContext: extractProblemContext(),
-      ...extractExample(),
+      tags: globalThis.LeetRepoProblem.getProblemTags(document),
+      ...problemDetails,
+      problemContext: problemDetails.problemDescription.slice(0, 1_200),
+      exampleInput: firstExample.input || "",
+      exampleOutput: firstExample.output || "",
       difficulty: detectDifficulty(),
       language: globalThis.LeetRepoLanguage.detectLanguage(document),
       code: editorCode(),
@@ -195,7 +167,7 @@
           <label class="lr-notes-label" for="lr-personal-notes">Personal notes</label>
           <textarea class="lr-notes" id="lr-personal-notes" rows="2" maxlength="4000" placeholder="What should future-you remember?"></textarea>
           <div class="lr-auto"><span>Auto-push on Accepted</span><label class="lr-switch"><input class="lr-auto-push" type="checkbox"><span></span></label></div>
-          <div class="lr-auto lr-ai-option"><span class="lr-ai-copy">AI-generated README<small>Sends solution code to AI</small></span><label class="lr-switch"><input class="lr-ai-readme" type="checkbox" aria-label="Use AI-generated README"><span></span></label></div>
+          <div class="lr-auto lr-ai-option"><span class="lr-ai-copy">AI walkthrough + diagram<small>Sends solution code to AI</small></span><label class="lr-switch"><input class="lr-ai-readme" type="checkbox" aria-label="Use AI walkthrough and diagram"><span></span></label></div>
           <button class="lr-link lr-dashboard">Open dashboard →</button>
           <div class="lr-notice" hidden></div>
         </div></div>
@@ -292,13 +264,18 @@
       const response = await chrome.runtime.sendMessage({ type: "GENERATE_FEEDBACK", submission: latest });
       if (!response?.ok) throw new Error(response?.error || "Feedback failed.");
       ai = { ...ai, ...response.ai };
+      latest.review = response.review;
+      if (response.submission && response.persisted) {
+        syncedSubmissions = [response.submission, ...syncedSubmissions.filter((item) => String(item.number) !== String(response.submission.number))];
+      }
       const feedback = document.querySelector(`#${PANEL_ID} .lr-feedback`);
       const complexity = response.review.complexity?.time && response.review.complexity?.space
         ? `<div class="lr-complexity"><span>Time · ${escapeHtml(response.review.complexity.time)}</span><span>Space · ${escapeHtml(response.review.complexity.space)}</span></div>`
         : "";
-      feedback.innerHTML = `<strong>30-second refresher</strong><p>${escapeHtml(response.review.summary || response.review.steps?.[0] || "Review the approach and its key invariant.")}</p><div class="lr-patterns">${(response.review.patterns || []).map((pattern) => `<span>${escapeHtml(pattern)}</span>`).join("")}</div>${complexity}`;
+      feedback.innerHTML = `<strong>30-second refresher</strong><p>${escapeHtml(response.review.summary || response.review.steps?.[0] || "Review the approach and its key invariant.")}</p><div class="lr-patterns">${(latest.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>${complexity}`;
       feedback.hidden = false;
       if (response.ai?.warning) showNotice(response.ai.warning, true);
+      else if (response.persisted === false) showNotice("Feedback is ready and will be stored in the README when this Accepted solution is synced.");
     } catch (error) {
       showNotice(error.message, true);
     } finally {
@@ -316,7 +293,9 @@
   }
 
   async function push(automatic) {
-    if (pushing || !hasFreshAcceptance() || !latest?.code) return;
+    const pushKey = acceptedSubmissionKey;
+    if (pushing || !hasFreshAcceptance() || !latest?.code || (automatic && autoPushAttemptedKey === pushKey)) return;
+    if (automatic) autoPushAttemptedKey = pushKey;
     pushing = true;
     render();
     showNotice("");
@@ -329,7 +308,11 @@
       const success = response.result?.updated
         ? automatic ? "Accepted solution updated automatically." : "Solution updated successfully on GitHub."
         : automatic ? "Accepted and pushed automatically." : "Pushed successfully to GitHub.";
-      showNotice(response.ai?.warning ? `${success} ${response.ai.warning}` : response.ai?.generated ? `${success} AI explanation added.` : success);
+      showNotice(response.ai?.warning
+        ? `${success} ${response.ai.warning}`
+        : response.ai?.generated
+          ? `${success} AI explanation added.`
+          : response.ai?.reused ? `${success} Existing AI explanation reused without another request.` : success);
     } catch (error) {
       showNotice(error.message, true);
     } finally {
@@ -342,7 +325,6 @@
     latest = extractSubmission();
     latest.notes = notes[`${latest.number}-${latest.slug}`] || "";
     render();
-    if (!["Ready"].includes(latest.status) && latest.code) chrome.runtime.sendMessage({ type: "RECORD_ATTEMPT", submission: latest });
     if (settings?.autoPush && settings.connected && hasFreshAcceptance() && latest.code) push(true);
   }
 
@@ -372,6 +354,7 @@
         latest = null;
         pendingSubmission = null;
         acceptedSubmissionKey = "";
+        autoPushAttemptedKey = "";
         return;
       }
       mount();
@@ -400,7 +383,8 @@
     const submission = extractSubmission();
     if (!submission.code) return;
     acceptedSubmissionKey = "";
-    pendingSubmission = { key: submissionKey(submission), startedAt: Date.now() };
+    autoPushAttemptedKey = "";
+    pendingSubmission = beginAttempt(submission);
     latest = submission;
     showNotice("");
     render();
@@ -411,9 +395,11 @@
       ? resultStatusFromMutations(mutations)
       : null;
     if (resultStatus) {
+      const attempt = finishAttempt(pendingSubmission, resultStatus, extractSubmission());
       if (resultStatus === "Accepted") acceptedSubmissionKey = pendingSubmission.key;
       else acceptedSubmissionKey = "";
       pendingSubmission = null;
+      chrome.runtime.sendMessage({ type: "RECORD_ATTEMPT", submission: attempt });
     }
     const pageChanged = mutations.some((mutation) => {
       const target = mutation.target.nodeType === Node.ELEMENT_NODE ? mutation.target : mutation.target.parentElement;

@@ -3,4 +3,7 @@ dist/
 .env
 .DS_Store
 assets/marketing/
+DEPLOYMENT.md
+SETUP.md
 deployment/
+setup/

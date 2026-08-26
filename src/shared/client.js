@@ -7,6 +7,7 @@ const DEMO_SUBMISSION = {
   title: "Trapping Rain Water",
   slug: "trapping-rain-water",
   difficulty: "Hard",
+  tags: ["Array", "Two Pointers", "Dynamic Programming", "Stack", "Monotonic Stack"],
   language: "C++",
   extension: "cpp",
   code: "class Solution { public: int trap(vector<int>& height) { return 6; } };",
@@ -20,8 +21,8 @@ let DEMO_SETTINGS = { ...DEFAULT_SETTINGS, connected: true, owner: "alex-c", rep
 
 let DEMO_HISTORY = [
   { ...DEMO_SUBMISSION, code: "let left = 0, right = height.size() - 1; while (left < right) { left++; }", syncedAt: new Date(Date.now() - 120000).toISOString(), reviewDueAt: new Date(Date.now() - 2 * 86400000).toISOString(), lastReviewedAt: new Date(Date.now() - 16 * 86400000).toISOString(), reviewIntervalDays: 14, reviewCount: 2 },
-  { ...DEMO_SUBMISSION, id: "11-container-with-most-water", number: "11", title: "Container With Most Water", slug: "container-with-most-water", url: "https://leetcode.com/problems/container-with-most-water/", difficulty: "Medium", language: "Python3", extension: "py", code: "left, right = 0, len(height) - 1\nwhile left < right:\n    left += 1", syncedAt: new Date(Date.now() - 86400000).toISOString(), reviewDueAt: new Date(Date.now() + 3 * 86400000).toISOString(), reviewIntervalDays: 14, reviewCount: 1 },
-  { ...DEMO_SUBMISSION, id: "1-two-sum", number: "1", title: "Two Sum", slug: "two-sum", url: "https://leetcode.com/problems/two-sum/", difficulty: "Easy", language: "Python3", extension: "py", code: "seen = dict()\nfor index, value in enumerate(nums):\n    seen[value] = index", syncedAt: new Date(Date.now() - 2 * 86400000).toISOString(), reviewDueAt: new Date(Date.now() - 2 * 3600000).toISOString() }
+  { ...DEMO_SUBMISSION, id: "11-container-with-most-water", number: "11", title: "Container With Most Water", slug: "container-with-most-water", url: "https://leetcode.com/problems/container-with-most-water/", difficulty: "Medium", tags: ["Array", "Two Pointers", "Greedy"], language: "Python3", extension: "py", code: "left, right = 0, len(height) - 1\nwhile left < right:\n    left += 1", syncedAt: new Date(Date.now() - 86400000).toISOString(), reviewDueAt: new Date(Date.now() + 3 * 86400000).toISOString(), reviewIntervalDays: 14, reviewCount: 1 },
+  { ...DEMO_SUBMISSION, id: "1-two-sum", number: "1", title: "Two Sum", slug: "two-sum", url: "https://leetcode.com/problems/two-sum/", difficulty: "Easy", tags: ["Array", "Hash Table"], language: "Python3", extension: "py", code: "seen = dict()\nfor index, value in enumerate(nums):\n    seen[value] = index", syncedAt: new Date(Date.now() - 2 * 86400000).toISOString(), reviewDueAt: new Date(Date.now() - 2 * 3600000).toISOString() }
 ].map((item) => ({ ...item, review: buildReview(item) }));
 
 const DEMO_ATTEMPTS = [

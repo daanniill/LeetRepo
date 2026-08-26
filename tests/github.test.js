@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { listRepos, listSolutionFolders, pushSubmission, verifyToken } from "../src/core/github.js";
+import { buildReadme } from "../src/core/submissions.js";
 
 test("listRepos returns repositories accessible to the supplied token", async (t) => {
   const calls = [];
@@ -30,11 +31,12 @@ test("listSolutionFolders imports every solution with its latest commit metadata
     { default_branch: "main" },
     { tree: [
       { type: "blob", path: "0001-two-sum/solution.py" },
-      { type: "blob", path: "0001-two-sum/README.md" },
+      { type: "blob", path: "0001-two-sum/README.md", sha: "two-sum-readme" },
       { type: "blob", path: "0001-two-sum/cpp/solution.cpp" },
       { type: "blob", path: "0002-add-two-numbers/python/solution.py" },
       { type: "blob", path: "notes.txt" }
     ] },
+    { encoding: "base64", content: btoa("# 1. Two Sum\n\n## Solution metadata\n\n- **Difficulty:** Easy\n") },
     [{ sha: "python-commit", commit: { committer: { date: "2026-08-01T10:00:00.000Z" } } }],
     [{ sha: "cpp-commit", commit: { committer: { date: "2026-08-07T10:00:00.000Z" } } }],
     [{ sha: "add-two-numbers-commit", commit: { author: { date: "2026-08-05T10:00:00.000Z" } } }]
@@ -47,16 +49,68 @@ test("listSolutionFolders imports every solution with its latest commit metadata
   const items = await listSolutionFolders("secret", "alex-c", "solutions");
   assert.equal(items.length, 2);
   assert.equal(items[0].title, "Two Sum");
+  assert.equal(items[0].difficulty, "Easy");
   assert.equal(items[0].language, "C++");
   assert.equal(items[0].syncedAt, "2026-08-07T10:00:00.000Z");
   assert.deepEqual(items[0].solutions.map((solution) => solution.language), ["C++", "Python3"]);
-  assert.equal(items[0].solutions[0].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum/cpp");
+  assert.deepEqual(items[0].solutions.map((solution) => solution.difficulty), ["Easy", "Easy"]);
+  assert.equal(items[0].solutions[0].commitUrl, "https://github.com/alex-c/solutions/tree/main/0001-two-sum");
   assert.equal(items[1].title, "Add Two Numbers");
+  assert.equal(items[1].difficulty, "Unknown");
   assert.equal(items[1].syncedAt, "2026-08-05T10:00:00.000Z");
   assert.equal(items[1].commitSha, "add-two-numbers-commit");
-  assert.match(calls[2], /path=0001-two-sum%2Fsolution.py/);
-  assert.match(calls[3], /path=0001-two-sum%2Fcpp%2Fsolution.cpp/);
-  assert.match(calls[4], /path=0002-add-two-numbers%2Fpython%2Fsolution.py/);
+  assert.match(calls[2], /git\/blobs\/two-sum-readme$/);
+  assert.match(calls[3], /path=0001-two-sum%2Fsolution.py/);
+  assert.match(calls[4], /path=0001-two-sum%2Fcpp%2Fsolution.cpp/);
+  assert.match(calls[5], /path=0002-add-two-numbers%2Fpython%2Fsolution.py/);
+});
+
+test("listSolutionFolders restores dashboard content from a tagged problem README", async (t) => {
+  const review = {
+    summary: "Use a hash map to find each complement.",
+    approach: ["Scan the array once.", "Return a stored complement."],
+    complexity: { time: "O(n)", space: "O(n)" },
+    generatedBy: "Groq"
+  };
+  const readme = buildReadme({
+    number: 1,
+    title: "Two Sum",
+    slug: "two-sum",
+    difficulty: "Easy",
+    tags: ["Array", "Hash Table"],
+    language: "Python3",
+    code: "return [0, 1]",
+    runtime: "40 ms",
+    memory: "18 MB",
+    problemDescription: "Return the indices of two values that add to the target.",
+    examples: [{ input: "nums = [2,7], target = 9", output: "[0,1]", explanation: "2 + 7 = 9." }],
+    constraints: ["2 <= nums.length <= 10^4"],
+    notes: "Remember duplicate values.",
+    reviewDueAt: "2026-09-01T00:00:00.000Z"
+  }, { aiEnabled: true }, review);
+  const replies = [
+    { default_branch: "main" },
+    { tree: [
+      { type: "blob", path: "0001-two-sum/README.md", sha: "readme-sha" },
+      { type: "blob", path: "0001-two-sum/python/solution.py", sha: "solution-sha" }
+    ] },
+    { encoding: "base64", content: Buffer.from(readme, "utf8").toString("base64") },
+    [{ sha: "solution-commit", commit: { committer: { date: "2026-08-01T10:00:00.000Z" } } }]
+  ];
+  let index = 0;
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(replies[index++]), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  }));
+
+  const [item] = await listSolutionFolders("secret", "alex-c", "solutions");
+  assert.equal(item.problemDescription, "Return the indices of two values that add to the target.");
+  assert.equal(item.code, "return [0, 1]");
+  assert.equal(item.review.summary, review.summary);
+  assert.equal(item.notes, "Remember duplicate values.");
+  assert.equal(item.reviewDueAt, "2026-09-01T00:00:00.000Z");
+  assert.deepEqual(item.examples, [{ input: "nums = [2,7], target = 9", output: "[0,1]", explanation: "2 + 7 = 9." }]);
+  assert.deepEqual(item.constraints, ["2 <= nums.length <= 10^4"]);
 });
 
 test("pushSubmission builds one tree and advances one branch ref", async (t) => {
@@ -107,7 +161,7 @@ test("pushSubmission builds one tree and advances one branch ref", async (t) => 
   assert.deepEqual(calls[8].body.parents, ["parent-sha"]);
   assert.equal(calls[9].init.method, "PATCH");
   assert.equal(calls[9].body.sha, "new-commit");
-  assert.equal(result.url, "https://github.com/alex-c/solutions/commit/new-commit");
+  assert.equal(result.url, "https://github.com/alex-c/solutions/tree/main/0001-two-sum");
   assert.equal(result.updated, false);
 });
 
@@ -298,6 +352,51 @@ test("pushSubmission retries on a non-fast-forward branch update", async (t) => 
   assert.equal(calls[9].body.force, false);
   assert.equal(calls[16].body.force, false);
   assert.equal(result.sha, "rebased-commit");
+});
+
+test("pushSubmission treats a matching competing branch update as success", async (t) => {
+  const calls = [];
+  const replies = [
+    { status: 200, body: { default_branch: "main" } },
+    { status: 200, body: { object: { sha: "original-parent" } } },
+    { status: 200, body: { tree: { sha: "original-tree" } } },
+    { status: 200, body: { tree: [] } },
+    { status: 200, body: { sha: "solution-blob" } },
+    { status: 200, body: { sha: "readme-blob" } },
+    { status: 200, body: { sha: "first-tree" } },
+    { status: 200, body: { tree: [
+      { type: "blob", path: "0001-two-sum/python/solution.py", sha: "solution-blob" },
+      { type: "blob", path: "0001-two-sum/README.md", sha: "readme-blob" }
+    ] } },
+    { status: 200, body: { sha: "first-commit" } },
+    { status: 422, body: { message: "Update is not a fast forward" } },
+    { status: 200, body: { object: { sha: "landed-commit" } } },
+    { status: 200, body: { tree: { sha: "landed-tree" } } },
+    { status: 200, body: { tree: [
+      { type: "blob", path: "0001-two-sum/python/solution.py", sha: "solution-blob" },
+      { type: "blob", path: "0001-two-sum/README.md", sha: "readme-blob" }
+    ] } }
+  ];
+  t.mock.method(globalThis, "fetch", async (url, init = {}) => {
+    const reply = replies[calls.length];
+    calls.push({ url, init, body: init.body ? JSON.parse(init.body) : null });
+    return new Response(JSON.stringify(reply.body), {
+      status: reply.status,
+      headers: { "content-type": "application/json" }
+    });
+  });
+
+  const result = await pushSubmission({
+    token: "secret",
+    settings: { owner: "alex-c", repo: "solutions", branch: "main", includeReadme: true },
+    submission: { number: 1, title: "Two Sum", language: "Python3", code: "return [0, 1]" }
+  });
+
+  assert.equal(result.sha, "landed-commit");
+  assert.equal(result.url, "https://github.com/alex-c/solutions/tree/main/0001-two-sum");
+  assert.equal(calls.filter((call) => call.url.endsWith("/git/commits") && call.init.method === "POST").length, 1);
+  assert.equal(calls.filter((call) => call.url.includes("/git/refs/heads/") && call.init.method === "PATCH").length, 1);
+  assert.equal(calls.length, 13);
 });
 
 test("pushSubmission aborts before moving the branch if the proposed tree loses a file", async (t) => {

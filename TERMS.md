@@ -1,12 +1,12 @@
 # LeetRepo Lite Terms and Conditions
 
-Last updated: August 11, 2026
+Last updated: August 25, 2026
 
 These Terms govern use of the LeetRepo Lite browser extension. LeetRepo Lite is local-first software with no LeetRepo account or hosted backend. By installing or using it, you agree to these Terms. Source-code rights are granted separately under the [MIT License](LICENSE).
 
 ## 1. What LeetRepo Lite does
 
-LeetRepo Lite captures LeetCode submission information, stores local solve and review history, commits user-selected files to a GitHub repository, and optionally requests explanations from an AI endpoint configured by the user.
+LeetRepo Lite captures LeetCode submission information, stores compact attempt history locally, commits solution and study data to a GitHub repository, and optionally requests explanations from an AI endpoint configured by the user.
 
 Features that interact with GitHub, LeetCode, an AI provider, or browser services depend on those third parties and their terms.
 

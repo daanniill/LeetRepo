@@ -8,6 +8,7 @@ import {
   normalizeStudyInterval,
   patternCoverage,
   rescheduleFirstReview,
+  reviewDueAfterSync,
   reviewDueAt,
   scheduleReview,
   studyIntervalDays,
@@ -58,6 +59,22 @@ test("changing the preference reschedules first reviews without moving completed
   assert.equal(rescheduleFirstReview(completed, 2).reviewDueAt, completed.reviewDueAt);
 });
 
+test("syncing again preserves a completed review cycle", () => {
+  assert.equal(reviewDueAfterSync({}, "2026-08-08T12:00:00.000Z", 7), "2026-08-15T12:00:00.000Z");
+  assert.equal(reviewDueAfterSync({
+    reviewCount: 2,
+    lastReviewedAt: "2026-08-05T12:00:00.000Z",
+    reviewIntervalDays: 14,
+    reviewDueAt: "2026-08-19T12:00:00.000Z"
+  }, "2026-08-08T12:00:00.000Z", 7), "2026-08-19T12:00:00.000Z");
+  assert.equal(reviewDueAfterSync({
+    reviewCount: 1,
+    lastReviewedAt: "2026-08-05T12:00:00.000Z",
+    reviewIntervalDays: 14
+  }, "2026-08-08T12:00:00.000Z", 7), "2026-08-19T12:00:00.000Z");
+  assert.equal(reviewDueAfterSync({}, "2026-08-08T12:00:00.000Z", 7, false), null);
+});
+
 test("completing and snoozing a review update only the intended study state", () => {
   const completed = scheduleReview({ id: "1-two-sum", reviewCount: 2, reviewLapses: 1, reviewIntervalDays: 7 }, "again", now);
   assert.equal(completed.reviewDueAt, "2026-08-09T12:00:00.000Z");
@@ -67,6 +84,28 @@ test("completing and snoozing a review update only the intended study state", ()
   const snoozed = snoozeReview(completed, now, 3);
   assert.equal(snoozed.reviewDueAt, "2026-08-11T12:00:00.000Z");
   assert.equal(snoozed.reviewCount, 3);
+  assert.equal(snoozed.reviewEvents.length, 1, "snoozing does not log a review event");
+});
+
+test("scheduling a review appends to review-event history instead of replacing it", () => {
+  const first = scheduleReview({ id: "1-two-sum" }, "hard", new Date("2026-08-01T12:00:00.000Z"));
+  assert.deepEqual(first.reviewEvents, [
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 }
+  ]);
+  const second = scheduleReview(first, "good", now);
+  assert.deepEqual(second.reviewEvents, [
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 },
+    { ratedAt: "2026-08-08T12:00:00.000Z", rating: "good", intervalDaysAfter: 7 }
+  ]);
+});
+
+test("review-event history is capped so storage cannot grow without bound", () => {
+  let item = { id: "1-two-sum" };
+  for (let i = 0; i < 205; i += 1) {
+    item = scheduleReview(item, "good", new Date(now.getTime() + i * 1000));
+  }
+  assert.equal(item.reviewEvents.length, 200);
+  assert.equal(item.reviewCount, 205);
 });
 
 test("study queue exposes due, overdue, upcoming, and next-week groups", () => {
@@ -83,17 +122,17 @@ test("study queue exposes due, overdue, upcoming, and next-week groups", () => {
   assert.equal(queue.totalReviews, 3);
 });
 
-test("pattern coverage normalizes aliases and distinguishes due, rotation, practiced, and unseen", () => {
+test("topic coverage keeps LeetCode names and distinguishes due, rotation, and practiced", () => {
   const coverage = patternCoverage([
-    { reviewDueAt: "2026-08-07T12:00:00.000Z", review: { patterns: ["BFS"] } },
-    { reviewDueAt: "2026-08-20T12:00:00.000Z", review: { patterns: ["Hash Map"] } },
-    { reviewDueAt: "2026-08-20T12:00:00.000Z", review: { patterns: ["Stack"] } },
-    { reviewDueAt: "2026-08-21T12:00:00.000Z", review: { patterns: ["Stack"] } },
-    { reviewDueAt: "2026-08-22T12:00:00.000Z", review: { patterns: ["Stack"] } }
+    { reviewDueAt: "2026-08-07T12:00:00.000Z", tags: ["Breadth-First Search"] },
+    { reviewDueAt: "2026-08-20T12:00:00.000Z", tags: ["Hash Table"] },
+    { reviewDueAt: "2026-08-20T12:00:00.000Z", tags: ["Stack"] },
+    { reviewDueAt: "2026-08-21T12:00:00.000Z", tags: ["Stack"] },
+    { reviewDueAt: "2026-08-22T12:00:00.000Z", tags: ["Stack"] }
   ], undefined, now);
-  assert.equal(canonicalPattern("bfs"), "Graph Traversal");
-  assert.equal(coverage.find(({ pattern }) => pattern === "Graph Traversal").status, "due");
-  assert.equal(coverage.find(({ pattern }) => pattern === "Arrays & Hashing").status, "rotation");
+  assert.equal(canonicalPattern("  Breadth-First   Search "), "Breadth-First Search");
+  assert.equal(coverage.find(({ pattern }) => pattern === "Breadth-First Search").status, "due");
+  assert.equal(coverage.find(({ pattern }) => pattern === "Hash Table").status, "rotation");
   assert.equal(coverage.find(({ pattern }) => pattern === "Stack").status, "practiced");
-  assert.equal(coverage.find(({ pattern }) => pattern === "Trie").status, "unseen");
+  assert.equal(coverage.some(({ status }) => status === "unseen"), false);
 });
