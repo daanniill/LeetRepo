@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from "../../core/submissions.js";
-import { formatStudyInterval, normalizeStudyInterval } from "../../core/study.js";
+import { formatStudyInterval, normalizeDailyStudyLimit, normalizeStudyInterval } from "../../core/study.js";
 import { applyTheme, logo, send, setBusy, showNotice } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
@@ -20,6 +20,9 @@ function syncStudyIntervalControls({ clamp = false } = {}) {
   document.querySelector("#study-interval-preview").textContent = enabled
     ? `Got it resurfaces this problem after ${formatStudyInterval(interval.days, interval.unit)}.`
     : "Turn on spaced repetition to use this interval.";
+  const dailyLimit = document.querySelector("#daily-study-limit");
+  dailyLimit.disabled = !enabled;
+  document.querySelector("#daily-study-limit-setting").classList.toggle("disabled", !enabled);
 }
 
 async function init() {
@@ -36,6 +39,7 @@ async function init() {
   const studyInterval = normalizeStudyInterval(settings.studyIntervalValue, settings.studyIntervalUnit);
   document.querySelector("#study-interval-value").value = studyInterval.value;
   document.querySelector("#study-interval-unit").value = studyInterval.unit;
+  document.querySelector("#daily-study-limit").value = normalizeDailyStudyLimit(settings.dailyStudyLimit);
   const themeInputs = [...document.querySelectorAll('input[name="theme"]')];
   const theme = themeInputs.find((input) => input.value === settings.theme) || themeInputs[0];
   theme.checked = true;
@@ -67,6 +71,7 @@ document.querySelector("#settings-form").addEventListener("submit", async (event
       commitTemplate: document.querySelector("#commit-template").value.trim(),
       studyIntervalValue: Number(document.querySelector("#study-interval-value").value),
       studyIntervalUnit: document.querySelector("#study-interval-unit").value,
+      dailyStudyLimit: Number(document.querySelector("#daily-study-limit").value),
       theme: document.querySelector('input[name="theme"]:checked')?.value || DEFAULT_SETTINGS.theme
     };
     toggleKeys.forEach((key) => settings[key] = document.querySelector(`#${key}`).checked);

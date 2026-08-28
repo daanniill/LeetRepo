@@ -3,7 +3,7 @@ import { listRepos, listSolutionFolders, pushSubmission } from "../core/github.j
 import { beginHostedGitHubSignIn, hostedRequest, launchIdentityWebAuthFlow, newRequestId } from "../core/service.js";
 import { clearDeviceAuthentication, hasCompletedOnboarding, settingsForSync } from "../core/auth.js";
 import { clearLeetRepoStorage } from "../core/storage.js";
-import { normalizeStudyInterval, reviewDueAfterSync, scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
+import { normalizeDailyStudyLimit, normalizeStudyInterval, reviewDueAfterSync, scheduleReview, snoozeReview, studyIntervalDays } from "../core/study.js";
 
 const getLocal = (keys) => chrome.storage.local.get(keys);
 const setLocal = (value) => chrome.storage.local.set(value);
@@ -46,6 +46,7 @@ function normalizeSettings(value = {}) {
     includeReadme: true,
     studyIntervalValue: studyInterval.value,
     studyIntervalUnit: studyInterval.unit,
+    dailyStudyLimit: normalizeDailyStudyLimit(stored.dailyStudyLimit),
     theme: normalizeTheme(stored.theme)
   };
 }

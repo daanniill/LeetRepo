@@ -1,4 +1,4 @@
-import { MAX_REVIEW_EVENTS, REVIEW_RATINGS } from "./study.js";
+import { DEFAULT_DAILY_STUDY_LIMIT, MAX_REVIEW_EVENTS, REVIEW_RATINGS } from "./study.js";
 
 export { dueForReview, reviewDueAt } from "./study.js";
 
@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS = {
   spacedRepetition: true,
   studyIntervalValue: 30,
   studyIntervalUnit: "days",
+  dailyStudyLimit: DEFAULT_DAILY_STUDY_LIMIT,
   aiEnabled: false,
   aiConsent: false,
   commitTemplate: "solve: {number}. {title} ({difficulty})",

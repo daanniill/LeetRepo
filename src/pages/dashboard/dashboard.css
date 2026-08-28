@@ -144,6 +144,8 @@
 .study-queue-panel { min-height: 610px; overflow: hidden; display: flex; flex-direction: column; }
 .study-queue-header { padding: var(--space-5) var(--space-5) var(--space-4); display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); }
 .study-queue-header h2 { margin: 7px 0 0; font-size: var(--text-lg); }
+.study-plan-progress { margin: 5px 0 0; color: var(--accent-ink); font-size: var(--text-3xs); font-weight: 700; }
+.study-plan-progress[hidden] { display: none; }
 .queue-total { min-width: 34px; height: 34px; padding: 0 9px; border-radius: var(--radius-sm); display: grid; place-items: center; color: var(--accent-ink); background: var(--accent-tint); font: 700 var(--text-xs) var(--font-heading); font-variant-numeric: tabular-nums; }
 .study-tabs { margin: 0 var(--space-5); padding: var(--space-1); border: 1px solid var(--line); border-radius: var(--radius-sm); display: grid; grid-template-columns: 1fr 1fr; }
 .study-tab { min-height: var(--control-h-sm); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-xs); color: var(--muted); background: transparent; cursor: pointer; font-size: var(--text-2xs); font-weight: 700; transition: color var(--dur-2) var(--ease-out), background-color var(--dur-3) var(--ease-out), box-shadow var(--dur-3) var(--ease-out); }

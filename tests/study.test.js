@@ -5,11 +5,13 @@ import {
   canonicalPattern,
   formatStudyInterval,
   nextReviewInterval,
+  normalizeDailyStudyLimit,
   normalizeStudyInterval,
   patternCoverage,
   rescheduleFirstReview,
   reviewDueAfterSync,
   reviewDueAt,
+  reviewsCompletedOn,
   scheduleReview,
   studyIntervalDays,
   snoozeReview
@@ -126,6 +128,51 @@ test("study queue exposes due, overdue, upcoming, and next-week groups", () => {
   assert.deepEqual(queue.upcoming.map(({ item }) => item.id), ["soon", "later"]);
   assert.deepEqual(queue.nextSevenDays.map(({ item }) => item.id), ["soon"]);
   assert.equal(queue.totalReviews, 3);
+});
+
+test("daily study limit is bounded to a sane range", () => {
+  assert.equal(normalizeDailyStudyLimit(5), 5);
+  assert.equal(normalizeDailyStudyLimit(0), 10);
+  assert.equal(normalizeDailyStudyLimit(-3), 10);
+  assert.equal(normalizeDailyStudyLimit("not a number"), 10);
+  assert.equal(normalizeDailyStudyLimit(500), 50);
+});
+
+test("reviewsCompletedOn counts only review events rated today", () => {
+  const items = [
+    { reviewEvents: [
+      { ratedAt: new Date(now.getTime() - 3_600_000).toISOString(), rating: "good" },
+      { ratedAt: new Date(now.getTime() - 5 * 86_400_000).toISOString(), rating: "hard" }
+    ] },
+    { reviewEvents: [{ ratedAt: new Date(now.getTime() + 3_600_000).toISOString(), rating: "again" }] }
+  ];
+  assert.equal(reviewsCompletedOn(items, now), 2);
+  assert.equal(reviewsCompletedOn([], now), 0);
+});
+
+test("today's plan caps the due queue at the daily limit and accounts for reviews already completed today", () => {
+  const dueItems = Array.from({ length: 5 }, (_, index) => ({
+    id: `due-${index}`,
+    reviewDueAt: "2026-08-08T09:00:00.000Z"
+  }));
+  const uncapped = buildStudyQueue(dueItems, now, undefined, 10);
+  assert.equal(uncapped.plan.length, 5);
+  assert.equal(uncapped.planLimit, 10);
+  assert.equal(uncapped.planTotal, 5);
+  assert.equal(uncapped.completedToday, 0);
+
+  const capped = buildStudyQueue(dueItems, now, undefined, 3);
+  assert.deepEqual(capped.plan.map(({ item }) => item.id), ["due-0", "due-1", "due-2"]);
+  assert.equal(capped.planTotal, 3);
+
+  const alreadyReviewedToday = [
+    { id: "reviewed-earlier", reviewDueAt: "2026-09-01T00:00:00.000Z", reviewEvents: [{ ratedAt: "2026-08-08T08:00:00.000Z", rating: "good" }] },
+    ...dueItems
+  ];
+  const afterProgress = buildStudyQueue(alreadyReviewedToday, now, undefined, 3);
+  assert.equal(afterProgress.completedToday, 1);
+  assert.equal(afterProgress.plan.length, 2, "the daily limit already counts today's completed review");
+  assert.equal(afterProgress.planTotal, 3);
 });
 
 test("topic coverage keeps LeetCode names and distinguishes due, rotation, and practiced", () => {

@@ -59,6 +59,27 @@ export function studyIntervalDays(settings = {}) {
   return normalizeStudyInterval(settings.studyIntervalValue, settings.studyIntervalUnit).days;
 }
 
+export const DEFAULT_DAILY_STUDY_LIMIT = 10;
+const DAILY_STUDY_LIMIT_MAX = 50;
+
+export function normalizeDailyStudyLimit(value) {
+  return Math.min(positiveInteger(value) || DEFAULT_DAILY_STUDY_LIMIT, DAILY_STUDY_LIMIT_MAX);
+}
+
+export function reviewsCompletedOn(items = [], now = new Date()) {
+  const current = validDate(now) || new Date();
+  const startOfDay = new Date(current);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(startOfDay.getTime() + DAY_MS);
+  return items.reduce((total, item) => {
+    const events = Array.isArray(item.reviewEvents) ? item.reviewEvents : [];
+    return total + events.filter((event) => {
+      const ratedAt = validDate(event.ratedAt);
+      return ratedAt && ratedAt >= startOfDay && ratedAt < endOfDay;
+    }).length;
+  }, 0);
+}
+
 export function formatStudyInterval(days, preferredUnit = null) {
   const value = positiveInteger(days) || 1;
   if (STUDY_INTERVAL_UNITS.includes(preferredUnit) && value % INTERVAL_UNIT_DAYS[preferredUnit] === 0) {
@@ -135,7 +156,7 @@ export function snoozeReview(item = {}, now = new Date(), days = 3) {
   return { ...item, reviewDueAt: addDays(snoozedAt, snoozeDays).toISOString() };
 }
 
-export function buildStudyQueue(items = [], now = new Date(), initialIntervalDays = INITIAL_REVIEW_INTERVAL_DAYS) {
+export function buildStudyQueue(items = [], now = new Date(), initialIntervalDays = INITIAL_REVIEW_INTERVAL_DAYS, dailyLimit = DEFAULT_DAILY_STUDY_LIMIT) {
   const current = validDate(now) || new Date();
   const startOfToday = new Date(current);
   startOfToday.setHours(0, 0, 0, 0);
@@ -146,12 +167,19 @@ export function buildStudyQueue(items = [], now = new Date(), initialIntervalDay
     .sort((left, right) => left.dueAt - right.dueAt);
   const due = scheduled.filter((entry) => entry.dueAt <= current);
   const upcoming = scheduled.filter((entry) => entry.dueAt > current);
+  const completedToday = reviewsCompletedOn(items, current);
+  const planLimit = normalizeDailyStudyLimit(dailyLimit);
+  const plan = due.slice(0, Math.max(0, planLimit - completedToday));
   return {
     due,
     upcoming,
     overdue: due.filter((entry) => entry.dueAt < startOfToday),
     nextSevenDays: upcoming.filter((entry) => entry.dueAt <= nextWeek),
-    totalReviews: items.reduce((total, item) => total + Math.max(nonNegativeInteger(item.reviewCount), item.lastReviewedAt ? 1 : 0), 0)
+    totalReviews: items.reduce((total, item) => total + Math.max(nonNegativeInteger(item.reviewCount), item.lastReviewedAt ? 1 : 0), 0),
+    plan,
+    planLimit,
+    planTotal: Math.min(planLimit, completedToday + due.length),
+    completedToday
   };
 }
 

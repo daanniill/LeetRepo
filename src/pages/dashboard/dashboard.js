@@ -15,6 +15,7 @@ let studyRevealed = false;
 let studyEntries = [];
 let studyRecallItemId = null;
 let studyRecallDraft = "";
+let studyPlanExtended = false;
 let toastTimer;
 let toastHideTimer;
 const DAY_MS = 86400000;
@@ -276,7 +277,7 @@ function filteredStudyEntries(entries) {
 
 function renderStudyQueue(queue, enabled) {
   const list = document.querySelector("#study-queue");
-  const source = studyTab === "due" ? queue.due : queue.upcoming;
+  const source = studyTab === "due" ? (studyPlanExtended ? queue.due : queue.plan) : queue.upcoming;
   const entries = filteredStudyEntries(source);
   studyEntries = [];
   document.querySelector("#study-queue-total").textContent = entries.length;
@@ -296,12 +297,16 @@ function renderStudyQueue(queue, enabled) {
   if (!entries.length) {
     const hasFilters = studyPattern !== "All" || studyDifficulty !== "All";
     const next = queue.upcoming[0];
+    const remainingBeyondPlan = studyTab === "due" && !studyPlanExtended ? queue.due.length - queue.plan.length : 0;
     list.innerHTML = hasFilters
       ? '<div class="study-empty"><strong>No matching reviews</strong><p>Clear a filter to see the rest of your queue.</p><button class="button ghost" id="clear-study-filters">Clear filters</button></div>'
-      : studyTab === "due" && queue.upcoming.length
-        ? `<div class="study-empty"><strong>You’re clear for now</strong><p>Your next review is ${escapeHtml(studyDueLabel(next.dueAt))}.</p><button class="button ghost" id="show-upcoming-reviews">View upcoming</button></div>`
-        : '<div class="study-empty"><strong>Nothing scheduled</strong><p>Newly synced solutions receive their first review date automatically.</p></div>';
+      : remainingBeyondPlan > 0
+        ? `<div class="study-empty"><strong>Today’s plan complete</strong><p>${remainingBeyondPlan} more review${remainingBeyondPlan === 1 ? " is" : "s are"} due if you want to keep going.</p><button class="button ghost" id="extend-study-plan">Study more today</button></div>`
+        : studyTab === "due" && queue.upcoming.length
+          ? `<div class="study-empty"><strong>You’re clear for now</strong><p>Your next review is ${escapeHtml(studyDueLabel(next.dueAt))}.</p><button class="button ghost" id="show-upcoming-reviews">View upcoming</button></div>`
+          : '<div class="study-empty"><strong>Nothing scheduled</strong><p>Newly synced solutions receive their first review date automatically.</p></div>';
     document.querySelector("#clear-study-filters")?.addEventListener("click", () => { studyPattern = "All"; studyDifficulty = "All"; selectedStudyId = null; renderStudy(); });
+    document.querySelector("#extend-study-plan")?.addEventListener("click", () => { studyPlanExtended = true; renderStudy(); });
     document.querySelector("#show-upcoming-reviews")?.addEventListener("click", () => { studyTab = "upcoming"; selectedStudyId = null; studyRevealed = false; renderStudy(); });
     return null;
   }
@@ -451,15 +456,20 @@ function renderStudy() {
   const items = state.submissions;
   const enabled = state.settings.spacedRepetition !== false;
   const preferredIntervalDays = studyIntervalDays(state.settings);
-  const queue = buildStudyQueue(items, new Date(), preferredIntervalDays);
+  const queue = buildStudyQueue(items, new Date(), preferredIntervalDays, state.settings.dailyStudyLimit);
   const coverage = patternCoverage(items, studyPatternsFor, new Date(), preferredIntervalDays);
   const inRotation = coverage.filter(({ count }) => count > 0).length;
   document.querySelector("#study-due-stat").textContent = enabled ? queue.due.length : 0;
   document.querySelector("#study-upcoming-stat").textContent = enabled ? queue.nextSevenDays.length : 0;
   document.querySelector("#study-reviewed-stat").textContent = queue.totalReviews;
   document.querySelector("#study-pattern-stat").textContent = inRotation;
-  document.querySelector("#study-due-tab-count").textContent = enabled ? queue.due.length : 0;
+  document.querySelector("#study-due-tab-count").textContent = enabled ? (studyPlanExtended ? queue.due.length : queue.plan.length) : 0;
   document.querySelector("#study-upcoming-tab-count").textContent = enabled ? queue.upcoming.length : 0;
+  const planProgress = document.querySelector("#study-plan-progress");
+  planProgress.hidden = !enabled || queue.planTotal === 0;
+  if (!planProgress.hidden) {
+    planProgress.textContent = `${Math.min(queue.completedToday, queue.planTotal)} of ${queue.planTotal} planned for today`;
+  }
   populateStudyFilters(coverage);
   document.querySelector("#study-pattern-filter").disabled = !enabled || !items.length;
   document.querySelector("#study-difficulty-filter").disabled = !enabled || !items.length;
