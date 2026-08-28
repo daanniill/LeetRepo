@@ -1,5 +1,5 @@
 import { buildReview, calculateStreak, historyInsights, relativeTime, solveTimestamp, submissionSearchText, submissionSolutions } from "../../core/submissions.js";
-import { buildStudyQueue, formatStudyInterval, nextReviewInterval, patternCoverage, studyIntervalDays } from "../../core/study.js";
+import { buildStudyQueue, formatStudyInterval, nextReviewInterval, patternCoverage, studyIntervalDays, todaysReviewSummary } from "../../core/study.js";
 import { difficultyClass, escapeHtml, logo, send, setBusy } from "../../shared/client.js";
 
 document.querySelector("#logo").innerHTML = logo();
@@ -366,7 +366,27 @@ function renderStudyQueue(queue, enabled) {
   return entries.find(({ item }) => item.id === selectedStudyId) || entries[0];
 }
 
-function renderStudySession(entry, enabled, preferredIntervalDays) {
+function renderSessionSummary(summary) {
+  const timeNote = summary.timedCount > 0
+    ? `You studied for ${formatDuration(summary.totalDurationSeconds)}.`
+    : "Nice work — come back tomorrow for more.";
+  const list = summary.entries.slice(0, 6)
+    .map(({ item }) => `<li>${String(item.number).padStart(4, "0")}. ${escapeHtml(item.title)}</li>`)
+    .join("");
+  return `<div class="study-session-empty study-summary">
+    <div class="eyebrow">Session complete</div>
+    <h2>${summary.count} review${summary.count === 1 ? "" : "s"} today</h2>
+    <p>${escapeHtml(timeNote)}</p>
+    <div class="summary-ratings">
+      <span class="summary-rating again"><strong>${summary.ratings.again}</strong>Again</span>
+      <span class="summary-rating hard"><strong>${summary.ratings.hard}</strong>Hard</span>
+      <span class="summary-rating good"><strong>${summary.ratings.good}</strong>Good</span>
+    </div>
+    ${list ? `<ul class="summary-list">${list}</ul>` : ""}
+  </div>`;
+}
+
+function renderStudySession(entry, enabled, preferredIntervalDays, queue) {
   const panel = document.querySelector("#study-session");
   if (!enabled) {
     studyRecallItemId = null;
@@ -380,6 +400,10 @@ function renderStudySession(entry, enabled, preferredIntervalDays) {
     studyRecallItemId = null;
     studyRecallDraft = "";
     studyCardStartedAt = null;
+    if (studyTab === "due" && queue?.due.length === 0 && queue?.completedToday > 0) {
+      panel.innerHTML = renderSessionSummary(todaysReviewSummary(state.submissions, new Date()));
+      return;
+    }
     const message = state.submissions.length ? "Choose a review from the queue when you’re ready." : "Sync your first Accepted solution to create a study session.";
     panel.innerHTML = `<div class="study-session-empty"><div class="eyebrow">Study session</div><h2>No active review</h2><p>${escapeHtml(message)}</p></div>`;
     return;
@@ -514,7 +538,7 @@ function renderStudy() {
   document.querySelector("#study-pattern-filter").disabled = !enabled || !items.length;
   document.querySelector("#study-difficulty-filter").disabled = !enabled || !items.length;
   const selectedEntry = renderStudyQueue(queue, enabled);
-  renderStudySession(selectedEntry, enabled, preferredIntervalDays);
+  renderStudySession(selectedEntry, enabled, preferredIntervalDays, queue);
   renderPatternCoverage(coverage, enabled);
 
   const insights = historyInsights(items);

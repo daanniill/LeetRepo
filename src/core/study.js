@@ -66,18 +66,35 @@ export function normalizeDailyStudyLimit(value) {
   return Math.min(positiveInteger(value) || DEFAULT_DAILY_STUDY_LIMIT, DAILY_STUDY_LIMIT_MAX);
 }
 
-export function reviewsCompletedOn(items = [], now = new Date()) {
+export function todaysReviewSummary(items = [], now = new Date()) {
   const current = validDate(now) || new Date();
   const startOfDay = new Date(current);
   startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(startOfDay.getTime() + DAY_MS);
-  return items.reduce((total, item) => {
+  const entries = [];
+  for (const item of items) {
     const events = Array.isArray(item.reviewEvents) ? item.reviewEvents : [];
-    return total + events.filter((event) => {
+    for (const event of events) {
       const ratedAt = validDate(event.ratedAt);
-      return ratedAt && ratedAt >= startOfDay && ratedAt < endOfDay;
-    }).length;
-  }, 0);
+      if (ratedAt && ratedAt >= startOfDay && ratedAt < endOfDay) entries.push({ item, event });
+    }
+  }
+  entries.sort((left, right) => Date.parse(right.event.ratedAt) - Date.parse(left.event.ratedAt));
+  const ratings = { again: 0, hard: 0, good: 0 };
+  let totalDurationSeconds = 0;
+  let timedCount = 0;
+  for (const { event } of entries) {
+    if (REVIEW_RATINGS.includes(event.rating)) ratings[event.rating] += 1;
+    if (Number.isFinite(event.durationSeconds)) {
+      totalDurationSeconds += event.durationSeconds;
+      timedCount += 1;
+    }
+  }
+  return { count: entries.length, entries, ratings, totalDurationSeconds, timedCount };
+}
+
+export function reviewsCompletedOn(items = [], now = new Date()) {
+  return todaysReviewSummary(items, now).count;
 }
 
 export function formatStudyInterval(days, preferredUnit = null) {

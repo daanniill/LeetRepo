@@ -14,7 +14,8 @@ import {
   reviewsCompletedOn,
   scheduleReview,
   studyIntervalDays,
-  snoozeReview
+  snoozeReview,
+  todaysReviewSummary
 } from "../src/core/study.js";
 
 const now = new Date("2026-08-08T12:00:00.000Z");
@@ -155,6 +156,39 @@ test("reviewsCompletedOn counts only review events rated today", () => {
   ];
   assert.equal(reviewsCompletedOn(items, now), 2);
   assert.equal(reviewsCompletedOn([], now), 0);
+});
+
+test("todaysReviewSummary aggregates ratings, timing, and reviewed items from today only", () => {
+  const items = [
+    {
+      id: "two-sum",
+      title: "Two Sum",
+      reviewEvents: [
+        { ratedAt: new Date(now.getTime() - 10 * 60_000).toISOString(), rating: "good", durationSeconds: 30 },
+        { ratedAt: new Date(now.getTime() - 5 * 86_400_000).toISOString(), rating: "again", durationSeconds: 999 }
+      ]
+    },
+    {
+      id: "trapping-rain-water",
+      title: "Trapping Rain Water",
+      reviewEvents: [{ ratedAt: new Date(now.getTime() - 5 * 60_000).toISOString(), rating: "hard", durationSeconds: null }]
+    }
+  ];
+  const summary = todaysReviewSummary(items, now);
+  assert.equal(summary.count, 2);
+  assert.deepEqual(summary.ratings, { again: 0, hard: 1, good: 1 });
+  assert.equal(summary.totalDurationSeconds, 30);
+  assert.equal(summary.timedCount, 1);
+  assert.deepEqual(summary.entries.map(({ item }) => item.id), ["trapping-rain-water", "two-sum"], "most recently reviewed comes first");
+});
+
+test("todaysReviewSummary is empty when nothing has been reviewed today", () => {
+  const summary = todaysReviewSummary([], now);
+  assert.equal(summary.count, 0);
+  assert.deepEqual(summary.ratings, { again: 0, hard: 0, good: 0 });
+  assert.equal(summary.totalDurationSeconds, 0);
+  assert.equal(summary.timedCount, 0);
+  assert.deepEqual(summary.entries, []);
 });
 
 test("today's plan caps the due queue at the daily limit and accounts for reviews already completed today", () => {
