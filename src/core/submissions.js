@@ -1,4 +1,4 @@
-import { DEFAULT_DAILY_STUDY_LIMIT, MAX_REVIEW_EVENTS, REVIEW_RATINGS } from "./study.js";
+import { DEFAULT_DAILY_STUDY_LIMIT, MAX_REVIEW_DURATION_SECONDS, MAX_REVIEW_EVENTS, REVIEW_RATINGS } from "./study.js";
 
 export { dueForReview, reviewDueAt } from "./study.js";
 
@@ -103,11 +103,15 @@ function normalizeReviewEvents(value) {
     if (!REVIEW_RATINGS.includes(event.rating)) return [];
     const intervalDaysAfter = Number(event.intervalDaysAfter);
     if (!Number.isFinite(intervalDaysAfter) || intervalDaysAfter <= 0) return [];
+    const durationSeconds = event.durationSeconds == null ? NaN : Number(event.durationSeconds);
     return [{
       ratedAt: ratedAt.toISOString(),
       rating: event.rating,
       intervalDaysAfter: Math.floor(intervalDaysAfter),
-      recall: boundedText(event.recall, 2_000)
+      recall: boundedText(event.recall, 2_000),
+      durationSeconds: Number.isFinite(durationSeconds) && durationSeconds >= 0
+        ? Math.min(Math.round(durationSeconds), MAX_REVIEW_DURATION_SECONDS)
+        : null
     }];
   }).slice(-MAX_REVIEW_EVENTS);
 }

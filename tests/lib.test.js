@@ -154,7 +154,7 @@ test("normalizeSubmission validates and bounds review-event history", () => {
   const item = normalizeSubmission({
     ...submission,
     reviewEvents: [
-      { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "  Used a hash map to track complements.  " },
+      { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "  Used a hash map to track complements.  ", durationSeconds: 4_000 },
       { ratedAt: "not-a-date", rating: "good", intervalDaysAfter: 14 },
       { ratedAt: "2026-08-02T12:00:00.000Z", rating: "invalid-rating", intervalDaysAfter: 14 },
       { ratedAt: "2026-08-03T12:00:00.000Z", rating: "hard", intervalDaysAfter: -1 },
@@ -162,8 +162,9 @@ test("normalizeSubmission validates and bounds review-event history", () => {
     ]
   });
   assert.deepEqual(item.reviewEvents, [
-    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "Used a hash map to track complements." }
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "Used a hash map to track complements.", durationSeconds: 3_600 }
   ]);
+  assert.equal(normalizeSubmission({ ...submission, reviewEvents: [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, durationSeconds: -5 }] }).reviewEvents[0].durationSeconds, null);
   assert.deepEqual(normalizeSubmission(submission).reviewEvents, []);
 });
 
@@ -171,18 +172,18 @@ test("resyncing a re-pushed solution unions review-event history instead of drop
   const existing = {
     ...submission,
     reviewCount: 1,
-    reviewEvents: [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" }]
+    reviewEvents: [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "", durationSeconds: null }]
   };
   const merged = mergeSubmissionSolutions(existing, { ...submission, code: "return 2;", syncedAt: "2026-08-07T10:00:00.000Z" });
-  assert.deepEqual(merged.reviewEvents, [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" }]);
+  assert.deepEqual(merged.reviewEvents, [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "", durationSeconds: null }]);
 
   const rereviewed = mergeSubmissionSolutions(merged, {
     ...submission,
-    reviewEvents: [{ ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "Sliding window." }]
+    reviewEvents: [{ ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "Sliding window.", durationSeconds: 42 }]
   });
   assert.deepEqual(rereviewed.reviewEvents, [
-    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" },
-    { ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "Sliding window." }
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "", durationSeconds: null },
+    { ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "Sliding window.", durationSeconds: 42 }
   ]);
 });
 

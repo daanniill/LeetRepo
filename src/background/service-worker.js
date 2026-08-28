@@ -446,7 +446,7 @@ export async function handle(message) {
         const now = new Date();
         const updatedSubmission = message.type === "SNOOZE_REVIEW"
           ? snoozeReview(existing, now, 3)
-          : scheduleReview(existing, message.type === "MARK_REVIEWED" ? "good" : message.rating, now, studyIntervalDays(settings), message.recall);
+          : scheduleReview(existing, message.type === "MARK_REVIEWED" ? "good" : message.rating, now, studyIntervalDays(settings), message.recall, message.durationSeconds);
         await updateRepositoryReadme(
           accessToken,
           normalizedSettings,

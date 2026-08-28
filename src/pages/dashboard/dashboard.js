@@ -16,6 +16,9 @@ let studyEntries = [];
 let studyRecallItemId = null;
 let studyRecallDraft = "";
 let studyPlanExtended = false;
+let studyCardStartedAt = null;
+let studySessionStartedAt = null;
+let studySessionTimerInterval = null;
 let toastTimer;
 let toastHideTimer;
 const DAY_MS = 86400000;
@@ -259,6 +262,38 @@ function studyDueLabel(value, now = new Date()) {
   return days === 1 ? "due tomorrow" : `due in ${days}d`;
 }
 
+function formatElapsed(seconds) {
+  const total = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(total / 60);
+  return `${minutes}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function formatDuration(seconds) {
+  if (seconds == null) return "";
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
+
+function updateStudySessionTimer() {
+  if (!studySessionStartedAt) return;
+  const timer = document.querySelector("#study-session-timer");
+  if (timer) timer.textContent = formatElapsed((Date.now() - studySessionStartedAt) / 1000);
+}
+
+function startStudySessionTimer() {
+  if (!studySessionStartedAt) studySessionStartedAt = Date.now();
+  updateStudySessionTimer();
+  if (studySessionTimerInterval) return;
+  studySessionTimerInterval = setInterval(updateStudySessionTimer, 1000);
+}
+
+function stopStudySessionTimer() {
+  if (!studySessionTimerInterval) return;
+  clearInterval(studySessionTimerInterval);
+  studySessionTimerInterval = null;
+}
+
 function populateStudyFilters(coverage) {
   const patternSelect = document.querySelector("#study-pattern-filter");
   const available = coverage.filter(({ count }) => count > 0).map(({ pattern }) => pattern);
@@ -336,6 +371,7 @@ function renderStudySession(entry, enabled, preferredIntervalDays) {
   if (!enabled) {
     studyRecallItemId = null;
     studyRecallDraft = "";
+    studyCardStartedAt = null;
     panel.innerHTML = '<div class="study-session-empty"><div class="eyebrow">Spaced repetition</div><h2>Scheduling is turned off.</h2><p>Your synced solutions are safe. Turn the setting back on when you want reviews to resurface.</p><button class="button" id="open-study-settings">Open settings</button></div>';
     panel.querySelector("#open-study-settings").addEventListener("click", () => send("OPEN_OPTIONS"));
     return;
@@ -343,6 +379,7 @@ function renderStudySession(entry, enabled, preferredIntervalDays) {
   if (!entry) {
     studyRecallItemId = null;
     studyRecallDraft = "";
+    studyCardStartedAt = null;
     const message = state.submissions.length ? "Choose a review from the queue when you’re ready." : "Sync your first Accepted solution to create a study session.";
     panel.innerHTML = `<div class="study-session-empty"><div class="eyebrow">Study session</div><h2>No active review</h2><p>${escapeHtml(message)}</p></div>`;
     return;
@@ -351,6 +388,7 @@ function renderStudySession(entry, enabled, preferredIntervalDays) {
   if (item.id !== studyRecallItemId) {
     studyRecallItemId = item.id;
     studyRecallDraft = "";
+    studyCardStartedAt = Date.now();
   }
   const review = reviewFor(item);
   const patterns = studyPatternsFor(item);
@@ -414,14 +452,16 @@ async function snoozeStudyReview(item, button) {
 
 async function rateStudyReview(item, rating, button) {
   setBusy(button, true, "Saving…");
+  const durationSeconds = studyCardStartedAt ? Math.round((Date.now() - studyCardStartedAt) / 1000) : null;
   try {
-    const response = await send("RATE_REVIEW", { id: item.id, rating, recall: studyRecallDraft });
+    const response = await send("RATE_REVIEW", { id: item.id, rating, recall: studyRecallDraft, durationSeconds });
     state.submissions = response.submissions || state.submissions;
     selectedStudyId = null;
     studyRevealed = false;
     render();
     const interval = formatStudyInterval(response.submission?.reviewIntervalDays || 1, rating === "good" ? state.settings.studyIntervalUnit : null);
-    showToast(`Review will resurface in ${interval}.`);
+    const timeNote = durationSeconds != null ? ` · reviewed in ${formatDuration(durationSeconds)}` : "";
+    showToast(`Review will resurface in ${interval}${timeNote}.`);
   } catch (error) {
     setBusy(button, false);
     showToast(error.message);
@@ -468,7 +508,7 @@ function renderStudy() {
   const planProgress = document.querySelector("#study-plan-progress");
   planProgress.hidden = !enabled || queue.planTotal === 0;
   if (!planProgress.hidden) {
-    planProgress.textContent = `${Math.min(queue.completedToday, queue.planTotal)} of ${queue.planTotal} planned for today`;
+    document.querySelector("#study-plan-progress-text").textContent = `${Math.min(queue.completedToday, queue.planTotal)} of ${queue.planTotal} planned for today`;
   }
   populateStudyFilters(coverage);
   document.querySelector("#study-pattern-filter").disabled = !enabled || !items.length;
@@ -491,6 +531,8 @@ function showView(view) {
     if (active) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   });
+  if (view === "study") startStudySessionTimer();
+  else stopStudySessionTimer();
 }
 
 function nextIndex(key, index, length) {

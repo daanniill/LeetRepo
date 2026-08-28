@@ -150,8 +150,8 @@ test("recordPush preserves an earned review schedule and event history when a so
     lastReviewedAt: "2026-08-18T00:00:00.000Z",
     lastReviewRating: "good",
     reviewEvents: [
-      { ratedAt: "2026-08-01T00:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" },
-      { ratedAt: "2026-08-18T00:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "" }
+      { ratedAt: "2026-08-01T00:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "", durationSeconds: null },
+      { ratedAt: "2026-08-18T00:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "", durationSeconds: null }
     ]
   };
   globalThis.chrome = createChromeMock({ local: { submissions: [existing] } });
@@ -174,8 +174,8 @@ test("PUSH_SUBMISSION preserves an earned review schedule and event history when
     reviewCount: 2, reviewIntervalDays: 14, reviewDueAt: "2026-09-01T00:00:00.000Z",
     lastReviewedAt: "2026-08-18T00:00:00.000Z", lastReviewRating: "good",
     reviewEvents: [
-      { ratedAt: "2026-08-01T00:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" },
-      { ratedAt: "2026-08-18T00:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "" }
+      { ratedAt: "2026-08-01T00:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "", durationSeconds: null },
+      { ratedAt: "2026-08-18T00:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "", durationSeconds: null }
     ]
   };
   const repository = mockRepository(t, existing);

@@ -92,13 +92,20 @@ test("completing and snoozing a review update only the intended study state", ()
 test("scheduling a review appends to review-event history instead of replacing it", () => {
   const first = scheduleReview({ id: "1-two-sum" }, "hard", new Date("2026-08-01T12:00:00.000Z"));
   assert.deepEqual(first.reviewEvents, [
-    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" }
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "", durationSeconds: null }
   ]);
-  const second = scheduleReview(first, "good", now);
+  const second = scheduleReview(first, "good", now, null, "", 95);
   assert.deepEqual(second.reviewEvents, [
-    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" },
-    { ratedAt: "2026-08-08T12:00:00.000Z", rating: "good", intervalDaysAfter: 7, recall: "" }
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "", durationSeconds: null },
+    { ratedAt: "2026-08-08T12:00:00.000Z", rating: "good", intervalDaysAfter: 7, recall: "", durationSeconds: 95 }
   ]);
+});
+
+test("scheduling a review records and bounds how long the recall took", () => {
+  assert.equal(scheduleReview({ id: "1-two-sum" }, "good", now, null, "", 42).reviewEvents[0].durationSeconds, 42);
+  assert.equal(scheduleReview({ id: "1-two-sum" }, "good", now, null, "", 10_000).reviewEvents[0].durationSeconds, 3_600, "duration is capped at one hour");
+  assert.equal(scheduleReview({ id: "1-two-sum" }, "good", now, null, "", -5).reviewEvents[0].durationSeconds, null, "a negative duration is treated as unmeasured");
+  assert.equal(scheduleReview({ id: "1-two-sum" }, "good", now).reviewEvents[0].durationSeconds, null);
 });
 
 test("scheduling a review records and bounds a written recall attempt", () => {

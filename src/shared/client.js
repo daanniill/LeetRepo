@@ -99,7 +99,7 @@ function demoResponse(type, payload) {
       if (item.id !== payload.id) return item;
       updatedSubmission = type === "SNOOZE_REVIEW"
         ? snoozeReview(item)
-        : scheduleReview(item, type === "MARK_REVIEWED" ? "good" : payload.rating, new Date(), studyIntervalDays(DEMO_SETTINGS), payload.recall);
+        : scheduleReview(item, type === "MARK_REVIEWED" ? "good" : payload.rating, new Date(), studyIntervalDays(DEMO_SETTINGS), payload.recall, payload.durationSeconds);
       return updatedSubmission;
     });
     return Promise.resolve({ submissions: DEMO_HISTORY, submission: updatedSubmission });
