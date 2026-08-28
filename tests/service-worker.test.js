@@ -150,8 +150,8 @@ test("recordPush preserves an earned review schedule and event history when a so
     lastReviewedAt: "2026-08-18T00:00:00.000Z",
     lastReviewRating: "good",
     reviewEvents: [
-      { ratedAt: "2026-08-01T00:00:00.000Z", rating: "hard", intervalDaysAfter: 3 },
-      { ratedAt: "2026-08-18T00:00:00.000Z", rating: "good", intervalDaysAfter: 14 }
+      { ratedAt: "2026-08-01T00:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" },
+      { ratedAt: "2026-08-18T00:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "" }
     ]
   };
   globalThis.chrome = createChromeMock({ local: { submissions: [existing] } });
@@ -174,8 +174,8 @@ test("PUSH_SUBMISSION preserves an earned review schedule and event history when
     reviewCount: 2, reviewIntervalDays: 14, reviewDueAt: "2026-09-01T00:00:00.000Z",
     lastReviewedAt: "2026-08-18T00:00:00.000Z", lastReviewRating: "good",
     reviewEvents: [
-      { ratedAt: "2026-08-01T00:00:00.000Z", rating: "hard", intervalDaysAfter: 3 },
-      { ratedAt: "2026-08-18T00:00:00.000Z", rating: "good", intervalDaysAfter: 14 }
+      { ratedAt: "2026-08-01T00:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" },
+      { ratedAt: "2026-08-18T00:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "" }
     ]
   };
   const repository = mockRepository(t, existing);
@@ -242,6 +242,20 @@ test("RATE_REVIEW advances the schedule and stores the event in the GitHub READM
   assert.equal(response.submission.reviewEvents.length, 1);
   assert.equal(repository.written().reviewCount, 1);
   assert.equal(repository.written().reviewEvents[0].rating, "good");
+});
+
+test("RATE_REVIEW persists a written recall attempt alongside the review event", async (t) => {
+  const repository = mockRepository(t, {
+    id: "1-two-sum", number: "1", title: "Two Sum", slug: "two-sum", language: "Python3",
+    code: "return [0, 1]", syncedAt: "2026-08-01T00:00:00.000Z", reviewCount: 0
+  });
+  globalThis.chrome = createChromeMock({
+    local: repositoryAuth(),
+    sync: { settings: onboardedSettings }
+  });
+  const response = await handle({ type: "RATE_REVIEW", id: "1-two-sum", rating: "good", recall: "  Hash map keyed by complement.  " });
+  assert.equal(response.submission.reviewEvents[0].recall, "Hash map keyed by complement.");
+  assert.equal(repository.written().reviewEvents[0].recall, "Hash map keyed by complement.");
 });
 
 test("GENERATE_FEEDBACK commits hosted AI feedback to the tagged GitHub README", async (t) => {

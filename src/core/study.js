@@ -104,12 +104,12 @@ export function nextReviewInterval(item = {}, rating, preferredIntervalDays = nu
   return reviewCount === 0 ? 14 : Math.min(90, Math.max(7, Math.ceil((current || 7) * 2)));
 }
 
-export function scheduleReview(item = {}, rating, now = new Date(), preferredIntervalDays = null) {
+export function scheduleReview(item = {}, rating, now = new Date(), preferredIntervalDays = null, recall = "") {
   const reviewedAt = validDate(now) || new Date();
   const intervalDays = nextReviewInterval(item, rating, preferredIntervalDays);
   const reviewEvents = [
     ...(Array.isArray(item.reviewEvents) ? item.reviewEvents : []),
-    { ratedAt: reviewedAt.toISOString(), rating, intervalDaysAfter: intervalDays }
+    { ratedAt: reviewedAt.toISOString(), rating, intervalDaysAfter: intervalDays, recall: String(recall || "").trim().slice(0, 2_000) }
   ].slice(-MAX_REVIEW_EVENTS);
   return {
     ...item,

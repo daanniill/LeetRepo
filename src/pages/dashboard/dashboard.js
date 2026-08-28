@@ -13,6 +13,8 @@ let studyDifficulty = "All";
 let selectedStudyId = null;
 let studyRevealed = false;
 let studyEntries = [];
+let studyRecallItemId = null;
+let studyRecallDraft = "";
 let toastTimer;
 let toastHideTimer;
 const DAY_MS = 86400000;
@@ -327,16 +329,24 @@ function renderStudyQueue(queue, enabled) {
 function renderStudySession(entry, enabled, preferredIntervalDays) {
   const panel = document.querySelector("#study-session");
   if (!enabled) {
+    studyRecallItemId = null;
+    studyRecallDraft = "";
     panel.innerHTML = '<div class="study-session-empty"><div class="eyebrow">Spaced repetition</div><h2>Scheduling is turned off.</h2><p>Your synced solutions are safe. Turn the setting back on when you want reviews to resurface.</p><button class="button" id="open-study-settings">Open settings</button></div>';
     panel.querySelector("#open-study-settings").addEventListener("click", () => send("OPEN_OPTIONS"));
     return;
   }
   if (!entry) {
+    studyRecallItemId = null;
+    studyRecallDraft = "";
     const message = state.submissions.length ? "Choose a review from the queue when you’re ready." : "Sync your first Accepted solution to create a study session.";
     panel.innerHTML = `<div class="study-session-empty"><div class="eyebrow">Study session</div><h2>No active review</h2><p>${escapeHtml(message)}</p></div>`;
     return;
   }
   const { item, dueAt } = entry;
+  if (item.id !== studyRecallItemId) {
+    studyRecallItemId = item.id;
+    studyRecallDraft = "";
+  }
   const review = reviewFor(item);
   const patterns = studyPatternsFor(item);
   const problemUrl = leetcodeProblemUrl(item);
@@ -350,6 +360,7 @@ function renderStudySession(entry, enabled, preferredIntervalDays) {
     <div class="study-session-meta"><span>${escapeHtml(studyDueLabel(dueAt))}</span>${patterns.map((pattern) => `<span>${escapeHtml(pattern)}</span>`).join("")}</div>
     ${studyRevealed ? `
       <article class="study-refresher">
+        ${studyRecallDraft ? `<div class="recall-response"><strong>Your recall</strong><p>${escapeHtml(studyRecallDraft)}</p></div>` : ""}
         <p class="study-summary">${escapeHtml(review.summary || "Reconstruct the approach, invariant, and complexity before opening the code.")}</p>
         ${review.complexity?.time ? `<div class="complexity-strip"><span><small>Time</small>${escapeHtml(review.complexity.time)}</span><span><small>Space</small>${escapeHtml(review.complexity.space)}</span></div>` : ""}
         ${steps.length ? `<h3>Approach replay</h3><ol class="review-steps">${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>` : ""}
@@ -368,12 +379,14 @@ function renderStudySession(entry, enabled, preferredIntervalDays) {
         <strong>Before looking at your solution:</strong>
         <ol><li>Describe the approach and its key invariant.</li><li>State the time and space complexity.</li><li>Name one edge case you would test.</li></ol>
       </div>
+      <label class="recall-input"><span>Write your recall attempt</span><textarea id="study-recall-input" rows="4" maxlength="2000" placeholder="Type what you remember before revealing…">${escapeHtml(studyRecallDraft)}</textarea></label>
       <button class="button full reveal-button" id="reveal-study-review">Reveal refresher</button>`}
     <div class="study-session-actions">
       ${studyTab === "due" ? `<button class="button ghost" id="snooze-study-review">Snooze 3 days</button>` : ""}
       ${problemUrl ? `<a class="button secondary" href="${escapeHtml(problemUrl)}" target="_blank" rel="noreferrer">Re-solve on LeetCode ↗</a>` : ""}
       ${studyRevealed && commitUrl ? `<a class="button secondary" href="${escapeHtml(commitUrl)}" target="_blank" rel="noreferrer">View on GitHub ↗</a>` : ""}
     </div>`;
+  panel.querySelector("#study-recall-input")?.addEventListener("input", (event) => { studyRecallDraft = event.target.value; });
   panel.querySelector("#reveal-study-review")?.addEventListener("click", () => { studyRevealed = true; renderStudy(); });
   panel.querySelector("#snooze-study-review")?.addEventListener("click", (event) => snoozeStudyReview(item, event.currentTarget));
   panel.querySelectorAll("[data-rating]").forEach((button) => button.addEventListener("click", () => rateStudyReview(item, button.dataset.rating, button)));
@@ -397,7 +410,7 @@ async function snoozeStudyReview(item, button) {
 async function rateStudyReview(item, rating, button) {
   setBusy(button, true, "Saving…");
   try {
-    const response = await send("RATE_REVIEW", { id: item.id, rating });
+    const response = await send("RATE_REVIEW", { id: item.id, rating, recall: studyRecallDraft });
     state.submissions = response.submissions || state.submissions;
     selectedStudyId = null;
     studyRevealed = false;

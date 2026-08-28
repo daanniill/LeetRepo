@@ -154,7 +154,7 @@ test("normalizeSubmission validates and bounds review-event history", () => {
   const item = normalizeSubmission({
     ...submission,
     reviewEvents: [
-      { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14 },
+      { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "  Used a hash map to track complements.  " },
       { ratedAt: "not-a-date", rating: "good", intervalDaysAfter: 14 },
       { ratedAt: "2026-08-02T12:00:00.000Z", rating: "invalid-rating", intervalDaysAfter: 14 },
       { ratedAt: "2026-08-03T12:00:00.000Z", rating: "hard", intervalDaysAfter: -1 },
@@ -162,7 +162,7 @@ test("normalizeSubmission validates and bounds review-event history", () => {
     ]
   });
   assert.deepEqual(item.reviewEvents, [
-    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14 }
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "Used a hash map to track complements." }
   ]);
   assert.deepEqual(normalizeSubmission(submission).reviewEvents, []);
 });
@@ -171,18 +171,18 @@ test("resyncing a re-pushed solution unions review-event history instead of drop
   const existing = {
     ...submission,
     reviewCount: 1,
-    reviewEvents: [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 }]
+    reviewEvents: [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" }]
   };
   const merged = mergeSubmissionSolutions(existing, { ...submission, code: "return 2;", syncedAt: "2026-08-07T10:00:00.000Z" });
-  assert.deepEqual(merged.reviewEvents, [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 }]);
+  assert.deepEqual(merged.reviewEvents, [{ ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" }]);
 
   const rereviewed = mergeSubmissionSolutions(merged, {
     ...submission,
-    reviewEvents: [{ ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14 }]
+    reviewEvents: [{ ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "Sliding window." }]
   });
   assert.deepEqual(rereviewed.reviewEvents, [
-    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 },
-    { ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14 }
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" },
+    { ratedAt: "2026-08-09T12:00:00.000Z", rating: "good", intervalDaysAfter: 14, recall: "Sliding window." }
   ]);
 });
 

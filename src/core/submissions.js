@@ -102,7 +102,12 @@ function normalizeReviewEvents(value) {
     if (!REVIEW_RATINGS.includes(event.rating)) return [];
     const intervalDaysAfter = Number(event.intervalDaysAfter);
     if (!Number.isFinite(intervalDaysAfter) || intervalDaysAfter <= 0) return [];
-    return [{ ratedAt: ratedAt.toISOString(), rating: event.rating, intervalDaysAfter: Math.floor(intervalDaysAfter) }];
+    return [{
+      ratedAt: ratedAt.toISOString(),
+      rating: event.rating,
+      intervalDaysAfter: Math.floor(intervalDaysAfter),
+      recall: boundedText(event.recall, 2_000)
+    }];
   }).slice(-MAX_REVIEW_EVENTS);
 }
 

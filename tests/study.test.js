@@ -90,13 +90,19 @@ test("completing and snoozing a review update only the intended study state", ()
 test("scheduling a review appends to review-event history instead of replacing it", () => {
   const first = scheduleReview({ id: "1-two-sum" }, "hard", new Date("2026-08-01T12:00:00.000Z"));
   assert.deepEqual(first.reviewEvents, [
-    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 }
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" }
   ]);
   const second = scheduleReview(first, "good", now);
   assert.deepEqual(second.reviewEvents, [
-    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3 },
-    { ratedAt: "2026-08-08T12:00:00.000Z", rating: "good", intervalDaysAfter: 7 }
+    { ratedAt: "2026-08-01T12:00:00.000Z", rating: "hard", intervalDaysAfter: 3, recall: "" },
+    { ratedAt: "2026-08-08T12:00:00.000Z", rating: "good", intervalDaysAfter: 7, recall: "" }
   ]);
+});
+
+test("scheduling a review records and bounds a written recall attempt", () => {
+  const reviewed = scheduleReview({ id: "1-two-sum" }, "good", now, null, `  ${"x".repeat(2_500)}  `);
+  assert.equal(reviewed.reviewEvents[0].recall.length, 2_000);
+  assert.equal(scheduleReview({ id: "1-two-sum" }, "good", now).reviewEvents[0].recall, "");
 });
 
 test("review-event history is capped so storage cannot grow without bound", () => {
