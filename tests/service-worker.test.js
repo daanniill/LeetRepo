@@ -167,6 +167,40 @@ test("recordPush preserves an earned review schedule and event history when a so
   assert.deepEqual(item.reviewEvents, existing.reviewEvents);
 });
 
+test("PUSH_SUBMISSION preserves an earned review schedule and event history when re-pushing to GitHub", async (t) => {
+  const existing = {
+    id: "1-two-sum", number: "1", title: "Two Sum", slug: "two-sum", language: "Python3",
+    code: "return [0, 1]", syncedAt: "2026-08-01T00:00:00.000Z",
+    reviewCount: 2, reviewIntervalDays: 14, reviewDueAt: "2026-09-01T00:00:00.000Z",
+    lastReviewedAt: "2026-08-18T00:00:00.000Z", lastReviewRating: "good",
+    reviewEvents: [
+      { ratedAt: "2026-08-01T00:00:00.000Z", rating: "hard", intervalDaysAfter: 3 },
+      { ratedAt: "2026-08-18T00:00:00.000Z", rating: "good", intervalDaysAfter: 14 }
+    ]
+  };
+  const repository = mockRepository(t, existing);
+  globalThis.chrome = createChromeMock({
+    local: repositoryAuth(),
+    sync: { settings: onboardedSettings }
+  });
+
+  const response = await handle({
+    type: "PUSH_SUBMISSION",
+    submission: {
+      number: "1", title: "Two Sum", slug: "two-sum", language: "Python3",
+      code: "return [0, 1]  # tidied comment", status: "Accepted", pushReady: true
+    }
+  });
+
+  assert.equal(response.submission.reviewDueAt, "2026-09-01T00:00:00.000Z", "re-pushing a solved problem must not reset an earned due date");
+  assert.equal(response.submission.reviewCount, 2);
+  assert.deepEqual(response.submission.reviewEvents, existing.reviewEvents);
+  const written = repository.written();
+  assert.equal(written.reviewDueAt, "2026-09-01T00:00:00.000Z", "the persisted GitHub README must also keep the earned due date");
+  assert.equal(written.reviewCount, 2);
+  assert.deepEqual(written.reviewEvents, existing.reviewEvents);
+});
+
 test("GET_STATE builds the dashboard library from GitHub READMEs instead of local solution records", async (t) => {
   const item = {
     id: "1-two-sum", number: "1", title: "Two Sum", slug: "two-sum", difficulty: "Easy",

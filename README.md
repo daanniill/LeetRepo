@@ -80,6 +80,10 @@ The free tier includes up to 3 requests per day and 30 per month. If AI notes ar
 
 Turning AI off does not affect solution syncing, previously committed feedback, local fallback feedback, or the GitHub-backed dashboard.
 
+## Known limitations
+
+- **Popup and dashboard loads call GitHub live.** Your library rebuilds from GitHub READMEs on every load instead of an instant local read, so opening the popup or dashboard takes noticeably longer with a large solved-problem history. Neither surface shows a loading indicator yet, so they can appear blank for a moment while data fetches. A cached or optimistic load is planned to smooth this out.
+
 ## Privacy and safety
 
 - You choose which repositories LeetRepo can access and can change that access later.
